@@ -62,15 +62,15 @@ export function ConfirmSubscriptionUpgradeModal({ open, onOpenChange }: ConfirmS
           <div className="p-3 bg-muted rounded-lg space-y-2">
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Current Plan:</span>
-              <span className="font-medium">Professional - $99/month</span>
+              <span className="font-medium">Professional - MWK 99/month</span>
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">New Plan:</span>
-              <span className="font-medium">Enterprise - $199/month</span>
+              <span className="font-medium">Enterprise - MWK 199/month</span>
             </div>
             <div className="flex justify-between pt-2 border-t">
               <span className="text-sm font-medium">Price Difference:</span>
-              <span className="font-bold text-green-600">+$100/month</span>
+              <span className="font-bold text-green-600">+MWK 100/month</span>
             </div>
           </div>
 

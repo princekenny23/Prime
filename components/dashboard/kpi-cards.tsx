@@ -60,7 +60,7 @@ export function KPICards({ data }: KPICardsProps) {
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
       <KPICard
         title="Today's Sales"
-        value={`$${data.sales.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+        value={`MWK ${data.sales.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
         change={data.sales.change}
         changeLabel="from yesterday"
         icon={<DollarSign className="h-4 w-4" />}
@@ -83,7 +83,7 @@ export function KPICards({ data }: KPICardsProps) {
       />
       <KPICard
         title="Expenses"
-        value={`$${data.expenses.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+        value={`MWK ${data.expenses.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
         change={data.expenses.change}
         changeLabel="this month"
         icon={<ArrowDownRight className="h-4 w-4" />}
@@ -91,7 +91,7 @@ export function KPICards({ data }: KPICardsProps) {
       />
       <KPICard
         title="Profit"
-        value={`$${data.profit.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+        value={`MWK ${data.profit.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
         change={data.profit.change}
         changeLabel="this month"
         icon={<ArrowUpRight className="h-4 w-4" />}

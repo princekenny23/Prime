@@ -61,7 +61,7 @@ export default function SalesPage() {
                     <TableCell>{new Date().toLocaleDateString()}</TableCell>
                     <TableCell>Customer {item}</TableCell>
                     <TableCell>{Math.floor(Math.random() * 10) + 1} items</TableCell>
-                    <TableCell>${(Math.random() * 1000 + 50).toFixed(2)}</TableCell>
+                    <TableCell>MWK {(Math.random() * 1000 + 50).toFixed(2)}</TableCell>
                     <TableCell>
                       <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
                         Completed

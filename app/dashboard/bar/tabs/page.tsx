@@ -108,7 +108,7 @@ export default function TabsPage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalOpen.toFixed(2)}</div>
+              <div className="text-2xl font-bold">MWK {totalOpen.toFixed(2)}</div>
             </CardContent>
           </Card>
 
@@ -181,7 +181,7 @@ export default function TabsPage() {
                     </TableCell>
                     <TableCell>{tab.items}</TableCell>
                     <TableCell className="font-semibold">
-                      ${tab.total.toFixed(2)}
+                      MWK {tab.total.toFixed(2)}
                     </TableCell>
                     <TableCell>
                       {tab.status === "Open" ? (

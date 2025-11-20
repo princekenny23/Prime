@@ -84,7 +84,7 @@ export function QuickAddSaleModal({ open, onOpenChange }: { open: boolean; onOpe
     // In production, this would call API
     toast({
       title: "Sale Completed",
-      description: `Sale of $${total.toFixed(2)} has been processed successfully.`,
+      description: `Sale of MWK ${total.toFixed(2)} has been processed successfully.`,
     })
     setCart([])
     setPaymentMethod("cash")

@@ -66,7 +66,7 @@ export function CartPanel({ cart, onUpdateQuantity, onRemove, onApplyDiscount, o
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{item.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      ${item.price.toFixed(2)} each
+                      MWK {item.price.toFixed(2)} each
                     </p>
                   </div>
                   <Button
@@ -102,7 +102,7 @@ export function CartPanel({ cart, onUpdateQuantity, onRemove, onApplyDiscount, o
                 {item.discount > 0 && (
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Discount:</span>
-                    <span className="text-green-600">-${item.discount.toFixed(2)}</span>
+                        <span className="text-green-600">-MWK {item.discount.toFixed(2)}</span>
                   </div>
                 )}
 
@@ -116,7 +116,7 @@ export function CartPanel({ cart, onUpdateQuantity, onRemove, onApplyDiscount, o
                     <Percent className="h-3 w-3 mr-1" />
                     Discount
                   </Button>
-                  <span className="font-semibold">${item.total.toFixed(2)}</span>
+                  <span className="font-semibold">MWK {item.total.toFixed(2)}</span>
                 </div>
               </div>
             ))}

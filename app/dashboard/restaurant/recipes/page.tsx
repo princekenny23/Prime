@@ -115,7 +115,7 @@ export default function RecipesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ${(recipes.reduce((sum, r) => sum + r.cost, 0) / recipes.length).toFixed(2)}
+                MWK {(recipes.reduce((sum, r) => sum + r.cost, 0) / recipes.length).toFixed(2)}
               </div>
             </CardContent>
           </Card>
@@ -179,7 +179,7 @@ export default function RecipesPage() {
                     <TableCell>{recipe.portions}</TableCell>
                     <TableCell>{recipe.ingredients}</TableCell>
                     <TableCell className="font-semibold">
-                      ${recipe.cost.toFixed(2)}
+                      MWK {recipe.cost.toFixed(2)}
                     </TableCell>
                     <TableCell>
                       {new Date(recipe.lastUpdated).toLocaleDateString()}

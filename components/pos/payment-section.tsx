@@ -29,21 +29,21 @@ export function PaymentSection({
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Subtotal</span>
-            <span>${subtotal.toFixed(2)}</span>
+            <span>MWK {subtotal.toFixed(2)}</span>
           </div>
           {discount > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Discount</span>
-              <span className="text-green-600">-${discount.toFixed(2)}</span>
+              <span className="text-green-600">-MWK {discount.toFixed(2)}</span>
             </div>
           )}
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Tax</span>
-            <span>${tax.toFixed(2)}</span>
+            <span>MWK {tax.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-lg font-bold pt-2 border-t">
             <span>Total</span>
-            <span>${total.toFixed(2)}</span>
+            <span>MWK {total.toFixed(2)}</span>
           </div>
         </div>
 

@@ -118,11 +118,11 @@ export default function ProductDetailPage() {
                 <CardContent className="space-y-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Cost</p>
-                    <p className="font-medium">${product.cost.toFixed(2)}</p>
+                    <p className="font-medium">MWK {product.cost.toFixed(2)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Price</p>
-                    <p className="font-medium">${product.price.toFixed(2)}</p>
+                    <p className="font-medium">MWK {product.price.toFixed(2)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Tax Rate</p>
@@ -219,8 +219,8 @@ export default function ProductDetailPage() {
                         <TableCell>{new Date(sale.date).toLocaleDateString()}</TableCell>
                         <TableCell>{sale.saleId}</TableCell>
                         <TableCell>{sale.quantity}</TableCell>
-                        <TableCell>${sale.price.toFixed(2)}</TableCell>
-                        <TableCell className="font-semibold">${sale.total.toFixed(2)}</TableCell>
+                        <TableCell>MWK {sale.price.toFixed(2)}</TableCell>
+                        <TableCell className="font-semibold">MWK {sale.total.toFixed(2)}</TableCell>
                         <TableCell>{sale.customer}</TableCell>
                       </TableRow>
                     ))}

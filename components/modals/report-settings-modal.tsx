@@ -32,7 +32,7 @@ export function ReportSettingsModal({ open, onOpenChange }: ReportSettingsModalP
   const [isSaving, setIsSaving] = useState(false)
   const [reportTitle, setReportTitle] = useState("")
   const [dateFormat, setDateFormat] = useState("mm/dd/yyyy")
-  const [currency, setCurrency] = useState("USD")
+  const [currency, setCurrency] = useState("MWK")
   const [decimalPlaces, setDecimalPlaces] = useState("2")
 
   const handleSave = async () => {
@@ -96,6 +96,7 @@ export function ReportSettingsModal({ open, onOpenChange }: ReportSettingsModalP
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="MWK">MWK (Malawian Kwacha)</SelectItem>
                   <SelectItem value="USD">USD ($)</SelectItem>
                   <SelectItem value="EUR">EUR (€)</SelectItem>
                   <SelectItem value="GBP">GBP (£)</SelectItem>

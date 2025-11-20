@@ -137,8 +137,8 @@ export default function ProductsPage() {
                     </TableCell>
                     <TableCell>{product.sku}</TableCell>
                     <TableCell>{product.category}</TableCell>
-                    <TableCell>${product.cost.toFixed(2)}</TableCell>
-                    <TableCell>${product.price.toFixed(2)}</TableCell>
+                    <TableCell>MWK {product.cost.toFixed(2)}</TableCell>
+                    <TableCell>MWK {product.price.toFixed(2)}</TableCell>
                     <TableCell>{product.stock}</TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded-full text-xs ${

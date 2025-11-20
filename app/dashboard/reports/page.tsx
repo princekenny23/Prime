@@ -31,7 +31,7 @@ export default function ReportsPage() {
               <div className="flex items-center gap-2">
                 <BarChart3 className="h-8 w-8 text-primary" />
                 <div>
-                  <p className="text-2xl font-bold">$45,231</p>
+                  <p className="text-2xl font-bold">MWK 45,231</p>
                   <p className="text-xs text-muted-foreground">This month</p>
                 </div>
               </div>
@@ -76,7 +76,7 @@ export default function ReportsPage() {
               <div className="flex items-center gap-2">
                 <BarChart3 className="h-8 w-8 text-primary" />
                 <div>
-                  <p className="text-2xl font-bold">$89,456</p>
+                  <p className="text-2xl font-bold">MWK 89,456</p>
                   <p className="text-xs text-muted-foreground">Total revenue</p>
                 </div>
               </div>

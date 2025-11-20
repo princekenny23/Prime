@@ -99,15 +99,15 @@ export function ReceiptPreviewModal({
                   <div className="flex-1">
                     <p className="font-medium">{item.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {item.quantity} x ${item.price.toFixed(2)}
+                      {item.quantity} x MWK {item.price.toFixed(2)}
                       {item.discount > 0 && (
                         <span className="text-green-600 ml-1">
-                          (-${item.discount.toFixed(2)})
+                          (-MWK {item.discount.toFixed(2)})
                         </span>
                       )}
                     </p>
                   </div>
-                  <p className="font-medium ml-2">${item.total.toFixed(2)}</p>
+                  <p className="font-medium ml-2">MWK {item.total.toFixed(2)}</p>
                 </div>
               </div>
             ))}
@@ -117,21 +117,21 @@ export function ReceiptPreviewModal({
           <div className="border-t border-dashed pt-3 space-y-1 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Subtotal:</span>
-              <span>${subtotal.toFixed(2)}</span>
+              <span>MWK {subtotal.toFixed(2)}</span>
             </div>
             {discount > 0 && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Discount:</span>
-                <span className="text-green-600">-${discount.toFixed(2)}</span>
+                <span className="text-green-600">-MWK {discount.toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Tax:</span>
-              <span>${tax.toFixed(2)}</span>
+              <span>MWK {tax.toFixed(2)}</span>
             </div>
             <div className="flex justify-between font-bold text-lg pt-2 border-t border-dashed">
               <span>Total:</span>
-              <span>${total.toFixed(2)}</span>
+              <span>MWK {total.toFixed(2)}</span>
             </div>
           </div>
 

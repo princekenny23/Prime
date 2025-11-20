@@ -134,7 +134,7 @@ export default function MenuPage() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">{item.description}</TableCell>
                     <TableCell className="font-semibold">
-                      ${item.price.toFixed(2)}
+                      MWK {item.price.toFixed(2)}
                     </TableCell>
                     <TableCell>
                       <Badge variant={item.available ? "default" : "secondary"}>

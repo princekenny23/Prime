@@ -204,7 +204,7 @@ export default function DiscountsPage() {
                         <TableCell className="font-semibold">
                           {discount.value}%
                         </TableCell>
-                        <TableCell>${discount.minPurchase}</TableCell>
+                        <TableCell>MWK {discount.minPurchase}</TableCell>
                         <TableCell>
                           {discount.usage} / {discount.limit === 0 ? "∞" : discount.limit}
                         </TableCell>

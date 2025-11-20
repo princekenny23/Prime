@@ -29,7 +29,7 @@ export function NotificationBell() {
       id: "1",
       type: "sale",
       title: "New Sale Completed",
-      message: "Sale #1001 completed for $125.50",
+      message: "Sale #1001 completed for MWK 125.50",
       timestamp: new Date().toISOString(),
       read: false,
       priority: "normal",

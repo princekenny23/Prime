@@ -136,7 +136,7 @@ export default function DrinksPage() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalValue.toFixed(2)}</div>
+              <div className="text-2xl font-bold">MWK {totalValue.toFixed(2)}</div>
             </CardContent>
           </Card>
 
@@ -200,10 +200,10 @@ export default function DrinksPage() {
                     </TableCell>
                     <TableCell>{drink.type} ({drink.size})</TableCell>
                     <TableCell className="font-semibold">
-                      ${drink.cost.toFixed(2)}
+                      MWK {drink.cost.toFixed(2)}
                     </TableCell>
                     <TableCell className="font-semibold">
-                      ${drink.price.toFixed(2)}
+                      MWK {drink.price.toFixed(2)}
                     </TableCell>
                     <TableCell>{drink.stock}</TableCell>
                     <TableCell>{drink.bottleToShot}:1</TableCell>

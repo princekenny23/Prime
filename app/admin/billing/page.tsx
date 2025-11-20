@@ -113,7 +113,7 @@ export default function AdminBillingPage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
+              <div className="text-2xl font-bold">MWK {totalRevenue.toFixed(2)}</div>
             </CardContent>
           </Card>
 
@@ -123,7 +123,7 @@ export default function AdminBillingPage() {
               <TrendingUp className="h-4 w-4 text-yellow-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">${pendingAmount.toFixed(2)}</div>
+              <div className="text-2xl font-bold text-yellow-600">MWK {pendingAmount.toFixed(2)}</div>
             </CardContent>
           </Card>
 
@@ -202,7 +202,7 @@ export default function AdminBillingPage() {
                           <Badge variant="outline">{record.plan}</Badge>
                         </TableCell>
                         <TableCell className="font-semibold">
-                          ${record.amount.toFixed(2)}
+                          MWK {record.amount.toFixed(2)}
                         </TableCell>
                         <TableCell>
                           <Badge className={getStatusColor(record.status)}>

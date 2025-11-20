@@ -78,7 +78,7 @@ export default function CustomerDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ${customer.totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                MWK {customer.totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </CardContent>
           </Card>
@@ -169,7 +169,7 @@ export default function CustomerDetailPage() {
                   <div>
                     <p className="text-sm text-muted-foreground">Lifetime Value</p>
                     <p className="font-medium text-xl">
-                      ${customer.totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      MWK {customer.totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   </div>
                 </CardContent>
@@ -206,7 +206,7 @@ export default function CustomerDetailPage() {
                         <TableCell className="font-medium">{purchase.saleId}</TableCell>
                         <TableCell>{purchase.items} items</TableCell>
                         <TableCell className="font-semibold">
-                          ${purchase.total.toFixed(2)}
+                          MWK {purchase.total.toFixed(2)}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">

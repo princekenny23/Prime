@@ -91,7 +91,7 @@ export default function InventoryPage() {
                     <TableCell>SKU-{1000 + item}</TableCell>
                     <TableCell>Category {item % 3 + 1}</TableCell>
                     <TableCell>{Math.floor(Math.random() * 100)}</TableCell>
-                    <TableCell>${(Math.random() * 100 + 10).toFixed(2)}</TableCell>
+                    <TableCell>MWK {(Math.random() * 100 + 10).toFixed(2)}</TableCell>
                     <TableCell>
                       <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
                         In Stock

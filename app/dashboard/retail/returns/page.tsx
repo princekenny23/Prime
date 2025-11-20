@@ -111,7 +111,7 @@ export default function ReturnsPage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalAmount.toFixed(2)}</div>
+              <div className="text-2xl font-bold">MWK {totalAmount.toFixed(2)}</div>
             </CardContent>
           </Card>
 
@@ -175,7 +175,7 @@ export default function ReturnsPage() {
                     </TableCell>
                     <TableCell>{returnItem.items}</TableCell>
                     <TableCell className="font-semibold">
-                      ${returnItem.amount.toFixed(2)}
+                      MWK {returnItem.amount.toFixed(2)}
                     </TableCell>
                     <TableCell>{returnItem.reason}</TableCell>
                     <TableCell>

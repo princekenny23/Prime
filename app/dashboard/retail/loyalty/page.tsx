@@ -198,7 +198,7 @@ export default function LoyaltyPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="font-semibold">
-                      ${customer.totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      MWK {customer.totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell>
                       <Button

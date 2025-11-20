@@ -103,7 +103,7 @@ export function EditPlanModal({ open, onOpenChange, plan }: EditPlanModalProps) 
           <div className="space-y-2">
             <Label htmlFor="price">Price *</Label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">$</span>
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">MWK</span>
               <Input
                 id="price"
                 type="number"

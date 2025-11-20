@@ -127,7 +127,7 @@ export default function AdminPlansPage() {
                 </div>
                 <CardDescription>
                   <div className="flex items-baseline gap-1 mt-2">
-                    <span className="text-3xl font-bold">${plan.price.toFixed(2)}</span>
+                    <span className="text-3xl font-bold">MWK {plan.price.toFixed(2)}</span>
                     <span className="text-sm text-muted-foreground">/{plan.billingCycle}</span>
                   </div>
                 </CardDescription>

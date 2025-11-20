@@ -23,7 +23,7 @@ export function ActivityLogSidebar() {
       action: "New Sale",
       user: "John Doe",
       timestamp: new Date().toISOString(),
-      details: "Sale #1001 - $125.50",
+      details: "Sale #1001 - MWK 125.50",
     },
     {
       id: "2",
@@ -47,7 +47,7 @@ export function ActivityLogSidebar() {
       action: "Sale Completed",
       user: "John Doe",
       timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-      details: "Sale #1000 - $89.99",
+      details: "Sale #1000 - MWK 89.99",
     },
     {
       id: "5",

@@ -44,7 +44,7 @@ export function PaymentModal({ open, onOpenChange, total, onComplete }: PaymentM
       setIsProcessing(false)
       toast({
         title: "Payment Successful",
-        description: `Payment of $${total.toFixed(2)} processed successfully.`,
+        description: `Payment of MWK ${total.toFixed(2)} processed successfully.`,
       })
       onComplete()
     }, 1500)
@@ -65,7 +65,7 @@ export function PaymentModal({ open, onOpenChange, total, onComplete }: PaymentM
         <div className="space-y-4 py-4">
           <div className="text-center p-4 bg-muted rounded-lg">
             <p className="text-sm text-muted-foreground">Total Amount</p>
-            <p className="text-3xl font-bold">${total.toFixed(2)}</p>
+            <p className="text-3xl font-bold">MWK {total.toFixed(2)}</p>
           </div>
 
           <Tabs value={paymentMethod} onValueChange={setPaymentMethod}>
@@ -99,7 +99,7 @@ export function PaymentModal({ open, onOpenChange, total, onComplete }: PaymentM
               {amount && parseFloat(amount) >= total && (
                 <div className="p-3 bg-green-50 dark:bg-green-950 rounded-lg">
                   <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                    Change: ${change.toFixed(2)}
+                    Change: MWK {change.toFixed(2)}
                   </p>
                 </div>
               )}

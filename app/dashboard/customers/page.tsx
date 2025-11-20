@@ -133,7 +133,7 @@ export default function CustomersPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ${customers.reduce((sum, c) => sum + c.totalSpent, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                MWK {customers.reduce((sum, c) => sum + c.totalSpent, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </CardContent>
           </Card>
@@ -241,7 +241,7 @@ export default function CustomersPage() {
                       </div>
                     </TableCell>
                     <TableCell className="font-semibold">
-                      ${customer.totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      MWK {customer.totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">

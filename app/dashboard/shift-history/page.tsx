@@ -209,7 +209,7 @@ export default function ShiftHistoryPage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalSales.toFixed(2)}</div>
+              <div className="text-2xl font-bold">MWK {totalSales.toFixed(2)}</div>
               <p className="text-xs text-muted-foreground">
                 From closed shifts
               </p>
@@ -238,7 +238,7 @@ export default function ShiftHistoryPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ${closedShifts > 0 ? (totalSales / closedShifts).toFixed(2) : "0.00"}
+                MWK {closedShifts > 0 ? (totalSales / closedShifts).toFixed(2) : "0.00"}
               </div>
               <p className="text-xs text-muted-foreground">
                 Per closed shift
@@ -354,13 +354,13 @@ export default function ShiftHistoryPage() {
                           <TableCell>{getOutletName(shift.outletId)}</TableCell>
                           <TableCell>{getTillName(shift.tillId)}</TableCell>
                           <TableCell>{duration}</TableCell>
-                          <TableCell>${(shift.openingCashBalance || 0).toFixed(2)}</TableCell>
+                          <TableCell>MWK {(shift.openingCashBalance || 0).toFixed(2)}</TableCell>
                           <TableCell>
-                            {shift.closingCashBalance ? `$${shift.closingCashBalance.toFixed(2)}` : "N/A"}
+                            {shift.closingCashBalance ? `MWK ${shift.closingCashBalance.toFixed(2)}` : "N/A"}
                           </TableCell>
                           <TableCell>
                             {shift.status === "CLOSED" ? (
-                              <span className="font-medium">${sales.toFixed(2)}</span>
+                              <span className="font-medium">MWK {sales.toFixed(2)}</span>
                             ) : (
                               <span className="text-muted-foreground">-</span>
                             )}
@@ -384,7 +384,7 @@ export default function ShiftHistoryPage() {
                                       : "text-muted-foreground"
                                   }
                                 >
-                                  ${Math.abs(difference).toFixed(2)}
+                                  MWK {Math.abs(difference).toFixed(2)}
                                 </span>
                               </div>
                             ) : (

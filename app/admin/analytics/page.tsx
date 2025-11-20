@@ -63,7 +63,7 @@ export default function AdminAnalyticsPage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalRevenue.toLocaleString()}</div>
+              <div className="text-2xl font-bold">MWK {totalRevenue.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">
                 All time
               </p>
@@ -76,7 +76,7 @@ export default function AdminAnalyticsPage() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${monthlyRecurringRevenue.toLocaleString()}</div>
+              <div className="text-2xl font-bold">MWK {monthlyRecurringRevenue.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">
                 Monthly recurring
               </p>

@@ -52,7 +52,7 @@ export default function ProfitLossReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                ${revenue.toLocaleString('en-US')}
+                MWK {revenue.toLocaleString('en-US')}
               </div>
               <p className="text-xs text-muted-foreground">+12.5% from last period</p>
             </CardContent>
@@ -65,7 +65,7 @@ export default function ProfitLossReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">
-                ${cogs.toLocaleString('en-US')}
+                MWK {cogs.toLocaleString('en-US')}
               </div>
               <p className="text-xs text-muted-foreground">60% of revenue</p>
             </CardContent>
@@ -78,7 +78,7 @@ export default function ProfitLossReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-600">
-                ${grossProfit.toLocaleString('en-US')}
+                MWK {grossProfit.toLocaleString('en-US')}
               </div>
               <p className="text-xs text-muted-foreground">40% margin</p>
             </CardContent>
@@ -91,7 +91,7 @@ export default function ProfitLossReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                ${netProfit.toLocaleString('en-US')}
+                MWK {netProfit.toLocaleString('en-US')}
               </div>
               <p className="text-xs text-muted-foreground">{profitMargin.toFixed(1)}% margin</p>
             </CardContent>
@@ -109,27 +109,27 @@ export default function ProfitLossReportsPage() {
               <div className="flex justify-between items-center py-2 border-b">
                 <span className="font-medium">Revenue</span>
                 <span className="font-semibold text-green-600">
-                  ${revenue.toLocaleString('en-US')}
+                  MWK {revenue.toLocaleString('en-US')}
                 </span>
               </div>
               <div className="flex justify-between items-center py-2 border-b">
                 <span className="text-muted-foreground ml-4">Cost of Goods Sold</span>
-                <span className="text-red-600">-${cogs.toLocaleString('en-US')}</span>
+                <span className="text-red-600">-MWK {cogs.toLocaleString('en-US')}</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b-2 border-primary">
                 <span className="font-medium">Gross Profit</span>
                 <span className="font-semibold text-blue-600">
-                  ${grossProfit.toLocaleString('en-US')}
+                  MWK {grossProfit.toLocaleString('en-US')}
                 </span>
               </div>
               <div className="flex justify-between items-center py-2 border-b">
                 <span className="text-muted-foreground ml-4">Operating Expenses</span>
-                <span className="text-red-600">-${expenses.toLocaleString('en-US')}</span>
+                <span className="text-red-600">-MWK {expenses.toLocaleString('en-US')}</span>
               </div>
               <div className="flex justify-between items-center py-2 border-t-2 border-primary">
                 <span className="font-bold text-lg">Net Profit</span>
                 <span className="font-bold text-lg text-green-600">
-                  ${netProfit.toLocaleString('en-US')}
+                  MWK {netProfit.toLocaleString('en-US')}
                 </span>
               </div>
             </div>

@@ -143,7 +143,7 @@ export default function OrdersPage() {
               <Receipt className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
+              <div className="text-2xl font-bold">MWK {totalRevenue.toFixed(2)}</div>
             </CardContent>
           </Card>
 
@@ -217,7 +217,7 @@ export default function OrdersPage() {
                         </TableCell>
                         <TableCell>{order.items}</TableCell>
                         <TableCell className="font-semibold">
-                          ${order.total.toFixed(2)}
+                          MWK {order.total.toFixed(2)}
                         </TableCell>
                         <TableCell>
                           <Badge className={getStatusColor(order.status)}>

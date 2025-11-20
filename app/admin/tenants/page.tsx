@@ -150,7 +150,7 @@ export default function AdminTenantsPage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalRevenue.toLocaleString()}</div>
+              <div className="text-2xl font-bold">MWK {totalRevenue.toLocaleString()}</div>
             </CardContent>
           </Card>
 
@@ -227,7 +227,7 @@ export default function AdminTenantsPage() {
                         <TableCell>{tenant.users}</TableCell>
                         <TableCell>{tenant.outlets}</TableCell>
                         <TableCell className="font-semibold">
-                          ${tenant.revenue.toLocaleString()}
+                          MWK {tenant.revenue.toLocaleString()}
                         </TableCell>
                         <TableCell>
                           {new Date(tenant.joined).toLocaleDateString()}

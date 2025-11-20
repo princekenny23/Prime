@@ -69,7 +69,7 @@ export default function ReceivingPage() {
                     <TableCell>{new Date(order.date).toLocaleDateString()}</TableCell>
                     <TableCell className="font-medium">{order.supplier}</TableCell>
                     <TableCell>{order.products} items</TableCell>
-                    <TableCell>${order.total.toFixed(2)}</TableCell>
+                    <TableCell>MWK {order.total.toFixed(2)}</TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded-full text-xs ${
                         order.status === "received"

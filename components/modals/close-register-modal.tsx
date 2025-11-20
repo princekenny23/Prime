@@ -138,21 +138,21 @@ export function CloseRegisterModal({ open, onOpenChange }: CloseRegisterModalPro
                 Opening Cash
               </span>
               <span className="font-medium">
-                ${(activeShift.openingCashBalance || 0).toFixed(2)}
+                MWK {(activeShift.openingCashBalance || 0).toFixed(2)}
               </span>
             </div>
             {activeShift.floatingCash > 0 && (
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Floating Cash</span>
                 <span className="font-medium">
-                  ${activeShift.floatingCash.toFixed(2)}
+                  MWK {activeShift.floatingCash.toFixed(2)}
                 </span>
               </div>
             )}
             <div className="flex items-center justify-between text-sm pt-2 border-t">
               <span className="text-muted-foreground">Total Available</span>
               <span className="font-semibold">
-                ${((activeShift.openingCashBalance || 0) + (activeShift.floatingCash || 0)).toFixed(2)}
+                MWK {((activeShift.openingCashBalance || 0) + (activeShift.floatingCash || 0)).toFixed(2)}
               </span>
             </div>
           </div>
@@ -198,7 +198,7 @@ export function CloseRegisterModal({ open, onOpenChange }: CloseRegisterModalPro
                   )}
                 >
                   {calculateDifference() >= 0 ? "+" : ""}
-                  ${calculateDifference().toFixed(2)}
+                  MWK {calculateDifference().toFixed(2)}
                 </span>
               </div>
               {calculateDifference() !== 0 && (
