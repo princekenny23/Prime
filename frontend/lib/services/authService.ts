@@ -1,0 +1,135 @@
+import { api, apiEndpoints } from "@/lib/api"
+import type { User } from "@/lib/types/mock-data"
+
+export interface LoginResponse {
+  access: string
+  refresh: string
+  user: User | any  // Allow any to handle backend response structure
+}
+
+export interface RegisterData {
+  email: string
+  username: string
+  name: string
+  password: string
+  password_confirm: string
+  phone?: string
+  role?: string
+}
+
+export const authService = {
+  async login(email: string, password: string): Promise<LoginResponse> {
+    try {
+      console.log("Attempting login to:", apiEndpoints.auth.login)
+      const response = await api.post<LoginResponse>(apiEndpoints.auth.login, {
+        email,
+        password,
+      })
+      
+      console.log("Login response received:", { 
+        hasAccess: !!response.access, 
+        hasRefresh: !!response.refresh,
+        hasUser: !!response.user 
+      })
+      
+      // Store tokens
+      if (typeof window !== "undefined") {
+        localStorage.setItem("authToken", response.access)
+        localStorage.setItem("refreshToken", response.refresh)
+        console.log("Tokens stored in localStorage")
+      }
+      
+      // Transform backend user data to match frontend User type
+      const user = response.user ? {
+        id: String(response.user.id),
+        email: response.user.email,
+        name: response.user.name || response.user.username || response.user.email.split('@')[0],
+        role: response.user.role || 'admin',
+        businessId: response.user.tenant ? String(response.user.tenant.id) : '',
+        outletIds: [],
+        createdAt: response.user.date_joined || new Date().toISOString(),
+        is_saas_admin: response.user.is_saas_admin || false,
+        tenant: response.user.tenant,
+      } : null
+      
+      console.log("User transformed:", { id: user?.id, email: user?.email, is_saas_admin: user?.is_saas_admin })
+      
+      return {
+        ...response,
+        user: user as any
+      }
+    } catch (error: any) {
+      console.error("Login API error details:", {
+        message: error.message,
+        stack: error.stack,
+        // Don't log credentials
+      })
+      throw new Error(error.message || "Login failed. Please check your credentials and ensure the backend server is running.")
+    }
+  },
+
+  async register(data: RegisterData): Promise<LoginResponse> {
+    const response = await api.post<LoginResponse>(apiEndpoints.auth.register, data)
+    
+    // Store tokens
+    if (typeof window !== "undefined") {
+      localStorage.setItem("authToken", response.access)
+      localStorage.setItem("refreshToken", response.refresh)
+    }
+    
+    return response
+  },
+
+  async refreshToken(): Promise<{ access: string }> {
+    const refreshToken = typeof window !== "undefined" 
+      ? localStorage.getItem("refreshToken") 
+      : null
+    
+    if (!refreshToken) {
+      throw new Error("No refresh token available")
+    }
+    
+    const response = await api.post<{ access: string }>(apiEndpoints.auth.refresh, {
+      refresh: refreshToken,
+    })
+    
+    // Update access token
+    if (typeof window !== "undefined") {
+      localStorage.setItem("authToken", response.access)
+    }
+    
+    return response
+  },
+
+  async logout(): Promise<void> {
+    try {
+      await api.post(apiEndpoints.auth.logout, {})
+    } catch (error) {
+      // Continue with logout even if API call fails
+      console.error("Logout API error:", error)
+    } finally {
+      // Clear tokens
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("authToken")
+        localStorage.removeItem("refreshToken")
+      }
+    }
+  },
+
+  async getCurrentUser(): Promise<User> {
+    const response = await api.get<any>(apiEndpoints.auth.me)
+    // Transform backend user data to match frontend User type
+    return {
+      id: String(response.id),
+      email: response.email,
+      name: response.name || response.username || response.email.split('@')[0],
+      role: response.role || 'admin',
+      businessId: response.tenant ? String(response.tenant.id) : '',
+      outletIds: [],
+      createdAt: response.date_joined || new Date().toISOString(),
+      is_saas_admin: response.is_saas_admin || false,
+      tenant: response.tenant,
+    } as User
+  },
+}
+

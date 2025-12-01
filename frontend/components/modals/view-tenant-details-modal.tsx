@@ -1,0 +1,205 @@
+"use client"
+
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Building2, Users, DollarSign, Calendar, Mail, Phone } from "lucide-react"
+
+interface ViewTenantDetailsModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  tenant?: any
+}
+
+export function ViewTenantDetailsModal({ open, onOpenChange, tenant }: ViewTenantDetailsModalProps) {
+  if (!tenant) return null
+
+  // Transform tenant data with safe defaults
+  const tenantDetails = {
+    ...tenant,
+    phone: tenant.phone || "N/A",
+    address: tenant.address || "N/A",
+    taxId: tenant.tax_id || "N/A",
+    registrationDate: tenant.created_at || tenant.joined || new Date().toISOString(),
+    subscriptionEnd: tenant.subscription_end || null,
+    plan: tenant.plan || "N/A",
+    status: tenant.is_active ? "Active" : "Suspended",
+    revenue: tenant.revenue || 0,
+    outlets: tenant.outlets || [],
+    users: tenant.users || [],
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            Tenant Details - {tenant.name}
+          </DialogTitle>
+          <DialogDescription>
+            Complete information about this tenant
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-6 py-4">
+          {/* Basic Information */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Basic Information</h3>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Business Name</p>
+                <p className="font-medium">{tenantDetails.name}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Email</p>
+                <p className="font-medium flex items-center gap-2">
+                  <Mail className="h-3 w-3" />
+                  {tenantDetails.email}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Phone</p>
+                <p className="font-medium flex items-center gap-2">
+                  <Phone className="h-3 w-3" />
+                  {tenantDetails.phone}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Address</p>
+                <p className="font-medium">{tenantDetails.address}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Tax ID</p>
+                <p className="font-medium">{tenantDetails.taxId}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Status</p>
+                <Badge variant={tenantDetails.status === "Active" ? "default" : "destructive"}>
+                  {tenantDetails.status}
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          {/* Subscription Information */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Subscription</h3>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Plan</p>
+                <Badge variant="outline">{tenantDetails.plan}</Badge>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Registration Date</p>
+                <p className="font-medium flex items-center gap-2">
+                  <Calendar className="h-3 w-3" />
+                  {new Date(tenantDetails.registrationDate).toLocaleDateString()}
+                </p>
+              </div>
+              {tenantDetails.subscriptionEnd && (
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Subscription End</p>
+                  <p className="font-medium">
+                    {new Date(tenantDetails.subscriptionEnd).toLocaleDateString()}
+                  </p>
+                </div>
+              )}
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Total Revenue</p>
+                <p className="font-medium flex items-center gap-2">
+                  <DollarSign className="h-3 w-3" />
+                  MWK {(tenantDetails.revenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Outlets */}
+          {tenantDetails.outlets && tenantDetails.outlets.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="font-semibold text-lg">Outlets</h3>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tenantDetails.outlets.map((outlet: any) => (
+                    <TableRow key={outlet.id}>
+                      <TableCell className="font-medium">{outlet.name}</TableCell>
+                      <TableCell>{outlet.location || outlet.address || "N/A"}</TableCell>
+                      <TableCell>
+                        <Badge variant={outlet.status === "Active" || outlet.is_active ? "default" : "secondary"}>
+                          {outlet.status || (outlet.is_active ? "Active" : "Inactive")}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {/* Users */}
+          {tenantDetails.users && tenantDetails.users.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="font-semibold text-lg">Users</h3>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tenantDetails.users.map((user: any) => (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">{user.name}</TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{user.role}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          
+          {(!tenantDetails.outlets || tenantDetails.outlets.length === 0) && 
+           (!tenantDetails.users || tenantDetails.users.length === 0) && (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>No additional details available</p>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end">
+          <Button onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+

@@ -1,0 +1,254 @@
+"use client"
+
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react"
+import { shiftService } from "@/lib/services/shiftService"
+import { outletService } from "@/lib/services/outletService"
+import { useBusinessStore } from "@/stores/businessStore"
+import { useRealAPI } from "@/lib/utils/api-config"
+
+export interface Till {
+  id: string
+  name: string
+  outletId: string
+  isActive: boolean
+  isInUse?: boolean
+}
+
+export interface Shift {
+  id: string
+  outletId: string
+  tillId: string
+  userId: string
+  operatingDate: string // ISO date string
+  openingCashBalance: number
+  floatingCash: number
+  notes?: string
+  status: "OPEN" | "CLOSED"
+  startTime: string // ISO timestamp
+  endTime?: string // ISO timestamp
+  closingCashBalance?: number
+}
+
+interface ShiftContextType {
+  activeShift: Shift | null
+  shiftHistory: Shift[]
+  setActiveShift: (shift: Shift | null) => void
+  startShift: (shiftData: Omit<Shift, "id" | "status" | "startTime" | "endTime">) => Promise<Shift>
+  closeShift: (closingCashBalance: number) => Promise<void>
+  isLoading: boolean
+  getTillsForOutlet: (outletId: string) => Promise<Till[]>
+  checkShiftExists: (outletId: string, tillId: string, date: string) => Promise<boolean>
+}
+
+const ShiftContext = createContext<ShiftContextType | undefined>(undefined)
+
+export function ShiftProvider({ children }: { children: ReactNode }) {
+  const { currentOutlet } = useBusinessStore()
+  const [activeShift, setActiveShiftState] = useState<Shift | null>(null)
+  const [shiftHistory, setShiftHistory] = useState<Shift[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Load active shift and history on mount
+  useEffect(() => {
+    const loadShifts = async () => {
+      setIsLoading(true)
+      try {
+        if (useRealAPI() && currentOutlet) {
+          // Use real API
+          try {
+            const active = await shiftService.getActive(currentOutlet.id)
+            setActiveShiftState(active)
+          } catch (error: any) {
+            // No active shift found is OK
+            if (!error.message?.includes("404") && !error.message?.includes("No active shift")) {
+              console.error("Error loading active shift:", error)
+            }
+          }
+          
+          // Load shift history
+          try {
+            const history = await shiftService.getHistory({ outlet: currentOutlet.id })
+            setShiftHistory(history)
+          } catch (error) {
+            console.error("Error loading shift history:", error)
+          }
+        } else {
+          // Fallback to localStorage for simulation mode
+          const stored = localStorage.getItem("activeShift")
+          if (stored) {
+            const shift = JSON.parse(stored) as Shift
+            if (shift.status === "OPEN") {
+              setActiveShiftState(shift)
+            } else {
+              localStorage.removeItem("activeShift")
+            }
+          }
+
+          const historyStored = localStorage.getItem("shiftHistory")
+          if (historyStored) {
+            const history = JSON.parse(historyStored) as Shift[]
+            setShiftHistory(history)
+          }
+        }
+      } catch (error) {
+        console.error("Error loading shifts:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadShifts()
+  }, [currentOutlet])
+
+  // Save active shift to localStorage whenever it changes
+  useEffect(() => {
+    if (activeShift) {
+      localStorage.setItem("activeShift", JSON.stringify(activeShift))
+    } else {
+      localStorage.removeItem("activeShift")
+    }
+  }, [activeShift])
+
+  const setActiveShift = (shift: Shift | null) => {
+    setActiveShiftState(shift)
+  }
+
+  const startShift = async (
+    shiftData: Omit<Shift, "id" | "status" | "startTime" | "endTime">
+  ): Promise<Shift> => {
+    if (useRealAPI()) {
+      // Use real API
+      const newShift = await shiftService.start({
+        outlet_id: shiftData.outletId,
+        till_id: shiftData.tillId,
+        operating_date: shiftData.operatingDate,
+        opening_cash_balance: shiftData.openingCashBalance,
+        floating_cash: shiftData.floatingCash,
+        notes: shiftData.notes,
+      })
+      setActiveShiftState(newShift)
+      return newShift
+    } else {
+      // Simulation mode - use localStorage
+      const exists = await checkShiftExists(shiftData.outletId, shiftData.tillId, shiftData.operatingDate)
+      if (exists) {
+        throw new Error("A shift already exists for this outlet, date, and till combination.")
+      }
+
+      const tills = await getTillsForOutlet(shiftData.outletId)
+      const till = tills.find(t => t.id === shiftData.tillId)
+      if (till?.isInUse) {
+        throw new Error("This till is currently in use. Please select another till.")
+      }
+
+      const newShift: Shift = {
+        ...shiftData,
+        id: `shift-${Date.now()}`,
+        status: "OPEN",
+        startTime: new Date().toISOString(),
+      }
+
+      setActiveShiftState(newShift)
+      return newShift
+    }
+  }
+
+  const closeShift = async (closingCashBalance: number): Promise<void> => {
+    if (!activeShift) {
+      throw new Error("No active shift to close")
+    }
+
+    if (useRealAPI()) {
+      // Use real API
+      await shiftService.close(activeShift.id, closingCashBalance)
+      setActiveShiftState(null)
+      
+      // Reload history
+      if (currentOutlet) {
+        try {
+          const history = await shiftService.getHistory({ outlet: currentOutlet.id })
+          setShiftHistory(history)
+        } catch (error) {
+          console.error("Error reloading shift history:", error)
+        }
+      }
+    } else {
+      // Simulation mode
+      const closedShift: Shift = {
+        ...activeShift,
+        status: "CLOSED",
+        endTime: new Date().toISOString(),
+        closingCashBalance,
+      }
+
+      const updatedHistory = [closedShift, ...shiftHistory].slice(0, 100)
+      setShiftHistory(updatedHistory)
+      localStorage.setItem("shiftHistory", JSON.stringify(updatedHistory))
+      setActiveShiftState(null)
+    }
+  }
+
+  const getTillsForOutlet = async (outletId: string): Promise<Till[]> => {
+    if (useRealAPI()) {
+      try {
+        return await outletService.getTills(outletId)
+      } catch (error) {
+        console.error("Error loading tills:", error)
+        return []
+      }
+    } else {
+      // Simulation mode - return empty array (tills should be created via API)
+      return []
+    }
+  }
+
+  const checkShiftExists = async (outletId: string, tillId: string, date: string): Promise<boolean> => {
+    if (useRealAPI()) {
+      try {
+        return await shiftService.checkExists(outletId, tillId, date)
+      } catch (error) {
+        console.error("Error checking shift existence:", error)
+        return false
+      }
+    } else {
+      // Simulation mode - check localStorage
+      try {
+        const stored = localStorage.getItem("activeShift")
+        if (stored) {
+          const shift = JSON.parse(stored) as Shift
+          return (
+            shift.outletId === outletId &&
+            shift.tillId === tillId &&
+            shift.operatingDate === date &&
+            shift.status === "OPEN"
+          )
+        }
+      } catch (error) {
+        console.error("Error checking shift existence:", error)
+      }
+      return false
+    }
+  }
+
+  const value: ShiftContextType = {
+    activeShift,
+    shiftHistory,
+    setActiveShift,
+    startShift,
+    closeShift,
+    isLoading,
+    getTillsForOutlet,
+    checkShiftExists,
+  }
+
+  return <ShiftContext.Provider value={value}>{children}</ShiftContext.Provider>
+}
+
+export function useShift() {
+  const context = useContext(ShiftContext)
+  if (context === undefined) {
+    throw new Error("useShift must be used within a ShiftProvider")
+  }
+  return context
+}
+

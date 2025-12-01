@@ -1,0 +1,116 @@
+Create an Excel template file (.xlsx) for bulk product import with the following specifications:
+
+FILE REQUIREMENTS:
+- Format: Microsoft Excel (.xlsx)
+- File Name: product_import_template.xlsx
+- Sheet Name: "Products"
+- Encoding: UTF-8
+
+COLUMN STRUCTURE (11 columns in this exact order):
+1. Name (Required, Text, max 255 chars) - Example: "Coca Cola 500ml"
+2. Price (Required, Number, 2 decimals, min 0.01) - Example: 1500.00
+3. Stock (Optional, Integer, default 0) - Example: 100
+4. Unit (Optional, Text, default "pcs") - Valid values: pcs, kg, g, l, ml, box, pack
+5. SKU (Optional, Text, max 100 chars) - Leave empty for auto-generation
+6. Category (Optional, Text, max 255 chars) - Example: "Beverages"
+7. Barcode (Optional, Text, max 100 chars) - Example: "1234567890123"
+8. Cost (Optional, Number, 2 decimals, min 0) - Example: 1000.00
+9. Description (Optional, Text) - Example: "Carbonated soft drink"
+10. Low Stock Threshold (Optional, Integer, default 0) - Example: 10
+11. Is Active (Optional, Text, default "Yes") - Valid values: "Yes" or "No"
+
+HEADER ROW (Row 1):
+- Column headers: Name | Price | Stock | Unit | SKU | Category | Barcode | Cost | Description | Low Stock Threshold | Is Active
+- Format: Bold text, light blue background (#D9E1F2), centered, with borders
+- Font size: 11pt
+
+SAMPLE DATA (Rows 2-6, 5 products):
+
+Row 2:
+Name: "Coca Cola 500ml"
+Price: 1500.00
+Stock: 100
+Unit: "pcs"
+SKU: (empty)
+Category: "Beverages"
+Barcode: "1234567890123"
+Cost: 1000.00
+Description: "Carbonated soft drink"
+Low Stock Threshold: 10
+Is Active: "Yes"
+
+Row 3:
+Name: "Pizza Margherita"
+Price: 5000.00
+Stock: 50
+Unit: "pcs"
+SKU: (empty)
+Category: "Main Dishes"
+Barcode: "9876543210987"
+Cost: 3000.00
+Description: "Classic pizza with tomato and mozzarella"
+Low Stock Threshold: 5
+Is Active: "Yes"
+
+Row 4:
+Name: "Caesar Salad"
+Price: 3000.00
+Stock: 30
+Unit: "pcs"
+SKU: (empty)
+Category: "Appetizers"
+Barcode: "5555555555555"
+Cost: 1500.00
+Description: "Fresh romaine lettuce with caesar dressing"
+Low Stock Threshold: 10
+Is Active: "Yes"
+
+Row 5:
+Name: "Chocolate Cake"
+Price: 2500.00
+Stock: 20
+Unit: "pcs"
+SKU: (empty)
+Category: "Desserts"
+Barcode: "1111111111111"
+Cost: 1200.00
+Description: "Rich chocolate layer cake"
+Low Stock Threshold: 5
+Is Active: "Yes"
+
+Row 6:
+Name: "French Fries"
+Price: 1500.00
+Stock: 200
+Unit: "pcs"
+SKU: (empty)
+Category: "Sides"
+Barcode: "2222222222222"
+Cost: 500.00
+Description: "Crispy golden fries"
+Low Stock Threshold: 50
+Is Active: "Yes"
+
+FORMATTING REQUIREMENTS:
+- Header row: Bold, light blue background (#D9E1F2), centered, borders on all cells
+- Data rows: Regular text, white background, borders on all cells
+- Column widths: Name (25), Price (12), Stock (10), Unit (8), SKU (15), Category (20), Barcode (15), Cost (12), Description (40), Low Stock Threshold (18), Is Active (12)
+- Number formatting: Price and Cost with 2 decimal places, Stock and Low Stock Threshold as integers
+- Freeze header row (Row 1)
+
+DATA VALIDATION:
+- Price: Decimal, minimum 0.01
+- Stock: Whole number, minimum 0
+- Unit: List (pcs, kg, g, l, ml, box, pack)
+- Is Active: List (Yes, No)
+- Low Stock Threshold: Whole number, minimum 0
+
+IMPORTANT NOTES:
+- SKU column should be empty in sample rows (for auto-generation)
+- Categories will be auto-created if they don't exist
+- Column names are case-insensitive but use exact names for headers
+- First row must be headers
+- Maximum 1000 rows per import
+
+Create the Excel file with these exact specifications and save it as product_import_template.xlsx
+
