@@ -1,740 +1,989 @@
-# PrimePOS - Multi-Tenant Point of Sale System
+# PrimePOS - Professional SaaS Point of Sale System
 
-A comprehensive, professional-grade SaaS Point of Sale (POS) platform designed for multi-tenant businesses across various industries (Retail, Restaurant, Bar, Wholesale, etc.). Built with Django REST Framework backend and Next.js frontend.
+A comprehensive, multi-tenant SaaS Point of Sale (POS) system designed for retail stores, restaurants, and bars. Built with modern technologies to provide a scalable, secure, and feature-rich solution.
 
-## 🚀 System Overview
-
-PrimePOS is a full-featured POS system that enables businesses to:
-- Manage multiple outlets/branches
-- Process sales with multiple payment methods
-- Track inventory in real-time
-- Manage customer relationships and credit accounts
-- Generate comprehensive reports and analytics
-- Handle staff, roles, and permissions
-- Support industry-specific workflows
+---
 
 ## 📋 Table of Contents
 
+- [Overview](#overview)
+- [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
-- [System Architecture](#system-architecture)
 - [Features](#features)
-- [System Flow](#system-flow)
-- [Installation & Setup](#installation--setup)
+- [SaaS Progress & MVP Status](#-saas-progress--mvp-status)
+- [MVP Completion Checklist](#-mvp-completion-checklist)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
 - [API Documentation](#api-documentation)
-- [Development Status](#development-status)
-- [Remaining Features](#remaining-features)
+- [Key Modules](#key-modules)
+- [Inventory Management](#inventory-management)
+- [Development](#development)
+- [Deployment](#deployment)
+- [Roadmap](#-roadmap)
 
-## 🛠 Tech Stack
+---
 
-### Backend
-- **Framework**: Django 4.2+
-- **API**: Django REST Framework
-- **Database**: PostgreSQL 15+
-- **Authentication**: JWT (djangorestframework-simplejwt)
-- **Filtering**: Django Filter
-- **File Processing**: Pandas, Openpyxl (for Excel/CSV imports)
+## 🎯 Overview
 
-### Frontend
-- **Framework**: Next.js 14 (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **UI Components**: shadcn/ui (Radix UI)
+PrimePOS is a full-stack SaaS POS system that supports multiple business types (Retail, Restaurant, Bar) with comprehensive features including:
+
+- **Multi-tenant Architecture**: Complete data isolation per business
+- **Point of Sale**: Retail, Restaurant, and Bar-specific POS interfaces
+- **Inventory Management**: Real-time stock tracking and movements
+- **Payment Processing**: Multiple payment methods with transaction tracking
+- **Customer Management**: CRM with credit/accounts receivable
+- **Reporting & Analytics**: Comprehensive business insights
+- **Shift Management**: Cash reconciliation and shift tracking
+- **Restaurant Features**: Table management, Kitchen Order Tickets (KOT), menu builder
+
+---
+
+## 🏗️ Architecture
+
+### **Backend (Django REST Framework)**
+- **Framework**: Django 4.2.7 + Django REST Framework
+- **Database**: PostgreSQL (production), SQLite (development)
+- **Authentication**: JWT (JSON Web Tokens)
+- **Multi-tenancy**: Tenant-based data isolation
+- **API**: RESTful API with comprehensive endpoints
+
+### **Frontend (Next.js)**
+- **Framework**: Next.js 14 (React 18)
+- **UI Library**: Radix UI + Tailwind CSS
 - **State Management**: Zustand
-- **Icons**: Lucide React
-- **Charts**: Recharts
+- **Type Safety**: TypeScript
+- **Styling**: Tailwind CSS with custom components
 
-## 🏗 System Architecture
-
-### Multi-Tenant Architecture
-- **Tenant Isolation**: All data is automatically filtered by tenant
-- **Outlet Management**: Each tenant can have multiple outlets
-- **User Roles**: SaaS Admin, Admin, Manager, Cashier, Staff
-- **Permission System**: Role-based access control (RBAC)
-
-### Data Flow
+### **Architecture Pattern**
 ```
-Frontend (Next.js) 
-    ↓ HTTP/REST API
-Backend (Django REST Framework)
-    ↓ ORM Queries
-PostgreSQL Database
+┌─────────────────┐
+│   Next.js App   │  (Frontend - Port 3000)
+│   (React/TS)    │
+└────────┬────────┘
+         │ HTTP/REST
+         │
+┌────────▼────────┐
+│  Django REST    │  (Backend - Port 8000)
+│     API         │
+└────────┬────────┘
+         │
+┌────────▼────────┐
+│  PostgreSQL     │  (Database)
+└─────────────────┘
 ```
+
+---
+
+## 🛠️ Tech Stack
+
+### **Backend**
+- **Django** 4.2.7
+- **Django REST Framework** 3.14.0
+- **Django REST Framework Simple JWT** 5.3.0
+- **PostgreSQL** (psycopg2-binary)
+- **Django CORS Headers** 4.3.1
+- **Django Filter** 23.5
+- **Celery** 5.3.4 (async tasks)
+- **Redis** 5.0.1 (caching/queue)
+- **Pillow** (image processing)
+- **Pandas** + **OpenPyXL** (data export)
+
+### **Frontend**
+- **Next.js** 14.2.5
+- **React** 18.3.1
+- **TypeScript** 5.5.4
+- **Tailwind CSS** 3.4.7
+- **Radix UI** (component library)
+- **Zustand** 5.0.8 (state management)
+- **Lucide React** (icons)
+- **Recharts** 2.15.4 (charts)
+- **Date-fns** 3.6.0 (date utilities)
+
+---
 
 ## ✨ Features
 
-### ✅ Completed Features
+### **Core Features**
+- ✅ **Multi-tenant SaaS architecture** - Complete data isolation per business
+- ✅ **User authentication & authorization** - JWT-based auth with role management
+- ✅ **Role-based access control (RBAC)** - SaaS Admin, Tenant Admin, Staff roles
+- ✅ **Business & outlet management** - Multi-outlet support per tenant
+- ✅ **Real-time inventory tracking** - Stock movements, adjustments, transfers
+- ✅ **Point of Sale (Retail, Restaurant, Bar)** - Unified POS with business-specific interfaces
+- ✅ **Payment processing** - Cash payments (MVP), Card/Mobile planned
+- ✅ **Customer management & CRM** - Customer profiles, credit management, purchase history
+- ✅ **Sales & transaction management** - Atomic transactions with stock deduction
+- ✅ **Shift management & cash reconciliation** - Open/close shifts, cash drawer sessions, system totals
+- ✅ **Reporting & analytics** - Daily sales, top products, cash summary, shift summary
+- ✅ **Product & category management** - Retail/wholesale pricing, bulk import/export
+- ✅ **Supplier management** - Supplier profiles and management
+- ✅ **Staff management** - Staff roles and permissions
 
-#### 1. Authentication & Onboarding
-- **User Authentication**: Login, Registration, Password Reset, Email Verification
-- **JWT Token Management**: Access and refresh tokens with automatic renewal
-- **Multi-Step Onboarding**: Business Setup → Outlet Setup → Add First User
-- **Tenant Creation**: Automatic tenant assignment during onboarding
+### **Restaurant-Specific Features**
+- ✅ **Table management** - Table status, capacity, location tracking
+- ✅ **Kitchen Order Tickets (KOT)** - Automatic KOT generation for restaurant orders
+- ✅ **Kitchen Display System (KDS)** - Kitchen order tracking interface
+- ✅ **Menu builder** - Product categorization for restaurants
+- ✅ **Order management** - Table-based ordering system
+- ⏳ **Reservation system** - Planned for future release
 
-#### 2. Multi-Tenant Management
-- **Tenant Context**: Automatic tenant filtering for all data
-- **Outlet Management**: Create, update, delete outlets per tenant
-- **Outlet Switching**: Seamless switching between outlets
-- **SaaS Admin Panel**: Platform-level tenant management
+### **Retail-Specific Features**
+- ✅ **Returns & refunds** - Refund processing API
+- ✅ **Discount management** - Discount application in sales
+- ⏳ **Loyalty programs** - Planned (frontend UI exists, backend pending)
+- ⏳ **Purchase orders** - Frontend UI exists, backend API pending
+- ✅ **Supplier management** - Complete supplier CRUD operations
+- ✅ **Wholesale pricing** - Retail and wholesale price support
 
-#### 3. Product Management
-- **Product CRUD**: Create, read, update, delete products
-- **Category Management**: Organize products by categories
-- **SKU Auto-Generation**: Automatic SKU generation per tenant
-- **Bulk Import**: Excel/CSV import with auto-category creation
-- **Stock Tracking**: Real-time stock levels with low stock alerts
-- **Product Status**: In Stock, Low Stock, Out of Stock indicators
+### **Bar-Specific Features**
+- ✅ **Bar POS interface** - Specialized bar checkout interface
+- ✅ **Drink menu** - Product categorization for bars
+- ⏳ **Mix recipes** - Planned for future release
+- ⏳ **Tab management** - Planned for future release
 
-#### 4. Inventory Management
-- **Stock Adjustments**: Manual stock increases/decreases with reason tracking
-- **Stock Transfers**: Transfer inventory between outlets (bulk support)
-- **Stock Taking**: Physical inventory counting with progress tracking
-  - Search and filter items
-  - Quick count adjustments
-  - Auto-complete functionality
-  - Multiple users can join sessions
-- **Stock Receiving**: Record incoming inventory from suppliers (bulk support)
-- **Stock Movements**: Complete audit trail of all inventory changes
-- **History Tracking**: View adjustment, transfer, and receiving history
+### **Payment Features**
+- ✅ **Cash payments** - Fully implemented with cash reconciliation
+- ⏳ **Card payments** - Backend structure ready, gateway integration pending
+- ⏳ **Mobile Money** - Backend structure ready, provider integration pending
+- ✅ **Credit/Accounts Receivable** - Credit sales with payment tracking
+- ✅ **Payment transaction tracking** - Complete payment history
+- ✅ **Payment method configuration** - Payment method CRUD operations
+- ✅ **Transaction fees** - Fee calculation support (structure ready)
 
-#### 5. Sales & POS
-- **POS Terminal**: Full-screen sales interface
-- **Product Grid**: Tile-based product selection
-- **Cart Management**: Add, remove, update quantities
-- **Payment Methods**: Cash, Card, Mobile Money, Credit
-- **Receipt Generation**: Automatic receipt numbers
-- **Sale History**: View all transactions with filters
-- **Atomic Transactions**: Stock deduction happens atomically with sale creation
+### **Inventory Features**
+- ✅ **Item Variations** - Square POS compatible variation system (sizes, colors, volumes)
+- ✅ **Location-based stock** - Per-outlet inventory tracking for each variation
+- ✅ **Real-time stock tracking** - Automatic stock deduction on sales (variation-based)
+- ✅ **Stock movements** - Complete movement history with variation support (immutable ledger)
+- ✅ **Stock adjustments** - Manual stock corrections (per variation/location)
+- ✅ **Stock transfers** - Inter-outlet transfers (variation-based)
+- ✅ **Stock taking** - Physical inventory counting (with variation support)
+- ✅ **Low stock alerts** - Variation-level low stock detection
+- ✅ **Inventory tracking toggle** - Per-variation inventory tracking control
+- ✅ **Bulk product import** - Excel/CSV import with variation support and per-outlet stock initialization
+- ✅ **Bulk product export** - Excel export with all product and variation data
+- ✅ **Excel import templates** - Pre-configured templates for Retail, Wholesale, Bar, and Restaurant
 
-#### 6. Customer Relationship Management (CRM)
-- **Customer Management**: Full CRUD operations
-- **Credit System**: 
-  - Enable/disable credit per customer
-  - Set credit limits and payment terms (Net 15/30/60/90)
-  - Track outstanding balances
-  - Automatic due date calculation
-  - Credit status management (Active, Suspended, Closed)
-- **Payment Collection**: 
-  - Record payments against invoices
-  - FIFO payment allocation (oldest invoices first)
-  - Payment history tracking
-  - Overdue invoice detection
-- **Loyalty Points**: Track and adjust customer loyalty points
-- **Customer Analytics**: Total spent, visit history, purchase patterns
+---
 
-#### 7. Credit & Accounts Receivable
-- **Credit Sales**: Process sales on credit with automatic validation
-- **Credit Limits**: Enforce credit limits before allowing credit sales
-- **Payment Terms**: Configurable payment terms per customer
-- **Outstanding Balance Tracking**: Real-time balance calculations
-- **Payment Recording**: Record payments with multiple payment methods
-- **Invoice Management**: Track unpaid, partially paid, and paid invoices
-- **Overdue Detection**: Automatic overdue status for past-due invoices
-- **Credit Reports**: Credit summary, aging analysis, overdue reports
+## 📁 Project Structure
 
-#### 8. Staff Management
-- **Staff CRUD**: Create, read, update, delete staff members
-- **Role Management**: Create custom roles with permission matrix
-- **Permission System**: Granular permissions (Sales, Inventory, Products, Customers, Reports, Staff, Settings)
-- **Attendance Tracking**: Check-in/check-out functionality
-- **Outlet Assignment**: Assign staff to specific outlets
-- **Password Management**: Reset passwords for staff accounts
-
-#### 9. Supplier Management
-- **Supplier CRUD**: Complete supplier information management
-- **Contact Information**: Name, email, phone, address
-- **Payment Terms**: Track supplier payment terms
-- **Supplier History**: View purchase history from suppliers
-
-#### 10. User Account Management
-- **User CRUD**: Create, read, update, delete user accounts
-- **Role Assignment**: Assign roles to users
-- **Business Assignment**: Link users to tenants
-- **Account Status**: Active/inactive status management
-
-#### 11. Reports & Analytics
-- **Sales Reports**: Sales performance, trends, top products
-- **Product Reports**: Product performance, category breakdown
-- **Customer Reports**: Customer segments, top customers
-- **Stock Movement Reports**: Inventory movements, stock in/out
-- **Export Functionality**: PDF and CSV export
-- **Date Range Filtering**: Custom date ranges for all reports
-
-#### 12. Office Management
-- **Office Landing Page**: Central hub for office functions
-- **Accounts**: User account management
-- **Suppliers**: Supplier relationship management
-- **CRM**: Customer relationship management with credit features
-- **Staff**: Staff and role management
-- **Reports**: Comprehensive reporting system
-
-### 🚧 In Progress / Partially Complete
-
-#### 1. Shift Management
-- **Backend Models**: Shift model exists
-- **Frontend**: Basic shift context created
-- **Status**: Needs full implementation (start shift, close shift, shift history)
-
-#### 2. Reports
-- **Backend**: Report endpoints exist
-- **Frontend**: Report pages created with UI
-- **Status**: Needs data integration and chart implementation
-
-#### 3. POS Integration
-- **Basic POS**: Product selection and cart working
-- **Credit Sales**: Backend ready, frontend integration needed
-- **Receipt Printing**: UI ready, needs printer integration
-- **Status**: Core functionality working, enhancements needed
-
-## 🔄 System Flow
-
-### 1. User Registration & Onboarding Flow
 ```
-1. User registers → Creates account
-2. Onboarding Step 1: Business Setup
-   - Business name, type, currency
-   - Contact information
-3. Onboarding Step 2: Outlet Setup
-   - Outlet name, address
-   - Creates first outlet
-4. Onboarding Step 3: Add First User
-   - User details, role assignment
-   - Completes onboarding
-5. Redirect to Dashboard
+primepos/
+├── backend/                 # Django REST API
+│   ├── apps/               # Django applications
+│   │   ├── accounts/       # User management
+│   │   ├── tenants/        # Multi-tenancy
+│   │   ├── outlets/       # Outlet management
+│   │   ├── products/      # Products & categories
+│   │   ├── inventory/      # Inventory management
+│   │   ├── sales/          # Sales & transactions
+│   │   ├── payments/       # Payment processing
+│   │   ├── customers/      # Customer management
+│   │   ├── shifts/         # Shift management
+│   │   ├── restaurant/     # Restaurant features
+│   │   ├── suppliers/      # Supplier management
+│   │   ├── staff/          # Staff management
+│   │   └── reports/        # Reporting
+│   ├── primepos/           # Django project settings
+│   │   ├── settings/       # Environment settings
+│   │   ├── urls.py        # URL routing
+│   │   └── wsgi.py        # WSGI config
+│   ├── manage.py
+│   └── requirements.txt
+│
+├── frontend/               # Next.js application
+│   ├── app/                # Next.js app router
+│   │   ├── dashboard/     # Dashboard pages
+│   │   ├── auth/          # Authentication pages
+│   │   ├── onboarding/    # Onboarding flow
+│   │   └── pos/           # POS interfaces
+│   ├── components/         # React components
+│   │   ├── ui/            # UI components
+│   │   ├── modals/        # Modal components
+│   │   ├── pos/           # POS components
+│   │   └── layouts/       # Layout components
+│   ├── lib/                # Utilities & services
+│   │   ├── api.ts         # API client
+│   │   ├── services/      # Service layer
+│   │   └── utils/         # Utilities
+│   ├── stores/             # Zustand stores
+│   ├── contexts/           # React contexts
+│   └── package.json
+│
+└── README.md
 ```
 
-### 2. Product Management Flow
-```
-1. Create Categories (optional)
-   - Category name, description
-2. Add Products
-   - Manual entry OR
-   - Bulk import (Excel/CSV)
-   - Auto-generates SKU if not provided
-   - Links to category
-3. Manage Stock
-   - View stock levels
-   - Adjust stock (increase/decrease)
-   - Transfer between outlets
-   - Receive from suppliers
-```
+---
 
-### 3. Sales Flow
-```
-1. Start Shift (if required)
-   - Select outlet, till, date
-   - Add opening cash balance
-2. POS Terminal
-   - Select products
-   - Add to cart
-   - Apply discounts (optional)
-   - Select customer (optional)
-3. Payment
-   - Choose payment method:
-     - Cash: Enter amount, calculate change
-     - Card: Process card payment
-     - Mobile Money: Process mobile payment
-     - Credit: Validate credit limit, create credit sale
-4. Complete Sale
-   - Stock automatically deducted
-   - Receipt generated
-   - Customer updated (if selected)
-   - Sale recorded
-```
+## 🚀 Getting Started
 
-### 4. Credit Sales Flow
-```
-1. Customer Selection
-   - System checks:
-     - Credit enabled?
-     - Current outstanding balance
-     - Available credit
-     - Credit status
-2. Credit Validation
-   - Sale total + outstanding ≤ credit limit?
-   - If yes: Proceed
-   - If no: Block sale or require override
-3. Create Credit Sale
-   - Payment method: 'credit'
-   - Status: 'completed'
-   - Payment status: 'unpaid'
-   - Due date: created_at + payment_terms_days
-   - Outstanding balance increases
-4. Payment Collection (Later)
-   - Customer comes to pay
-   - View unpaid invoices
-   - Record payment
-   - Allocate to oldest invoices (FIFO)
-   - Update payment status
-   - Outstanding balance decreases
-```
+### **Prerequisites**
+- Python 3.8+
+- Node.js 18+
+- PostgreSQL 12+ (for production)
+- Redis (optional, for Celery)
 
-### 5. Inventory Management Flow
-```
-1. Stock Adjustment
-   - Select product(s) - bulk support
-   - Choose adjustment type (increase/decrease)
-   - Enter quantity
-   - Add reason/notes
-   - Stock updated, movement recorded
+### **Backend Setup**
 
-2. Stock Transfer
-   - Select product(s) - bulk support
-   - Choose source and destination outlets
-   - Enter quantity
-   - Transfer recorded, stock updated
-
-3. Stock Taking
-   - Start stock take session
-   - System auto-creates items for all products
-   - Count items (search, filter, quick adjust)
-   - Save progress
-   - Complete stock take
-   - System applies adjustments automatically
-
-4. Stock Receiving
-   - Select supplier
-   - Add product(s) - bulk support
-   - Enter quantities and costs
-   - Select outlet
-   - Record receiving
-   - Stock updated, movement recorded
-```
-
-### 6. Customer Credit Management Flow
-```
-1. Enable Credit for Customer
-   - Set credit limit
-   - Set payment terms (Net 30, etc.)
-   - Set credit status (Active)
-   
-2. Credit Sale Processing
-   - Customer selected at POS
-   - System validates credit
-   - Sale created with credit payment method
-   - Due date calculated
-   
-3. Payment Collection
-   - Access Payment Collection page
-   - Select customer
-   - View unpaid invoices
-   - Record payment
-   - System allocates payment (FIFO)
-   - Invoices updated
-   
-4. Credit Monitoring
-   - View credit summary
-   - Check outstanding balances
-   - Identify overdue invoices
-   - Manage credit status
-```
-
-## 📦 Installation & Setup
-
-### Backend Setup
-
-1. **Navigate to backend directory**:
+1. **Navigate to backend directory**
 ```bash
 cd backend
 ```
 
-2. **Create virtual environment**:
+2. **Create virtual environment**
 ```bash
 python -m venv env
-source env/bin/activate  # On Windows: env\Scripts\activate
+# Windows
+env\Scripts\activate
+# Linux/Mac
+source env/bin/activate
 ```
 
-3. **Install dependencies**:
+3. **Install dependencies**
 ```bash
 pip install -r requirements.txt
 ```
 
-4. **Configure environment variables**:
-Create a `.env` file in the `backend` directory:
+4. **Configure environment variables**
+Create a `.env` file in `backend/`:
 ```env
 SECRET_KEY=your-secret-key-here
 DEBUG=True
-DB_NAME=primepos_db
-DB_USER=postgres
-DB_PASSWORD=postgres
-DB_HOST=localhost
-DB_PORT=5432
-CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+DATABASE_URL=sqlite:///db.sqlite3
+ALLOWED_HOSTS=localhost,127.0.0.1
+CORS_ALLOWED_ORIGINS=http://localhost:3000
 ```
 
-5. **Create database**:
-```bash
-createdb primepos_db
-```
-
-6. **Run migrations**:
+5. **Run migrations**
 ```bash
 python manage.py migrate
 ```
 
-7. **Create superuser**:
+6. **Create superuser**
 ```bash
 python manage.py createsuperuser
 ```
 
-8. **Run development server**:
+7. **Run development server**
 ```bash
 python manage.py runserver
 ```
 
-Backend API will be available at `http://localhost:8000/api/v1/`
+Backend will be available at `http://localhost:8000`
 
-### Frontend Setup
+### **Frontend Setup**
 
-1. **Navigate to frontend directory**:
+1. **Navigate to frontend directory**
 ```bash
 cd frontend
 ```
 
-2. **Install dependencies**:
+2. **Install dependencies**
 ```bash
 npm install
 ```
 
-3. **Configure environment variables**:
-Create a `.env.local` file:
+3. **Configure environment variables**
+Create a `.env.local` file in `frontend/`:
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_USE_REAL_API=true
 ```
 
-4. **Run development server**:
+4. **Run development server**
 ```bash
 npm run dev
 ```
 
 Frontend will be available at `http://localhost:3000`
 
-## 📚 API Documentation
+---
 
-### Authentication Endpoints
-- `POST /api/v1/auth/login/` - User login
-- `POST /api/v1/auth/register/` - User registration
-- `POST /api/v1/auth/refresh/` - Refresh access token
-- `GET /api/v1/auth/me/` - Get current user
+## 📡 API Documentation
 
-### Tenant Endpoints
-- `GET /api/v1/tenants/` - List tenants
-- `GET /api/v1/tenants/{id}/` - Get tenant details
-- `POST /api/v1/tenants/` - Create tenant
-- `PUT /api/v1/tenants/{id}/` - Update tenant
-- `GET /api/v1/tenants/current/` - Get current user's tenant
-
-### Product Endpoints
-- `GET /api/v1/products/` - List products (filtered by tenant)
-- `GET /api/v1/products/{id}/` - Get product
-- `POST /api/v1/products/` - Create product
-- `PUT /api/v1/products/{id}/` - Update product
-- `DELETE /api/v1/products/{id}/` - Delete product
-- `POST /api/v1/products/bulk-import/` - Bulk import products (Excel/CSV)
-- `POST /api/v1/products/bulk-delete/` - Bulk delete products
-- `GET /api/v1/products/low_stock/` - Get low stock products
-- `GET /api/v1/products/generate-sku-preview/` - Preview auto-generated SKU
-
-### Category Endpoints
-- `GET /api/v1/categories/` - List categories
-- `POST /api/v1/categories/` - Create category
-- `PUT /api/v1/categories/{id}/` - Update category
-- `DELETE /api/v1/categories/{id}/` - Delete category
-
-### Sales Endpoints
-- `GET /api/v1/sales/` - List sales
-- `GET /api/v1/sales/{id}/` - Get sale details
-- `POST /api/v1/sales/` - Create sale (with automatic stock deduction)
-- `GET /api/v1/sales/?payment_status=unpaid` - Get unpaid credit sales
-- `GET /api/v1/sales/?payment_status=overdue` - Get overdue credit sales
-
-### Customer Endpoints
-- `GET /api/v1/customers/` - List customers
-- `GET /api/v1/customers/{id}/` - Get customer
-- `POST /api/v1/customers/` - Create customer
-- `PUT /api/v1/customers/{id}/` - Update customer
-- `POST /api/v1/customers/{id}/adjust_points/` - Adjust loyalty points
-- `GET /api/v1/customers/{id}/credit_summary/` - Get credit summary
-- `PATCH /api/v1/customers/{id}/adjust_credit/` - Adjust credit settings
-
-### Credit Payment Endpoints
-- `GET /api/v1/credit-payments/` - List credit payments
-- `POST /api/v1/credit-payments/` - Record payment
-- `GET /api/v1/credit-payments/{id}/` - Get payment details
-- `GET /api/v1/credit-payments/?customer={id}` - Get customer payments
-- `GET /api/v1/credit-payments/?sale={id}` - Get sale payments
-
-### Inventory Endpoints
-- `POST /api/v1/inventory/adjust/` - Stock adjustment (bulk support)
-- `POST /api/v1/inventory/transfer/` - Transfer stock (bulk support)
-- `POST /api/v1/inventory/receive/` - Receive stock (bulk support)
-- `GET /api/v1/inventory/movements/` - Get stock movements
-- `GET /api/v1/inventory/stock-take/` - List stock takes
-- `POST /api/v1/inventory/stock-take/` - Start stock take
-- `GET /api/v1/inventory/stock-take/{id}/` - Get stock take details
-- `PATCH /api/v1/inventory/stock-take/{id}/items/{item_id}/` - Update item count
-- `POST /api/v1/inventory/stock-take/{id}/complete/` - Complete stock take
-- `POST /api/v1/inventory/stock-take/{id}/auto-complete/` - Auto-complete stock take
-
-### Outlet Endpoints
-- `GET /api/v1/outlets/` - List outlets
-- `GET /api/v1/outlets/{id}/` - Get outlet
-- `POST /api/v1/outlets/` - Create outlet
-- `PUT /api/v1/outlets/{id}/` - Update outlet
-
-### Staff Endpoints
-- `GET /api/v1/staff/` - List staff
-- `GET /api/v1/staff/{id}/` - Get staff
-- `POST /api/v1/staff/` - Create staff
-- `PUT /api/v1/staff/{id}/` - Update staff
-- `DELETE /api/v1/staff/{id}/` - Delete staff
-
-### Supplier Endpoints
-- `GET /api/v1/suppliers/` - List suppliers
-- `GET /api/v1/suppliers/{id}/` - Get supplier
-- `POST /api/v1/suppliers/` - Create supplier
-- `PUT /api/v1/suppliers/{id}/` - Update supplier
-- `DELETE /api/v1/suppliers/{id}/` - Delete supplier
-
-### User Management Endpoints
-- `GET /api/v1/auth/users/?tenant={id}` - List users (via tenant endpoint)
-- `POST /api/v1/auth/users/create/` - Create user
-- `PUT /api/v1/auth/users/{id}/` - Update user
-- `DELETE /api/v1/auth/users/{id}/delete/` - Delete user
-
-## 🗄 Database Models
-
-### Core Models
-- **Tenant**: Business/tenant information
-- **Outlet**: Business locations/branches
-- **User**: Extended Django user with tenant relationship
-- **Product**: Products with SKU, pricing, stock
-- **Category**: Product categories
-- **Sale**: Transactions with payment method and status
-- **SaleItem**: Transaction line items
-- **Customer**: CRM data with credit fields
-- **CreditPayment**: Payments against credit sales
-- **Staff**: Staff members with roles
-- **Role**: Permission roles
-- **Supplier**: Supplier/vendor information
-- **StockMovement**: Inventory movement tracking
-- **StockTake**: Stock counting sessions
-- **StockTakeItem**: Individual items in stock take
-
-### Credit System Models
-- **Customer.credit_enabled**: Boolean flag
-- **Customer.credit_limit**: Decimal field
-- **Customer.payment_terms_days**: Integer (15, 30, 60, 90)
-- **Customer.credit_status**: CharField (active, suspended, closed)
-- **Sale.due_date**: DateTimeField (for credit sales)
-- **Sale.amount_paid**: DecimalField (tracking payments)
-- **Sale.payment_status**: CharField (unpaid, partially_paid, paid, overdue)
-- **CreditPayment**: Records individual payments
-
-## 📊 Development Status
-
-### ✅ Phase 1: Core System (Complete)
-- Multi-tenant architecture
-- Authentication & authorization
-- Product management
-- Basic inventory tracking
-- Sales processing
-- Customer management
-
-### ✅ Phase 2: Advanced Inventory (Complete)
-- Stock adjustments (bulk)
-- Stock transfers (bulk)
-- Stock taking with progress tracking
-- Stock receiving (bulk)
-- Movement history
-
-### ✅ Phase 3: Credit System (Complete)
-- Credit customer management
-- Credit sales processing
-- Payment collection
-- Outstanding balance tracking
-- Overdue detection
-- Credit reports
-
-### 🚧 Phase 4: Enhanced Features (In Progress)
-- Shift management (backend ready, frontend needs work)
-- Advanced reporting (UI ready, needs data integration)
-- Receipt printing (UI ready, needs printer integration)
-- Email notifications (planned)
-- SMS notifications (planned)
-
-## 🎯 Remaining Features & Functions
-
-### High Priority
-
-1. **Shift Management**
-   - [ ] Complete shift start/close flow
-   - [ ] Shift history page with analytics
-   - [ ] Shift reports (sales per shift, cash reconciliation)
-   - [ ] Till management integration
-
-2. **POS Enhancements**
-   - [ ] Receipt printing (thermal printer integration)
-   - [ ] Barcode scanning support
-   - [ ] Keyboard shortcuts for faster operations
-   - [ ] Hold/recall sales functionality
-   - [ ] Split payments (multiple payment methods per sale)
-
-3. **Reporting System**
-   - [ ] Complete data integration for all reports
-   - [ ] Interactive charts (Recharts integration)
-   - [ ] Export to PDF with proper formatting
-   - [ ] Scheduled report generation
-   - [ ] Email report delivery
-
-4. **Credit System Enhancements**
-   - [ ] Aging analysis report (0-30, 31-60, 61-90, 90+ days)
-   - [ ] Payment reminders (email/SMS)
-   - [ ] Credit score/rating system
-   - [ ] Bad debt write-off functionality
-   - [ ] Payment plan support
-
-### Medium Priority
-
-5. **Customer Features**
-   - [ ] Customer portal (view invoices, make payments)
-   - [ ] Loyalty program enhancements
-   - [ ] Customer segmentation
-   - [ ] Marketing campaigns
-
-6. **Inventory Enhancements**
-   - [ ] Reorder point automation
-   - [ ] Purchase order generation
-   - [ ] Supplier price comparison
-   - [ ] Cost tracking and analysis
-
-7. **Staff Features**
-   - [ ] Attendance tracking (check-in/check-out)
-   - [ ] Performance metrics
-   - [ ] Commission calculation
-   - [ ] Schedule management
-
-8. **Settings & Configuration**
-   - [ ] Receipt template customization
-   - [ ] Tax configuration (multiple tax rates)
-   - [ ] Payment gateway integration
-   - [ ] Printer configuration
-   - [ ] Email/SMS provider setup
-
-### Low Priority / Future Enhancements
-
-9. **Advanced Features**
-   - [ ] Multi-currency support
-   - [ ] Multi-language support
-   - [ ] Mobile app (React Native)
-   - [ ] Offline mode support
-   - [ ] Data synchronization
-
-10. **Integrations**
-    - [ ] Accounting software (QuickBooks, Xero)
-    - [ ] Payment gateways (Stripe, PayPal)
-    - [ ] E-commerce platforms
-    - [ ] Shipping providers
-    - [ ] Tax compliance systems
-
-11. **Analytics & AI**
-    - [ ] Predictive analytics
-    - [ ] Sales forecasting
-    - [ ] Inventory optimization
-    - [ ] Customer behavior analysis
-    - [ ] Automated recommendations
-
-## 🔐 Security Features
-
-- **JWT Authentication**: Secure token-based authentication
-- **Tenant Isolation**: Automatic data filtering by tenant
-- **Role-Based Access Control**: Granular permission system
-- **Password Hashing**: Django's built-in password hashing
-- **CORS Protection**: Configured CORS for API security
-- **Input Validation**: Server-side validation for all inputs
-- **SQL Injection Protection**: Django ORM prevents SQL injection
-- **XSS Protection**: React automatically escapes content
-
-## 🧪 Testing
-
-### Backend Testing
-```bash
-cd backend
-python manage.py test
+### **Base URL**
+```
+http://localhost:8000/api/v1
 ```
 
-### Frontend Testing
-```bash
-cd frontend
-npm run test
+### **Authentication**
+All API requests require JWT authentication:
+```http
+Authorization: Bearer <access_token>
 ```
 
-## 📝 Code Structure
+### **Key Endpoints**
 
-### Backend Structure
-```
-backend/
-├── apps/
-│   ├── accounts/        # User authentication
-│   ├── tenants/         # Multi-tenant management
-│   ├── outlets/         # Outlet management
-│   ├── products/        # Product & category management
-│   ├── sales/           # Sales & transactions
-│   ├── customers/       # CRM & credit system
-│   ├── inventory/       # Inventory management
-│   ├── staff/           # Staff & roles
-│   ├── suppliers/       # Supplier management
-│   └── shifts/          # Shift management
-├── primepos/
-│   ├── settings/        # Django settings
-│   └── urls.py          # URL routing
-└── manage.py
-```
+#### **Authentication**
+- `POST /auth/login/` - User login
+- `POST /auth/register/` - User registration
+- `POST /auth/refresh/` - Refresh access token
+- `GET /auth/me/` - Get current user
 
-### Frontend Structure
-```
-frontend/
-├── app/
-│   ├── auth/            # Authentication pages
-│   ├── onboarding/      # Onboarding flow
-│   ├── dashboard/       # Main application
-│   │   ├── products/    # Product management
-│   │   ├── inventory/   # Inventory management
-│   │   ├── office/      # Office management
-│   │   │   ├── crm/     # CRM & credit
-│   │   │   │   ├── credits/    # Credit management
-│   │   │   │   └── payments/  # Payment collection
-│   │   │   ├── staff/   # Staff management
-│   │   │   ├── suppliers/ # Supplier management
-│   │   │   └── accounts/  # User accounts
-│   │   └── ...
-│   └── ...
-├── components/
-│   ├── modals/          # Modal components
-│   ├── ui/              # UI components
-│   └── ...
-├── lib/
-│   ├── services/        # API service functions
-│   ├── utils/           # Utility functions
-│   └── ...
-└── stores/              # Zustand state management
-```
+#### **Tenants (Businesses)**
+- `GET /tenants/` - List businesses
+- `POST /tenants/` - Create business
+- `GET /tenants/{id}/` - Get business details
+- `PUT /tenants/{id}/` - Update business
 
-## 🤝 Contributing
+#### **Outlets**
+- `GET /outlets/` - List outlets
+- `POST /outlets/` - Create outlet
+- `GET /outlets/{id}/` - Get outlet details
 
-This is a private project. For contributions, please contact the project maintainer.
+#### **Products**
+- `GET /products/` - List products (with variations)
+- `POST /products/` - Create product
+- `GET /products/{id}/` - Get product details (with variations)
+- `PUT /products/{id}/` - Update product
+- `DELETE /products/{id}/` - Delete product
+- `POST /products/bulk-import/` - Bulk import products with variations (Excel/CSV)
 
-## 📄 License
+#### **Item Variations**
+- `GET /products/variations/` - List item variations
+- `POST /products/variations/` - Create variation
+- `GET /products/variations/{id}/` - Get variation details
+- `PUT /products/variations/{id}/` - Update variation
+- `DELETE /products/variations/{id}/` - Delete variation
 
-Copyright © 2024 PrimePOS. All rights reserved.
+#### **Categories**
+- `GET /categories/` - List categories
+- `POST /categories/` - Create category
 
-## 📞 Support
+#### **Sales**
+- `GET /sales/` - List sales
+- `POST /sales/` - Create sale
+- `GET /sales/{id}/` - Get sale details
+- `POST /sales/{id}/refund/` - Process refund
 
-For support and questions, please contact the development team.
+#### **Inventory**
+- `GET /inventory/movements/` - List stock movements (with variation support)
+- `POST /inventory/adjust/` - Manual stock adjustment
+- `POST /inventory/transfer/` - Transfer stock between outlets
+- `POST /inventory/receive/` - Receive inventory from suppliers
+- `GET /inventory/stock-take/` - List stock takes
+- `POST /inventory/stock-take/` - Create stock take
+- `POST /inventory/stock-take/{id}/complete/` - Complete stock take
+
+#### **Location Stock**
+- `GET /inventory/location-stock/` - List location stock (per outlet/variation)
+- `POST /inventory/location-stock/` - Create/update location stock
+- `GET /inventory/location-stock/{id}/` - Get location stock details
+- `PUT /inventory/location-stock/{id}/` - Update location stock
+- `POST /inventory/location-stock/bulk-update/` - Bulk update stock levels
+
+📖 **For complete inventory flow documentation, see [INVENTORY_FLOW.md](./INVENTORY_FLOW.md)**
+
+#### **Payments**
+- `GET /payments/` - List payments
+- `POST /payments/` - Create payment
+- `GET /payment-methods/` - List payment methods
+- `POST /payment-methods/` - Create payment method
+
+#### **Restaurant**
+- `GET /tables/` - List tables
+- `POST /tables/` - Create table
+- `GET /restaurant/kitchen-orders/` - List KOTs
+- `POST /restaurant/kitchen-orders/{id}/update_item_status/` - Update item status
+
+#### **Shifts**
+- `GET /shifts/` - List shifts
+- `POST /shifts/start/` - Start a new shift
+- `POST /shifts/{id}/close/` - Close shift with cash reconciliation
+- `GET /shifts/current/` - Get current open shift
+- `GET /shifts/active/` - Get active shift for user
+
+#### **Cash Management**
+- `GET /cash-drawer-sessions/` - List cash drawer sessions
+- `POST /cash-drawer-sessions/open/` - Open cash drawer
+- `POST /cash-drawer-sessions/{id}/close/` - Close cash drawer
+- `GET /cash-movements/` - List cash movements (read-only)
+- `POST /cash-movements/add/` - Add cash movement
+- `POST /petty-cash-payouts/` - Create petty cash payout
+- `POST /cashup-settlements/` - Create cashup settlement
+
+#### **Reports**
+- `GET /reports/daily-sales/` - Daily sales report
+- `GET /reports/top-products/` - Top products by revenue
+- `GET /reports/cash-summary/` - Cash summary with shift breakdown
+- `GET /reports/shift-summary/` - Shift summary report
+- `GET /reports/sales/` - General sales report
+- `GET /reports/products/` - Products performance report
+- `GET /reports/profit-loss/` - Profit & Loss report
 
 ---
 
-**Last Updated**: December 2024
-**Version**: 1.0.0
-**Status**: Active Development
+## 🔑 Key Modules
+
+### **Backend Apps**
+
+#### **1. Tenants (`apps/tenants/`)**
+- Multi-tenant architecture
+- Business/tenant management
+- Tenant middleware for data isolation
+
+#### **2. Accounts (`apps/accounts/`)**
+- User management
+- Authentication
+- User roles & permissions
+
+#### **3. Products (`apps/products/`)**
+- Product management
+- **Item Variations** - Square POS compatible variation system (sizes, colors, pack sizes, volumes)
+- Category management
+- SKU generation (per variation)
+- Barcode support (per variation)
+- Retail/wholesale pricing (per variation)
+- Bulk import/export with variation support
+- Excel/CSV import templates for all business types
+
+#### **4. Sales (`apps/sales/`)**
+- Sale/transaction management with atomic transactions
+- Sale items with product tracking
+- Restaurant order support (table-based)
+- Automatic KOT creation for restaurant orders
+- Stock deduction on sale completion
+- Cash-only checkout endpoint (`/checkout-cash/`)
+- Receipt number generation
+- Refund processing
+- Credit sales with payment tracking
+
+#### **5. Payments (`apps/payments/`)**
+- Payment processing
+- Payment methods configuration
+- Payment splits
+- Transaction fees
+- Payment status tracking
+
+#### **6. Restaurant (`apps/restaurant/`)**
+- Table management
+- Kitchen Order Tickets (KOT)
+- Kitchen Display System
+- Order tracking
+
+#### **7. Inventory (`apps/inventory/`)**
+- **Location-based stock tracking** - Per-outlet inventory for each variation
+- **LocationStock model** - Square POS compatible per-location inventory
+- Stock movements (with variation support)
+- Stock adjustments
+- Stock transfers (inter-outlet)
+- Stock taking (with variation support)
+- Low stock alerts (per variation)
+- Inventory tracking toggle (per variation)
+
+#### **8. Customers (`apps/customers/`)**
+- Customer management (CRUD)
+- Credit/Accounts Receivable
+- Credit limit validation
+- Payment tracking
+- Customer purchase history
+- Loyalty points tracking (structure ready)
+
+#### **9. Shifts (`apps/shifts/`)**
+- Shift management (open/close)
+- Cash reconciliation with system totals
+- Opening/closing shifts with cash validation
+- Till management
+- Cash drawer sessions
+- Cash movements (immutable ledger)
+- Petty cash payouts
+- Cashup settlements
+
+### **Frontend Modules**
+
+#### **1. Dashboard (`app/dashboard/`)**
+- Main dashboard with analytics
+- Sales overview
+- Inventory status
+- Recent activity
+
+#### **2. POS (`app/pos/` & `components/pos/`)**
+- Retail POS
+- Restaurant POS
+- Bar POS
+- Cart management
+- Payment processing
+
+#### **3. Restaurant (`app/dashboard/restaurant/`)**
+- Table management (status, capacity, location)
+- Kitchen display system (KDS)
+- Order management with KOT tracking
+- Menu builder (product categorization)
+- Kitchen order tickets (KOT) management
+
+#### **4. Products (`app/dashboard/products/`)**
+- Product listing (with variation counts)
+- Product creation/editing
+- **Variation management** - Add/edit/delete item variations
+- Category management
+- Bulk import (with variation and per-outlet stock support)
+- Excel import templates for all business types
+
+#### **5. Sales (`app/dashboard/sales/`)**
+- Sales history
+- Transaction details
+- Refunds
+
+#### **6. Payments (`app/dashboard/office/payments/`)**
+- Payment transactions
+- Payment methods management
+- Payment statistics
+
+#### **7. Inventory (`app/dashboard/inventory/`)**
+- **Location stock management** - Per-outlet stock levels for each variation
+- Stock management with real-time tracking (variation-based)
+- Stock movements (complete audit trail with variation support)
+- Stock adjustments (manual corrections per variation/location)
+- Stock transfers (inter-outlet, variation-based)
+- Stock taking (physical inventory counting with variations)
+- Low stock alerts (per variation)
+- Bulk product import/export (with variation support)
+
+---
+
+## 💻 Development
+
+### **Backend Development**
+
+**Run migrations**
+```bash
+python manage.py makemigrations
+python manage.py migrate
+```
+
+**Create Django app**
+```bash
+python manage.py startapp app_name
+```
+
+**Run tests**
+```bash
+python manage.py test
+```
+
+**Access Django Admin**
+```
+http://localhost:8000/admin/
+```
+
+### **Frontend Development**
+
+**Type checking**
+```bash
+npm run type-check
+```
+
+**Linting**
+```bash
+npm run lint
+```
+
+**Build for production**
+```bash
+npm run build
+```
+
+### **Code Structure Guidelines**
+
+**Backend:**
+- Follow Django best practices
+- Use Django REST Framework serializers
+- Implement proper permissions
+- Add docstrings to views and models
+- Use atomic transactions for critical operations
+
+**Frontend:**
+- Use TypeScript for type safety
+- Follow React best practices
+- Use Zustand for state management
+- Keep components modular and reusable
+- Use service layer for API calls
+
+---
+
+## 🚢 Deployment
+
+### **Backend Deployment**
+
+1. **Set environment variables**
+```env
+DEBUG=False
+SECRET_KEY=production-secret-key
+DATABASE_URL=postgresql://user:pass@host:port/dbname
+ALLOWED_HOSTS=yourdomain.com
+CORS_ALLOWED_ORIGINS=https://yourdomain.com
+```
+
+2. **Collect static files**
+```bash
+python manage.py collectstatic
+```
+
+3. **Run migrations**
+```bash
+python manage.py migrate
+```
+
+4. **Use production WSGI server** (Gunicorn)
+```bash
+gunicorn primepos.wsgi:application
+```
+
+### **Frontend Deployment**
+
+1. **Build production bundle**
+```bash
+npm run build
+```
+
+2. **Start production server**
+```bash
+npm start
+```
+
+3. **Or deploy to Vercel/Netlify**
+- Connect repository
+- Set environment variables
+- Deploy automatically
+
+---
+
+## 🔐 Security
+
+- JWT authentication for API
+- Multi-tenant data isolation
+- Role-based access control (RBAC)
+- CORS configuration
+- SQL injection protection (Django ORM)
+- XSS protection (React)
+- CSRF protection
+- Secure password hashing
+
+---
+
+## 📊 Database Schema
+
+### **Core Models**
+- **Tenant**: Business/company
+- **User**: System users
+- **Outlet**: Business locations
+- **Product**: Products/items
+- **Category**: Product categories
+- **Sale**: Transactions
+- **SaleItem**: Transaction line items
+- **Payment**: Payment records
+- **Customer**: Customer information
+- **Shift**: Cashier shifts
+- **Table**: Restaurant tables
+- **KitchenOrderTicket**: Kitchen orders
+
+---
+
+## 🧪 Testing
+
+### **Backend Tests**
+```bash
+python manage.py test apps.products
+python manage.py test apps.sales
+```
+
+### **Frontend Tests**
+```bash
+npm test
+```
+
+---
+
+## 📝 Environment Variables
+
+### **Backend (.env)**
+```env
+SECRET_KEY=
+DEBUG=True
+DATABASE_URL=
+ALLOWED_HOSTS=
+CORS_ALLOWED_ORIGINS=
+REDIS_URL=redis://localhost:6379/0
+```
+
+### **Frontend (.env.local)**
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+NEXT_PUBLIC_USE_REAL_API=true
+```
+
+---
+
+## 🤝 Contributing
+
+1. Create a feature branch
+2. Make your changes
+3. Test thoroughly
+4. Submit a pull request
+
+---
+
+## 📄 License
+
+Proprietary - PrimeX LTD
+
+---
+
+## 📞 Support
+
+For support and questions, contact the development team.
+
+---
+
+---
+
+## 📈 SaaS Progress & MVP Status
+
+### ✅ **Completed (Production Ready)**
+
+#### **Core Infrastructure**
+- ✅ Multi-tenant architecture with complete data isolation
+- ✅ JWT authentication and authorization
+- ✅ Role-based access control (SaaS Admin, Tenant Admin, Staff)
+- ✅ Tenant middleware ensuring `request.tenant` always available
+- ✅ Comprehensive API with RESTful endpoints
+- ✅ Database migrations and schema management
+
+#### **Sales & Transactions**
+- ✅ **Cash-only sales** - Fully operational with atomic transactions
+- ✅ **Sale creation** - `POST /api/v1/sales/` with stock deduction
+- ✅ **Cash checkout** - `POST /api/v1/sales/checkout-cash/` endpoint
+- ✅ **Stock validation** - Prevents sales when stock insufficient
+- ✅ **Shift validation** - Sales require open shift
+- ✅ **Receipt generation** - Automatic receipt numbers
+- ✅ **Refund processing** - `POST /api/v1/sales/{id}/refund/`
+
+#### **Shift Management**
+- ✅ **Shift opening** - `POST /api/v1/shifts/start/`
+- ✅ **Shift closing** - `POST /api/v1/shifts/{id}/close/` with cash reconciliation
+- ✅ **Current shift lookup** - `GET /api/v1/shifts/current/`
+- ✅ **System totals** - Automatic calculation on shift close
+- ✅ **Cash drawer sessions** - Cash tracking per shift
+- ✅ **Cash movements** - Immutable ledger of all cash transactions
+- ✅ **Cash reconciliation** - Difference calculation (expected vs actual)
+
+#### **Inventory Management**
+- ✅ **Product management** - Full CRUD with retail/wholesale pricing
+- ✅ **Item Variations** - Square POS compatible variation system (sizes, colors, volumes, pack sizes)
+- ✅ **Location-based stock** - Per-outlet inventory tracking for each variation
+- ✅ **Category management** - Product categorization
+- ✅ **Stock tracking** - Real-time stock levels (per variation/location)
+- ✅ **Stock movements** - Complete audit trail with variation support
+- ✅ **Stock adjustments** - Manual corrections (per variation/location)
+- ✅ **Stock transfers** - Inter-outlet transfers (variation-based)
+- ✅ **Stock taking** - Physical inventory counting with variation support
+- ✅ **Inventory tracking toggle** - Per-variation control over inventory tracking
+- ✅ **Bulk import/export** - Excel/CSV support with variation and per-outlet stock initialization
+- ✅ **Excel import templates** - Pre-configured templates for Retail, Wholesale, Bar, and Restaurant business types
+
+#### **Customer Management**
+- ✅ **Customer CRUD** - Complete customer management
+- ✅ **Credit sales** - Accounts receivable support
+- ✅ **Payment tracking** - Customer payment history
+- ✅ **Purchase history** - Complete sales history per customer
+
+#### **Reporting**
+- ✅ **Daily sales report** - `GET /api/v1/reports/daily-sales/`
+- ✅ **Top products report** - `GET /api/v1/reports/top-products/`
+- ✅ **Cash summary report** - `GET /api/v1/reports/cash-summary/`
+- ✅ **Shift summary report** - `GET /api/v1/reports/shift-summary/`
+- ✅ **Sales report** - General sales reporting
+- ✅ **Products report** - Product performance analytics
+- ✅ **Profit & Loss** - Basic P&L reporting
+
+#### **POS Interfaces**
+- ✅ **Unified POS** - Single interface for Retail/Wholesale
+- ✅ **Retail POS** - Retail-specific interface
+- ✅ **Restaurant POS** - Table-based ordering with KOT
+- ✅ **Bar POS** - Bar-specific interface
+- ✅ **Cart management** - Add/remove items, quantity updates
+- ✅ **Customer selection** - Customer lookup and creation
+- ✅ **Payment modal** - Cash payment processing
+
+#### **Cash Management**
+- ✅ **Cash drawer sessions** - Open/close cash drawers
+- ✅ **Cash movements** - Add/drop cash, sale recording
+- ✅ **Petty cash payouts** - Operational expense tracking
+- ✅ **Cashup settlements** - End-of-day reconciliation
+
+---
+
+### ⏳ **In Progress / Partially Implemented**
+
+#### **Payment Methods**
+- ⚠️ **Card payments** - Backend structure exists, gateway integration pending
+  - Models and services ready
+  - Frontend UI disabled (MVP: cash only)
+  - TODO: Integrate with payment gateway (Stripe, Square, etc.)
+
+- ⚠️ **Mobile Money** - Backend structure exists, provider integration pending
+  - Models and services ready
+  - Frontend UI disabled (MVP: cash only)
+  - TODO: Integrate with providers (M-Pesa, Airtel Money, etc.)
+
+- ⚠️ **Split payments** - Frontend UI exists, backend logic pending
+  - Payment modal has split payment tab
+  - Backend needs split payment processing logic
+
+#### **Frontend Features**
+- ⚠️ **Loyalty programs** - Frontend UI exists (`app/dashboard/loyalty/`)
+  - Backend API not implemented
+  - TODO: Create loyalty points system
+
+- ⚠️ **Purchase orders** - Frontend UI exists (`app/dashboard/purchase-orders/`)
+  - Backend API not implemented
+  - TODO: Create purchase order models and APIs
+
+- ⚠️ **Discounts** - Frontend UI exists (`app/dashboard/discounts/`)
+  - Discount can be applied in sales
+  - TODO: Standalone discount management system
+
+- ⚠️ **Price lists** - Frontend UI exists (`app/dashboard/retail/price-lists/`)
+  - Backend API not implemented
+  - TODO: Create price list models and APIs
+
+---
+
+### ❌ **Not Implemented (MVP Requirements)**
+
+#### **Critical for MVP**
+1. **Card Payment Gateway Integration**
+   - Current: Backend structure ready, needs gateway API integration
+   - Required: Stripe, Square, or similar payment processor
+   - Impact: High - needed for non-cash businesses
+
+2. **Mobile Money Integration**
+   - Current: Backend structure ready, needs provider APIs
+   - Required: M-Pesa, Airtel Money, or similar
+   - Impact: High - needed for African markets
+
+3. **Receipt Printing**
+   - Current: Receipt preview exists, no print functionality
+   - Required: Thermal printer integration or PDF generation
+   - Impact: Medium - needed for physical receipts
+
+4. **Barcode Scanner Support**
+   - Current: Products have barcode field, no scanner integration
+   - Required: Barcode scanner hardware integration
+   - Impact: Medium - improves checkout speed
+
+#### **Nice to Have (Post-MVP)**
+1. **Loyalty Programs** - Points system, rewards, customer tiers
+2. **Purchase Orders** - Supplier ordering workflow
+3. **Advanced Reporting** - Custom date ranges, export to PDF/Excel
+4. **Email/SMS Notifications** - Order confirmations, low stock alerts
+5. **Multi-currency Support** - Currency conversion, exchange rates
+6. **Offline Mode** - Local storage, sync when online
+7. **Mobile App** - Native iOS/Android apps
+8. **Real-time Notifications** - WebSocket support for live updates
+9. **Advanced Analytics** - Predictive analytics, forecasting
+10. **Reservation System** - Restaurant table reservations
+
+---
+
+## 🎯 MVP Completion Checklist
+
+### **Core MVP Requirements**
+
+#### **Backend (Django)**
+- [x] Multi-tenant architecture
+- [x] User authentication & authorization
+- [x] Product & inventory management
+- [x] Sales & transaction processing
+- [x] Cash payment processing
+- [x] Shift management
+- [x] Customer management
+- [x] Basic reporting
+- [ ] Card payment gateway integration
+- [ ] Mobile money provider integration
+- [ ] Receipt generation (PDF/Print)
+
+#### **Frontend (Next.js)**
+- [x] Authentication flow
+- [x] Dashboard
+- [x] POS interfaces (Retail, Restaurant, Bar)
+- [x] Product management
+- [x] Inventory management
+- [x] Sales history
+- [x] Customer management
+- [x] Shift management
+- [x] Cash management
+- [ ] Receipt printing
+- [ ] Barcode scanner integration
+- [ ] Payment gateway UI (for card/mobile)
+
+#### **Integration & Testing**
+- [x] API endpoints tested
+- [x] Multi-tenant isolation verified
+- [x] Cash sales flow tested
+- [ ] Payment gateway testing
+- [ ] End-to-end testing
+- [ ] Performance testing
+- [ ] Security audit
+
+---
+
+## 🚀 MVP Launch Readiness: **75% Complete**
+
+### **What's Working Now**
+✅ **Cash-only POS is fully operational**
+- Complete sales flow from cart to receipt
+- Shift management and cash reconciliation
+- Real-time inventory tracking
+- Customer management
+- Basic reporting
+
+### **What's Needed for Full MVP**
+1. **Payment Gateway Integration** (2-3 weeks)
+   - Card payment processing
+   - Mobile money integration
+   - Payment confirmation flows
+
+2. **Receipt Printing** (1 week)
+   - PDF generation
+   - Thermal printer support
+   - Email receipt option
+
+3. **Testing & Bug Fixes** (1-2 weeks)
+   - End-to-end testing
+   - Performance optimization
+   - Security review
+
+**Estimated Time to Full MVP: 4-6 weeks**
+
+---
+
+## 🎯 Roadmap
+
+### **Phase 1: MVP Completion (Current)**
+- [ ] Card payment gateway integration
+- [ ] Mobile money provider integration
+- [ ] **Digital receipts storage** - Store receipts in database (see implementation guide)
+- [ ] Receipt printing (PDF/Thermal)
+- [ ] Barcode scanner support
+- [ ] Comprehensive testing
+
+### **Phase 2: Enhanced Features**
+- [ ] Loyalty programs
+- [ ] Purchase orders
+- [ ] Advanced reporting & analytics
+- [ ] Email/SMS notifications
+- [ ] Multi-currency support
+
+### **Phase 3: Scale & Optimize**
+- [ ] Real-time notifications (WebSocket)
+- [ ] Offline mode with sync
+- [ ] Mobile app (iOS/Android)
+- [ ] Advanced inventory forecasting
+- [ ] Reservation system
+
+---
+
+**Built with ❤️ by PrimeX LTD**
 
