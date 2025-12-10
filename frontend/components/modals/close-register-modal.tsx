@@ -109,9 +109,16 @@ export function CloseRegisterModal({ open, onOpenChange }: CloseRegisterModalPro
     }
   }
 
-  const shiftDuration = activeShift.startTime
-    ? Math.round((new Date().getTime() - new Date(activeShift.startTime).getTime()) / (1000 * 60))
-    : 0
+  const shiftDuration = (() => {
+    if (!activeShift.startTime) return 0
+    try {
+      const startDate = new Date(activeShift.startTime)
+      if (isNaN(startDate.getTime())) return 0
+      return Math.round((new Date().getTime() - startDate.getTime()) / (1000 * 60))
+    } catch {
+      return 0
+    }
+  })()
 
   const hours = Math.floor(shiftDuration / 60)
   const minutes = shiftDuration % 60
@@ -169,16 +176,19 @@ export function CloseRegisterModal({ open, onOpenChange }: CloseRegisterModalPro
               <Calculator className="h-4 w-4" />
               Closing Cash Balance <span className="text-destructive">*</span>
             </Label>
-            <Input
-              id="closingCash"
-              type="text"
-              inputMode="decimal"
-              value={closingCash}
-              onChange={handleCashChange}
-              placeholder="0.00"
-              className={cn(error && "border-destructive")}
-              autoFocus
-            />
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">MWK</span>
+              <Input
+                id="closingCash"
+                type="text"
+                inputMode="decimal"
+                value={closingCash}
+                onChange={handleCashChange}
+                placeholder="0.00"
+                className={cn(error && "border-destructive", "pl-12")}
+                autoFocus
+              />
+            </div>
             {error && (
               <p className="text-sm text-destructive flex items-center gap-1">
                 <AlertCircle className="h-3.5 w-3.5" />

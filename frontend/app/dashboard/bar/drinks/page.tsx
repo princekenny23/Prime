@@ -13,19 +13,34 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Wine, TrendingUp, AlertTriangle } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Plus, Search, Wine, TrendingUp, AlertTriangle, Edit, Trash2, Eye, MoreVertical, Package, RefreshCw } from "lucide-react"
 import { useState, useEffect } from "react"
 import { NewDrinkModal } from "@/components/modals/new-drink-modal"
+import { AddEditProductModal } from "@/components/modals/add-edit-product-modal"
 import { productService } from "@/lib/services/productService"
 import { useBusinessStore } from "@/stores/businessStore"
-import type { Product } from "@/lib/types/mock-data"
+import { useToast } from "@/components/ui/use-toast"
+import type { Product } from "@/lib/types"
+import Link from "next/link"
 
 export default function DrinksPage() {
   const { currentBusiness } = useBusinessStore()
+  const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState("")
   const [showNewDrink, setShowNewDrink] = useState(false)
+  const [showEditProduct, setShowEditProduct] = useState(false)
+  const [selectedDrink, setSelectedDrink] = useState<Product | null>(null)
   const [drinks, setDrinks] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [deletingDrinkId, setDeletingDrinkId] = useState<string | null>(null)
 
   useEffect(() => {
     const loadDrinks = async () => {
@@ -52,9 +67,107 @@ export default function DrinksPage() {
     (drink.categoryId && drink.categoryId.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
+  // Helper function to parse business-specific fields from description
+  const parseBusinessFields = (drink: Product) => {
+    const desc = drink.description || ""
+    const fields: any = {}
+    
+    // Parse volume_ml: "Volume: 750ml"
+    const volumeMatch = desc.match(/Volume:\s*(\d+)ml/i)
+    if (volumeMatch) {
+      fields.volume_ml = parseInt(volumeMatch[1])
+    }
+    
+    // Parse alcohol_percentage: "Alcohol: 40%"
+    const alcoholMatch = desc.match(/Alcohol:\s*([\d.]+)%/i)
+    if (alcoholMatch) {
+      fields.alcohol_percentage = parseFloat(alcoholMatch[1])
+    }
+    
+    return fields
+  }
+
+  const handleDrinkSaved = () => {
+    // Reload drinks after save
+    if (currentBusiness) {
+      const loadDrinks = async () => {
+        setIsLoading(true)
+        try {
+          const productsData = await productService.list({ is_active: true })
+          const products = Array.isArray(productsData) ? productsData : productsData.results || []
+          setDrinks(products)
+        } catch (error) {
+          console.error("Failed to load drinks:", error)
+        } finally {
+          setIsLoading(false)
+        }
+      }
+      loadDrinks()
+    }
+  }
+
+  const handleEdit = (drink: Product) => {
+    setSelectedDrink(drink)
+    setShowEditProduct(true)
+  }
+
+  const handleDelete = async (drink: Product) => {
+    if (!confirm(`Are you sure you want to delete "${drink.name}"? This action cannot be undone.`)) {
+      return
+    }
+
+    setDeletingDrinkId(drink.id)
+    try {
+      await productService.delete(drink.id)
+      toast({
+        title: "Drink Deleted",
+        description: `${drink.name} has been deleted successfully.`,
+      })
+      handleDrinkSaved()
+    } catch (error: any) {
+      console.error("Failed to delete drink:", error)
+      toast({
+        title: "Delete Failed",
+        description: error.message || "Failed to delete drink. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setDeletingDrinkId(null)
+    }
+  }
+
+  // Helper to check if a drink is low stock (checks both product and variations)
+  const isDrinkLowStock = (drink: Product) => {
+    // Check backend flag
+    if (drink.is_low_stock) return true
+    
+    // Check product-level
+    const stock = typeof drink.stock === 'number' ? drink.stock : parseFloat(drink.stock?.toString() || '0')
+    const threshold = typeof drink.lowStockThreshold === 'number' 
+      ? drink.lowStockThreshold 
+      : parseFloat(drink.lowStockThreshold?.toString() || '0')
+    
+    if (threshold > 0 && stock <= threshold) return true
+    
+    // Check variation-level
+    if (drink.variations && Array.isArray(drink.variations)) {
+      return drink.variations.some((v: any) => {
+        if (!v.track_inventory) return false
+        const varStock = v.total_stock || v.stock || 0
+        const varThreshold = v.low_stock_threshold || 0
+        return varThreshold > 0 && varStock <= varThreshold
+      })
+    }
+    
+    return false
+  }
+
   const totalDrinks = drinks.length
-  const lowStockCount = drinks.filter(d => d.lowStockThreshold && d.stock <= d.lowStockThreshold).length
-  const totalValue = drinks.reduce((sum, d) => sum + ((d.cost || 0) * d.stock), 0)
+  const lowStockCount = drinks.filter(isDrinkLowStock).length
+  const totalValue = drinks.reduce((sum, d) => {
+    const stock = typeof d.stock === 'number' ? d.stock : parseFloat(d.stock?.toString() || '0')
+    return sum + ((d.cost || 0) * stock)
+  }, 0)
   const categories = new Set(drinks.map(d => d.categoryId).filter(Boolean)).size
 
   return (
@@ -143,11 +256,12 @@ export default function DrinksPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Category</TableHead>
-                  <TableHead>Type/Size</TableHead>
+                  <TableHead>Volume (ml)</TableHead>
+                  <TableHead>Alcohol %</TableHead>
                   <TableHead>Cost</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>Stock</TableHead>
-                  <TableHead>Bottle:Shot</TableHead>
+                  <TableHead>Unit</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -167,29 +281,159 @@ export default function DrinksPage() {
                   </TableRow>
                 ) : (
                   filteredDrinks.map((drink) => {
-                    const isLowStock = drink.lowStockThreshold ? drink.stock <= drink.lowStockThreshold : false
+                    const businessFields = parseBusinessFields(drink)
+                    const stock = typeof drink.stock === 'number' ? drink.stock : parseFloat(drink.stock?.toString() || '0')
+                    const lowStockThreshold = typeof drink.lowStockThreshold === 'number' 
+                      ? drink.lowStockThreshold 
+                      : parseFloat(drink.lowStockThreshold?.toString() || '0')
+                    
+                    // Check if any variation is low stock
+                    let isLow = false
+                    let isOutOfStock = stock === 0
+                    
+                    if (drink.variations && Array.isArray(drink.variations)) {
+                      const lowVariations = drink.variations.filter((v: any) => {
+                        if (!v.track_inventory) return false
+                        const varStock = v.total_stock || v.stock || 0
+                        const varThreshold = v.low_stock_threshold || 0
+                        if (varThreshold > 0 && varStock <= varThreshold) {
+                          if (varStock === 0) isOutOfStock = true
+                          return true
+                        }
+                        return false
+                      })
+                      isLow = lowVariations.length > 0
+                    }
+                    
+                    // Also check product-level
+                    if (!isLow && lowStockThreshold > 0 && stock <= lowStockThreshold) {
+                      isLow = true
+                    }
+                    
+                    // Check backend flag
+                    if (drink.is_low_stock) {
+                      isLow = true
+                    }
+                    
                     return (
                       <TableRow key={drink.id}>
-                        <TableCell className="font-medium">{drink.name}</TableCell>
+                        <TableCell className="font-medium">
+                          <Link 
+                            href={`/dashboard/products/${drink.id}`}
+                            className="hover:text-primary"
+                          >
+                            {drink.name}
+                          </Link>
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline">{drink.categoryId || "Uncategorized"}</Badge>
                         </TableCell>
-                        <TableCell>{drink.unit || "pcs"}</TableCell>
+                        <TableCell>
+                          {businessFields.volume_ml ? (
+                            <span className="font-medium">{businessFields.volume_ml}ml</span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {businessFields.alcohol_percentage !== undefined ? (
+                            <span className="font-medium">{businessFields.alcohol_percentage}%</span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
                         <TableCell className="font-semibold">
                           {currentBusiness?.currencySymbol || "MWK"} {(drink.cost || 0).toFixed(2)}
                         </TableCell>
                         <TableCell className="font-semibold">
-                          {currentBusiness?.currencySymbol || "MWK"} {drink.price.toFixed(2)}
+                          {currentBusiness?.currencySymbol || "MWK"} {(drink.retail_price || drink.price || 0).toFixed(2)}
                         </TableCell>
-                        <TableCell>{drink.stock}</TableCell>
-                        <TableCell>-</TableCell>
                         <TableCell>
-                          <Badge variant={isLowStock ? "destructive" : "default"}>
-                            {isLowStock ? "Low Stock" : "In Stock"}
+                          <div className="flex items-center gap-2">
+                            <Package className="h-4 w-4 text-muted-foreground" />
+                            <span className={isOutOfStock ? "text-red-600 font-semibold" : isLow ? "text-orange-600 font-semibold" : ""}>
+                              {stock}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{drink.unit || "pcs"}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={isOutOfStock ? "destructive" : isLow ? "secondary" : "default"}
+                            className={
+                              isOutOfStock 
+                                ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200"
+                                : isLow
+                                ? "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200"
+                                : "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200"
+                            }
+                          >
+                            {isOutOfStock ? "Out of Stock" : isLow ? "Low Stock" : "In Stock"}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="sm">View</Button>
+                          <div className="flex items-center gap-2">
+                            <Link href={`/dashboard/products/${drink.id}`}>
+                              <Button variant="ghost" size="sm" title="View Details">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(drink)}
+                              title="Edit Drink"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/dashboard/products/${drink.id}`} className="flex items-center">
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    View Details
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleEdit(drink)}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Edit Drink
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/dashboard/inventory/adjust?product=${drink.id}`} className="flex items-center">
+                                    <Package className="mr-2 h-4 w-4" />
+                                    Adjust Stock
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => handleDelete(drink)}
+                                  disabled={deletingDrinkId === drink.id}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  {deletingDrinkId === drink.id ? (
+                                    <>
+                                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                      Deleting...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Delete Drink
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </TableCell>
                       </TableRow>
                     )
@@ -204,7 +448,23 @@ export default function DrinksPage() {
       {/* Modals */}
       <NewDrinkModal
         open={showNewDrink}
-        onOpenChange={setShowNewDrink}
+        onOpenChange={(open) => {
+          setShowNewDrink(open)
+          if (!open) {
+            handleDrinkSaved()
+          }
+        }}
+      />
+      <AddEditProductModal
+        open={showEditProduct}
+        onOpenChange={(open) => {
+          setShowEditProduct(open)
+          if (!open) {
+            setSelectedDrink(null)
+            handleDrinkSaved()
+          }
+        }}
+        product={selectedDrink}
       />
     </DashboardLayout>
   )

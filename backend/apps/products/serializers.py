@@ -1,5 +1,5 @@
-from rest_framework import serializers
-from .models import Product, Category
+from rest_framework import serializers  # pyright: ignore[reportMissingImports]
+from .models import Product, Category, ItemVariation, ProductUnit
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -17,8 +17,97 @@ class CategorySerializer(serializers.ModelSerializer):
         return representation
 
 
+class ItemVariationSerializer(serializers.ModelSerializer):
+    """Item Variation serializer"""
+    total_stock = serializers.SerializerMethodField()
+    is_low_stock = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ItemVariation
+        fields = (
+            'id', 'product', 'name', 'price', 'cost', 'sku', 'barcode',
+            'track_inventory', 'unit', 'low_stock_threshold', 'is_active',
+            'sort_order', 'total_stock', 'is_low_stock', 'created_at', 'updated_at'
+        )
+        read_only_fields = ('id', 'created_at', 'updated_at')
+        extra_kwargs = {
+            'sku': {'required': False, 'allow_blank': True},
+            'barcode': {'required': False, 'allow_blank': True},
+            'cost': {'required': False, 'allow_null': True},
+        }
+    
+    def get_total_stock(self, obj):
+        """Get total stock across all outlets"""
+        outlet = self.context.get('outlet')
+        return obj.get_total_stock(outlet=outlet)
+    
+    def get_is_low_stock(self, obj):
+        """Check if variation is low on stock"""
+        if not obj.track_inventory:
+            return False
+        outlet = self.context.get('outlet')
+        total_stock = obj.get_total_stock(outlet=outlet)
+        return obj.low_stock_threshold > 0 and total_stock <= obj.low_stock_threshold
+    
+    def validate_sku(self, value):
+        """Ensure SKU is unique per product (if provided)"""
+        if not value or (isinstance(value, str) and value.strip() == ""):
+            return None  # Return None instead of empty string
+        
+        product = self.initial_data.get('product') or (self.instance.product if self.instance else None)
+        if not product:
+            return value
+        
+        # Check if SKU exists for other variations of the same product
+        existing = ItemVariation.objects.filter(product=product, sku=value)
+        if self.instance:
+            existing = existing.exclude(pk=self.instance.pk)
+        
+        if existing.exists():
+            raise serializers.ValidationError("SKU already exists for another variation of this product")
+        
+        return value
+
+
+class ProductUnitSerializer(serializers.ModelSerializer):
+    """Product Unit serializer for multi-unit selling"""
+    stock_in_unit = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ProductUnit
+        fields = (
+            'id', 'product', 'unit_name', 'conversion_factor', 'retail_price', 
+            'wholesale_price', 'is_active', 'sort_order', 'stock_in_unit', 
+            'created_at', 'updated_at'
+        )
+        read_only_fields = ('id', 'created_at', 'updated_at')
+    
+    def get_stock_in_unit(self, obj):
+        """Get stock converted to this unit"""
+        outlet = self.context.get('outlet')
+        if outlet:
+            # Get stock from LocationStock if variation exists, else from product
+            if obj.product.variations.exists():
+                from apps.inventory.models import LocationStock
+                from django.db.models import Sum
+                variations = obj.product.variations.filter(is_active=True, track_inventory=True)
+                location_stocks = LocationStock.objects.filter(
+                    variation__in=variations,
+                    outlet=outlet
+                )
+                total_base_units = location_stocks.aggregate(total=Sum('quantity'))['total'] or 0
+            else:
+                total_base_units = obj.product.stock
+            
+            # Convert to this unit
+            if obj.conversion_factor > 0:
+                return float(total_base_units / obj.conversion_factor)
+            return 0
+        return None
+
+
 class ProductSerializer(serializers.ModelSerializer):
-    """Product serializer"""
+    """Product serializer with variation support"""
     category = CategorySerializer(read_only=True)
     category_id = serializers.IntegerField(
         source='category',
@@ -26,29 +115,79 @@ class ProductSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True
     )
-    is_low_stock = serializers.BooleanField(read_only=True)
+    is_low_stock = serializers.SerializerMethodField()
+    stock = serializers.SerializerMethodField()  # Calculate from LocationStock
+    variations = ItemVariationSerializer(many=True, read_only=True)
+    default_variation = ItemVariationSerializer(read_only=True)
+    selling_units = ProductUnitSerializer(many=True, read_only=True)
+    
+    # Backward compatibility fields
+    price = serializers.SerializerMethodField()
+    cost_price = serializers.SerializerMethodField()
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Make tenant read-only (set automatically from request context)
+        # Make tenant and outlet read-only (set automatically from request context)
         if 'tenant' in self.fields:
             self.fields['tenant'].read_only = True
+        if 'outlet' in self.fields:
+            self.fields['outlet'].read_only = True
     
     class Meta:
         model = Product
-        fields = ('id', 'tenant', 'category', 'category_id', 'name', 'description', 'sku', 
-                  'barcode', 'price', 'cost', 'stock', 'low_stock_threshold', 'unit', 
-                  'image', 'is_active', 'is_low_stock', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'tenant', 'created_at', 'updated_at')
+        fields = (
+            'id', 'tenant', 'outlet', 'category', 'category_id', 'name', 'description', 
+            'sku', 'barcode', 'retail_price', 'price', 'cost', 'cost_price', 
+            'wholesale_price', 'wholesale_enabled', 'minimum_wholesale_quantity', 
+            'stock', 'low_stock_threshold', 'unit', 'image', 'is_active', 
+            'is_low_stock', 'variations', 'default_variation', 'selling_units', 
+            'created_at', 'updated_at'
+        )
+        read_only_fields = ('id', 'tenant', 'outlet', 'created_at', 'updated_at', 'price', 'variations', 'default_variation', 'selling_units')
         extra_kwargs = {
-            'sku': {'required': False, 'allow_blank': True}
+            'sku': {'required': False, 'allow_blank': True},
+            'wholesale_price': {'required': False, 'allow_null': True},
+            'minimum_wholesale_quantity': {'required': False},
         }
+    
+    def get_price(self, obj):
+        """Backward compat: return default variation price or retail_price"""
+        return obj.get_price()
+    
+    def get_cost_price(self, obj):
+        """Backward compat: return default variation cost or cost"""
+        return obj.get_cost()
+    
+    def get_stock(self, obj):
+        """Calculate stock from all variations' LocationStock"""
+        outlet = self.context.get('outlet')
+        return obj.get_total_stock(outlet=outlet)
+    
+    def get_is_low_stock(self, obj):
+        """Check if product is low stock by checking variations"""
+        outlet = self.context.get('outlet')
+        
+        # Check product-level threshold
+        if obj.low_stock_threshold > 0:
+            total_stock = obj.get_total_stock(outlet=outlet)
+            if total_stock <= obj.low_stock_threshold:
+                return True
+        
+        # Check variation-level thresholds
+        variations = obj.variations.filter(is_active=True, track_inventory=True)
+        for variation in variations:
+            if variation.low_stock_threshold > 0:
+                var_stock = variation.get_total_stock(outlet=outlet)
+                if var_stock <= variation.low_stock_threshold:
+                    return True
+        
+        return False
     
     def validate_sku(self, value):
         """Ensure SKU is unique per tenant (if provided)"""
-        if not value or value.strip() == "":
-            # SKU is optional, will be auto-generated
-            return value
+        if not value or (isinstance(value, str) and value.strip() == ""):
+            # SKU is optional, return None instead of empty string
+            return None
             
         if self.instance:
             # Update: check if SKU exists for other products in same tenant
@@ -142,34 +281,115 @@ class ProductSerializer(serializers.ModelSerializer):
         
         return category  # Return the category object, not the ID
     
+    def validate_wholesale_price(self, value):
+        """Validate wholesale price"""
+        if value is not None and value != '':
+            from decimal import Decimal
+            try:
+                # Convert to Decimal if it's a string
+                if isinstance(value, str):
+                    value = Decimal(value)
+                elif isinstance(value, (int, float)):
+                    value = Decimal(str(value))
+                
+                if value < Decimal('0.01'):
+                    raise serializers.ValidationError("Wholesale price must be greater than 0.01")
+            except (ValueError, TypeError):
+                raise serializers.ValidationError("Wholesale price must be a valid number")
+        elif value == '':
+            # Empty string should be converted to None
+            return None
+        return value
+    
     def validate(self, attrs):
-        """Auto-generate SKU if not provided and ensure uniqueness"""
-        # Only auto-generate on create (not update)
+        """Auto-generate SKU if not provided and ensure uniqueness. Handle backward compatibility for price field."""
+        # Handle backward compatibility: if 'price' is provided, map it to 'retail_price'
+        if 'price' in attrs and 'retail_price' not in attrs:
+            attrs['retail_price'] = attrs.pop('price')
+        
+        # Handle backward compatibility: if 'cost_price' is provided, map it to 'cost'
+        if 'cost_price' in attrs and 'cost' not in attrs:
+            attrs['cost'] = attrs.pop('cost_price')
+        
+        # Validate wholesale pricing logic
+        wholesale_enabled = attrs.get('wholesale_enabled', False)
+        # Check instance if updating
+        if self.instance:
+            wholesale_enabled = attrs.get('wholesale_enabled', self.instance.wholesale_enabled)
+        
+        # Handle wholesale_price - convert empty strings to None
+        wholesale_price = attrs.get('wholesale_price')
+        if wholesale_price == '' or wholesale_price is None:
+            wholesale_price = None
+            attrs['wholesale_price'] = None
+        
+        if wholesale_enabled:
+            # If wholesale is enabled, wholesale_price should be provided
+            if wholesale_price is None:
+                # On update, check existing value
+                if self.instance:
+                    wholesale_price = self.instance.wholesale_price
+                else:
+                    wholesale_price = None
+            
+            if wholesale_price is None:
+                raise serializers.ValidationError({
+                    'wholesale_price': 'Wholesale price is required when wholesale is enabled.'
+                })
+            
+            # Ensure minimum_wholesale_quantity is at least 1
+            min_qty = attrs.get('minimum_wholesale_quantity', 1)
+            if self.instance and 'minimum_wholesale_quantity' not in attrs:
+                min_qty = self.instance.minimum_wholesale_quantity
+            
+            if min_qty < 1:
+                attrs['minimum_wholesale_quantity'] = 1
+        else:
+            # If wholesale is disabled, clear wholesale_price and reset minimum_wholesale_quantity
+            attrs['wholesale_enabled'] = False
+            attrs['wholesale_price'] = None
+            attrs['minimum_wholesale_quantity'] = 1
+        
+        # Handle SKU - optional, validate uniqueness if provided
         if not self.instance:
-            # Handle SKU - can be None, empty string, or actual value
+            # On create: validate SKU if provided
             sku_value = attrs.get('sku')
-            if sku_value is None:
-                sku = ''
-            elif isinstance(sku_value, str):
-                sku = sku_value.strip()
+            if sku_value:
+                # SKU provided - normalize and validate
+                if isinstance(sku_value, str):
+                    sku = sku_value.strip()
+                else:
+                    sku = str(sku_value).strip()
+                
+                # Only validate uniqueness if SKU is not empty
+                if sku:
+                    request = self.context.get('request')
+                    if request:
+                        tenant = getattr(request, 'tenant', None) or (request.user.tenant if hasattr(request, 'user') and request.user.is_authenticated else None)
+                        if tenant and Product.objects.filter(tenant=tenant, sku=sku).exists():
+                            raise serializers.ValidationError({'sku': 'SKU already exists for this tenant.'})
+                    attrs['sku'] = sku
+                else:
+                    # Empty string - set to None (NULL in database)
+                    attrs['sku'] = None
             else:
-                sku = str(sku_value).strip()
-            
-            request = self.context.get('request')
-            if not request:
-                raise serializers.ValidationError("Request context is missing for SKU generation.")
-            
-            tenant = getattr(request, 'tenant', None) or (request.user.tenant if hasattr(request, 'user') and request.user.is_authenticated else None)
-            if not tenant:
-                raise serializers.ValidationError("Unable to determine tenant for SKU generation.")
-            
-            if not sku:
-                # Auto-generate SKU
-                attrs['sku'] = self.generate_sku(tenant)
-            else:
-                # SKU provided - ensure it's unique per tenant
-                if Product.objects.filter(tenant=tenant, sku=sku).exists():
-                    raise serializers.ValidationError({'sku': 'SKU already exists for this tenant.'})
-                attrs['sku'] = sku  # Ensure it's set
+                # No SKU provided - set to None (NULL in database)
+                attrs['sku'] = None
+        else:
+            # On update: validate SKU if provided
+            if 'sku' in attrs:
+                sku_value = attrs.get('sku')
+                if sku_value:
+                    if isinstance(sku_value, str):
+                        sku = sku_value.strip()
+                    else:
+                        sku = str(sku_value).strip()
+                    
+                    # Only validate uniqueness if SKU is not empty
+                    if sku:
+                        if Product.objects.filter(tenant=self.instance.tenant, sku=sku).exclude(pk=self.instance.pk).exists():
+                            raise serializers.ValidationError({'sku': 'SKU already exists for this tenant.'})
+                        attrs['sku'] = sku
+                    else:
+                        attrs['sku'] = None
         return attrs
-

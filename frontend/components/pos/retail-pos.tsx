@@ -7,12 +7,9 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { usePOSStore } from "@/stores/posStore"
 import { useBusinessStore } from "@/stores/businessStore"
-import { getProducts, getCategories } from "@/lib/mockApi"
 import { productService, categoryService } from "@/lib/services/productService"
-import { useRealAPI } from "@/lib/utils/api-config"
 import { formatCurrency } from "@/lib/utils/currency"
 import { Search, ShoppingCart, Percent, Save, Trash2, Plus, Minus, X, Lock } from "lucide-react"
-import { PaymentModal } from "@/components/modals/payment-modal"
 import { DiscountModal } from "@/components/modals/discount-modal"
 import { CloseRegisterModal } from "@/components/modals/close-register-modal"
 import { ReceiptPreviewModal } from "@/components/modals/receipt-preview-modal"
@@ -32,37 +29,34 @@ export function RetailPOS() {
   const [receiptData, setReceiptData] = useState<any>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<string[]>([])
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true)
+  const [productsError, setProductsError] = useState<string | null>(null)
 
   useEffect(() => {
     const loadData = async () => {
-      if (!currentBusiness) return
+      if (!currentBusiness) {
+        setIsLoadingProducts(false)
+        return
+      }
+      
+      setIsLoadingProducts(true)
+      setProductsError(null)
       
       try {
-        if (useRealAPI()) {
-          // Use real API
-          const [productsData, categoriesData] = await Promise.all([
-            productService.list({ is_active: true }),
-            categoryService.list(),
-          ])
-          setProducts(productsData.results || productsData)
-          setCategories(["all", ...(categoriesData.map((c: any) => c.name) || [])])
-        } else {
-          // Use mock API
-          const businessProducts = getProducts(currentBusiness.id)
-          if (businessProducts.length > 0) {
-            setProducts(businessProducts)
-          }
-          
-          const businessCategories = getCategories(currentBusiness.id)
-          setCategories(["all", ...businessCategories.map(c => c.name)])
-        }
-      } catch (error) {
+        // Use real API
+        const [productsData, categoriesData] = await Promise.all([
+          productService.list({ is_active: true }),
+          categoryService.list(),
+        ])
+        setProducts(productsData.results || productsData)
+        setCategories(["all", ...(categoriesData.map((c: any) => c.name) || [])])
+      } catch (error: any) {
         console.error("Failed to load products:", error)
-        // Fallback to mock data
-        const businessProducts = getProducts(currentBusiness.id)
-        if (businessProducts.length > 0) {
-          setProducts(businessProducts)
-        }
+        setProductsError("Failed to load products. Please refresh the page.")
+        setProducts([])
+        setCategories(["all"])
+      } finally {
+        setIsLoadingProducts(false)
       }
     }
     
@@ -118,7 +112,7 @@ export function RetailPOS() {
       <div className="border-b bg-card px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Retail POS</h1>
+            <h1 className="text-2xl font-bold">Wholesale and Retail POS</h1>
             <p className="text-sm text-muted-foreground">{currentBusiness.name}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -288,10 +282,11 @@ export function RetailPOS() {
               <Button
                 className="w-full"
                 size="lg"
-                onClick={() => setShowPayment(true)}
+                disabled
+                title="Payment system will be implemented"
               >
                 <ShoppingCart className="mr-2 h-5 w-5" />
-                Process Payment
+                Process Payment (Coming Soon)
               </Button>
             </div>
           )}
@@ -299,43 +294,7 @@ export function RetailPOS() {
       </div>
 
       {/* Modals */}
-      <PaymentModal
-        open={showPayment}
-        onOpenChange={setShowPayment}
-        total={cartTotal}
-        subtotal={cartTotal}
-        tax={0}
-        discount={0}
-        cartItems={cart.map(item => ({
-          productId: item.productId,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-        }))}
-        onComplete={() => {
-          // Prepare receipt data
-          const receiptItems = cart.map(item => ({
-            id: item.id,
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity,
-            discount: 0,
-            total: item.total,
-          }))
-          
-          setReceiptData({
-            cart: receiptItems,
-            subtotal: cartTotal,
-            discount: 0,
-            tax: 0,
-            total: cartTotal,
-          })
-          
-          clearCart()
-          setShowPayment(false)
-          setShowReceipt(true)
-        }}
-      />
+      {/* PaymentModal removed - new payment system will be implemented */}
       <DiscountModal
         open={showDiscount}
         onOpenChange={setShowDiscount}

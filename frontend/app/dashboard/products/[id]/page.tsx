@@ -4,6 +4,7 @@ import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Package, TrendingUp, History, Building2 } from "lucide-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
@@ -16,13 +17,14 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { ViewProductHistoryModal } from "@/components/modals/view-product-history-modal"
+import { ManageVariationsModal } from "@/components/modals/manage-variations-modal"
+import { AddEditProductModal } from "@/components/modals/add-edit-product-modal"
 import { useState, useEffect } from "react"
-import { productService } from "@/lib/services/productService"
+import { productService, variationService, type ItemVariation } from "@/lib/services/productService"
 import { saleService } from "@/lib/services/saleService"
 import { inventoryService } from "@/lib/services/inventoryService"
 import { useBusinessStore } from "@/stores/businessStore"
-import { useRealAPI } from "@/lib/utils/api-config"
-import { getProduct } from "@/lib/mockApi"
+import { Edit } from "lucide-react"
 
 export default function ProductDetailPage() {
   const params = useParams()
@@ -32,8 +34,10 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<any>(null)
   const [stockHistory, setStockHistory] = useState<any[]>([])
   const [salesHistory, setSalesHistory] = useState<any[]>([])
+  const [variations, setVariations] = useState<ItemVariation[]>([])
+  const [showVariationsModal, setShowVariationsModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const useReal = useRealAPI()
 
   useEffect(() => {
     const loadProductData = async () => {
@@ -41,49 +45,44 @@ export default function ProductDetailPage() {
       
       setIsLoading(true)
       try {
-        if (useReal) {
-          const [productData, movementsData, salesData] = await Promise.all([
-            productService.get(productId),
-            inventoryService.getMovements({ product: productId }),
-            saleService.list({ tenant: currentBusiness.id, limit: 50 }),
-          ])
-          
-          setProduct(productData)
-          
-          // Transform movements to stock history
-          const movements = movementsData.results || []
-          setStockHistory(movements.map((m: any) => ({
-            date: m.created_at || m.date,
-            type: m.movement_type || m.type,
-            quantity: m.quantity,
-            balance: m.balance_after || m.balance,
-            user: m.user?.name || m.user_name || "System",
-          })))
-          
-          // Filter sales for this product
-          const sales = Array.isArray(salesData) ? salesData : salesData.results || []
-          const productSales: any[] = []
-          sales.forEach((sale: any) => {
-            sale.items?.forEach((item: any) => {
-              if ((item.product_id || item.productId) === productId) {
-                productSales.push({
-                  date: sale.created_at || sale.date,
-                  saleId: sale.receipt_number || sale.id,
-                  quantity: item.quantity,
-                  price: item.price,
-                  total: item.price * item.quantity,
-                  customer: sale.customer?.name || "Walk-in",
-                })
-              }
-            })
+        const [productData, movementsData, salesData, variationsData] = await Promise.all([
+          productService.get(productId),
+          inventoryService.getMovements({ product: productId }),
+          saleService.list({ tenant: currentBusiness.id, limit: 50 }),
+          variationService.list({ product: productId }),
+        ])
+        
+        setProduct(productData)
+        setVariations(variationsData)
+        
+        // Transform movements to stock history
+        const movements = movementsData.results || []
+        setStockHistory(movements.map((m: any) => ({
+          date: m.created_at || m.date,
+          type: m.movement_type || m.type,
+          quantity: m.quantity,
+          balance: m.balance_after || m.balance,
+          user: m.user?.name || m.user_name || "System",
+        })))
+        
+        // Filter sales for this product
+        const sales = Array.isArray(salesData) ? salesData : salesData.results || []
+        const productSales: any[] = []
+        sales.forEach((sale: any) => {
+          sale.items?.forEach((item: any) => {
+            if ((item.product_id || item.productId) === productId) {
+              productSales.push({
+                date: sale.created_at || sale.date,
+                saleId: sale.receipt_number || sale.id,
+                quantity: item.quantity,
+                price: item.price,
+                total: item.price * item.quantity,
+                customer: sale.customer?.name || "Walk-in",
+              })
+            }
           })
-          setSalesHistory(productSales.slice(0, 20))
-        } else {
-          const mockProduct = getProduct(productId)
-          setProduct(mockProduct)
-          setStockHistory([])
-          setSalesHistory([])
-        }
+        })
+        setSalesHistory(productSales.slice(0, 20))
       } catch (error) {
         console.error("Failed to load product data:", error)
       } finally {
@@ -92,7 +91,7 @@ export default function ProductDetailPage() {
     }
     
     loadProductData()
-  }, [productId, currentBusiness, useReal])
+  }, [productId, currentBusiness])
 
   if (isLoading || !product) {
     return (
@@ -107,21 +106,30 @@ export default function ProductDetailPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Link href="/dashboard/products">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-3xl font-bold">{product.name}</h1>
-            <p className="text-muted-foreground">SKU: {product.sku}</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/dashboard/products">
+              <Button variant="ghost" size="icon">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-3xl font-bold">{product.name}</h1>
+              <p className="text-muted-foreground">SKU: {product.sku}</p>
+            </div>
           </div>
+          <Button onClick={() => setShowEditModal(true)}>
+            <Edit className="mr-2 h-4 w-4" />
+            Edit Product
+          </Button>
         </div>
 
         <Tabs defaultValue="details" className="space-y-4">
           <TabsList>
             <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="variations">
+              Variations ({variations.length})
+            </TabsTrigger>
             <TabsTrigger value="stock-history">Stock History</TabsTrigger>
             <TabsTrigger value="sales-history">Sales History</TabsTrigger>
             <TabsTrigger value="supplier">Supplier Info</TabsTrigger>
@@ -219,6 +227,69 @@ export default function ProductDetailPage() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="variations" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Item Variations</CardTitle>
+                    <CardDescription>
+                      Manage different variations of this product (sizes, colors, pack sizes, etc.)
+                    </CardDescription>
+                  </div>
+                  <Button onClick={() => setShowVariationsModal(true)}>
+                    <Package className="mr-2 h-4 w-4" />
+                    Manage Variations
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {variations.length === 0 ? (
+                  <div className="text-center py-8 border rounded-lg">
+                    <Package className="h-12 w-12 mx-auto mb-2 text-muted-foreground opacity-50" />
+                    <p className="text-muted-foreground mb-4">No variations yet</p>
+                    <Button onClick={() => setShowVariationsModal(true)} variant="outline">
+                      Create First Variation
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {variations.map((variation) => (
+                      <div
+                        key={variation.id}
+                        className="flex items-center justify-between p-4 border rounded-lg"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{variation.name}</span>
+                            {variation.is_active ? (
+                              <Badge variant="default">Active</Badge>
+                            ) : (
+                              <Badge variant="secondary">Inactive</Badge>
+                            )}
+                            {variation.track_inventory && variation.is_low_stock && (
+                              <Badge variant="outline" className="text-orange-600 border-orange-600">
+                                Low Stock
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-muted-foreground mt-1">
+                            Price: MWK {variation.price.toFixed(2)}
+                            {variation.cost && ` | Cost: MWK ${variation.cost.toFixed(2)}`}
+                            {variation.track_inventory && variation.total_stock !== undefined && (
+                              ` | Stock: ${variation.total_stock} ${variation.unit}`
+                            )}
+                            {variation.sku && ` | SKU: ${variation.sku}`}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="stock-history" className="space-y-4">
@@ -354,6 +425,33 @@ export default function ProductDetailPage() {
         onOpenChange={setShowHistory}
         productId={productId}
         productName={product.name}
+      />
+      <ManageVariationsModal
+        open={showVariationsModal}
+        onOpenChange={setShowVariationsModal}
+        productId={productId}
+        productName={product.name}
+        onVariationsUpdated={() => {
+          // Reload variations
+          variationService.list({ product: productId }).then(setVariations)
+        }}
+      />
+      <AddEditProductModal
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        product={product}
+        onProductSaved={async () => {
+          // Reload product data after update
+          try {
+            const updatedProduct = await productService.get(productId)
+            setProduct(updatedProduct)
+            // Also reload variations in case they changed
+            const updatedVariations = await variationService.list({ product: productId })
+            setVariations(updatedVariations)
+          } catch (error) {
+            console.error("Failed to reload product after update:", error)
+          }
+        }}
       />
     </DashboardLayout>
   )

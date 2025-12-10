@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -12,49 +12,79 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
-
-interface Notification {
-  id: string
-  type: "sale" | "stock" | "staff" | "system"
-  title: string
-  message: string
-  timestamp: string
-  read: boolean
-  priority: "low" | "normal" | "high"
-}
+import { notificationService, type Notification } from "@/lib/services/notificationService"
+import { useBusinessStore } from "@/stores/businessStore"
+import { useWebSocketNotifications } from "@/hooks/useWebSocketNotifications"
 
 export function NotificationBell() {
-  const [notifications] = useState<Notification[]>([
-    {
-      id: "1",
-      type: "sale",
-      title: "New Sale Completed",
-      message: "Sale #1001 completed for MWK 125.50",
-      timestamp: new Date().toISOString(),
-      read: false,
-      priority: "normal",
-    },
-    {
-      id: "2",
-      type: "stock",
-      title: "Low Stock Alert",
-      message: "Product B is running low (12 units remaining)",
-      timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-      read: false,
-      priority: "high",
-    },
-    {
-      id: "3",
-      type: "staff",
-      title: "New Staff Added",
-      message: "Jane Doe has been added to the system",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-      read: true,
-      priority: "normal",
-    },
-  ])
+  const { currentBusiness } = useBusinessStore()
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  
+  // Use WebSocket hook for real-time notifications
+  const { isConnected, unreadCount, latestNotification } = useWebSocketNotifications()
 
-  const unreadCount = notifications.filter(n => !n.read).length
+  useEffect(() => {
+    if (!currentBusiness) return
+
+    loadNotifications()
+
+    // Auto-refresh every 30 seconds (as fallback if WebSocket fails)
+    const interval = setInterval(() => {
+      loadNotifications()
+    }, 30000)
+
+    return () => clearInterval(interval)
+  }, [currentBusiness])
+
+  // Update notifications list when new notification arrives via WebSocket
+  useEffect(() => {
+    if (latestNotification) {
+      // Add new notification to the top of the list
+      setNotifications((prev) => {
+        // Check if notification already exists (avoid duplicates)
+        const exists = prev.some((n) => n.id === latestNotification.id)
+        if (exists) {
+          // Update existing notification
+          return prev.map((n) => n.id === latestNotification.id ? latestNotification : n)
+        }
+        // Add new notification at the top
+        return [latestNotification, ...prev].slice(0, 10) // Keep only latest 10
+      })
+      // Optionally refresh the list after a short delay to ensure sync
+      const timeoutId = setTimeout(() => {
+        loadNotifications()
+      }, 1000)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [latestNotification])
+
+  const loadNotifications = async () => {
+    if (!currentBusiness) return
+
+    try {
+      setIsLoading(true)
+      const response = await notificationService.list({ page_size: 10 })
+      setNotifications(response.results || [])
+    } catch (error) {
+      console.error("Failed to load notifications:", error)
+      setNotifications([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleMarkAsRead = async (id: string | number) => {
+    try {
+      await notificationService.markRead(id)
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      )
+      // Unread count will be updated via WebSocket
+    } catch (error) {
+      console.error("Failed to mark notification as read:", error)
+    }
+  }
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -62,10 +92,22 @@ export function NotificationBell() {
         return "💰"
       case "stock":
         return "⚠️"
-      case "staff":
+      case "payment":
+        return "💳"
+      case "customer":
         return "👤"
+      case "staff":
+        return "👥"
+      case "report":
+        return "📊"
       case "system":
         return "🔔"
+      case "shift":
+        return "🕐"
+      case "inventory":
+        return "📦"
+      case "delivery":
+        return "🚚"
       default:
         return "📢"
     }
@@ -90,7 +132,15 @@ export function NotificationBell() {
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <span className="absolute top-1 right-1 h-2 w-2 bg-destructive rounded-full" />
+            <Badge
+              variant="destructive"
+              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+            >
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </Badge>
+          )}
+          {!isConnected && (
+            <span className="absolute -bottom-1 -right-1 h-2 w-2 bg-yellow-500 rounded-full border border-white" title="WebSocket disconnected" />
           )}
         </Button>
       </DropdownMenuTrigger>
@@ -106,51 +156,64 @@ export function NotificationBell() {
           </div>
           <ScrollArea className="h-[400px]">
             <div className="space-y-1">
-              {notifications.length === 0 ? (
+              {isLoading ? (
+                <div className="text-center py-8 text-sm text-muted-foreground">
+                  Loading notifications...
+                </div>
+              ) : notifications.length === 0 ? (
                 <div className="text-center py-8 text-sm text-muted-foreground">
                   No notifications
                 </div>
               ) : (
                 notifications.map((notification) => (
-                  <Link
+                  <div
                     key={notification.id}
-                    href="/dashboard/notifications"
+                    onClick={() => {
+                      if (!notification.read) {
+                        handleMarkAsRead(notification.id)
+                      }
+                    }}
                     className="block"
                   >
-                    <div
-                      className={`p-3 rounded-lg hover:bg-accent transition-colors cursor-pointer ${
-                        !notification.read ? "bg-blue-50 dark:bg-blue-950/20" : ""
-                      }`}
+                    <Link
+                      href={notification.link || "/dashboard/notifications"}
+                      className="block"
                     >
-                      <div className="flex items-start gap-3">
-                        <span className="text-lg">{getNotificationIcon(notification.type)}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <p className="text-sm font-medium truncate">
-                              {notification.title}
+                      <div
+                        className={`p-3 rounded-lg hover:bg-accent transition-colors cursor-pointer ${
+                          !notification.read ? "bg-blue-50 dark:bg-blue-950/20" : ""
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="text-lg">{getNotificationIcon(notification.type)}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-sm font-medium truncate">
+                                {notification.title}
+                              </p>
+                              {!notification.read && (
+                                <span className="h-2 w-2 bg-primary rounded-full flex-shrink-0 ml-2" />
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mb-1">
+                              {notification.message}
                             </p>
-                            {!notification.read && (
-                              <span className="h-2 w-2 bg-primary rounded-full flex-shrink-0 ml-2" />
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground mb-1">
-                            {notification.message}
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">
-                              {formatDistanceToNow(new Date(notification.timestamp), { addSuffix: true })}
-                            </span>
-                            <Badge
-                              variant="outline"
-                              className={`text-xs ${getPriorityColor(notification.priority)}`}
-                            >
-                              {notification.priority}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">
+                                {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className={`text-xs ${getPriorityColor(notification.priority)}`}
+                              >
+                                {notification.priority}
+                              </Badge>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </Link>
+                    </Link>
+                  </div>
                 ))
               )}
             </div>
@@ -167,4 +230,3 @@ export function NotificationBell() {
     </DropdownMenu>
   )
 }
-

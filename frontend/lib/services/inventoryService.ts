@@ -1,5 +1,5 @@
 import { api, apiEndpoints } from "@/lib/api"
-import type { Product } from "@/lib/types/mock-data"
+import type { Product } from "@/lib/types"
 
 export interface StockAdjustmentData {
   product_id: string

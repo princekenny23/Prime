@@ -10,10 +10,20 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Upload, FileText, Download, CheckCircle2, XCircle, AlertCircle } from "lucide-react"
+import { Upload, FileText, Download, CheckCircle2, XCircle, AlertCircle, Info } from "lucide-react"
 import { useState } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { productService } from "@/lib/services/productService"
+import { useBusinessStore } from "@/stores/businessStore"
+import {
+  getFieldsForBusinessType,
+  getRequiredFields,
+  getOptionalFields,
+  getBusinessSpecificFields,
+  type BusinessType,
+} from "@/lib/utils/excel-import-fields"
+import { Badge } from "@/components/ui/badge"
+// Accordion component - using collapsible divs instead
 
 interface ImportProductsModalProps {
   open: boolean
@@ -23,9 +33,16 @@ interface ImportProductsModalProps {
 
 export function ImportProductsModal({ open, onOpenChange, onSuccess }: ImportProductsModalProps) {
   const { toast } = useToast()
+  const { currentBusiness } = useBusinessStore()
   const [isLoading, setIsLoading] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [importResult, setImportResult] = useState<any>(null)
+  
+  const businessType = currentBusiness?.type as BusinessType
+  const allFields = getFieldsForBusinessType(businessType)
+  const requiredFields = getRequiredFields(businessType)
+  const optionalFields = getOptionalFields(businessType)
+  const businessSpecificFields = getBusinessSpecificFields(businessType)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -45,6 +62,48 @@ export function ImportProductsModal({ open, onOpenChange, onSuccess }: ImportPro
       setFile(selectedFile)
       setImportResult(null) // Clear previous results
     }
+  }
+
+  const handleDownloadTemplate = () => {
+    if (!businessType) {
+      toast({
+        title: "No Business Type",
+        description: "Please ensure you have a business selected.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Create CSV template with headers
+    const headers = allFields.map(f => f.name)
+    const csvContent = headers.join(",") + "\n"
+    
+    // Add sample row based on business type
+    const sampleRow: string[] = []
+    allFields.forEach(field => {
+      if (field.required) {
+        sampleRow.push(field.example || "")
+      } else {
+        sampleRow.push("")
+      }
+    })
+    const csvWithSample = csvContent + sampleRow.join(",") + "\n"
+    
+    // Create blob and download
+    const blob = new Blob([csvWithSample], { type: "text/csv;charset=utf-8;" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", `product-import-template-${businessType?.replace(/\s+/g, "-") || "all"}.csv`)
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    toast({
+      title: "Template Downloaded",
+      description: "Sample template CSV file has been downloaded.",
+    })
   }
 
   const handleImport = async () => {
@@ -130,19 +189,100 @@ export function ImportProductsModal({ open, onOpenChange, onSuccess }: ImportPro
             </div>
           </div>
 
-          <div className="bg-muted p-4 rounded-lg">
-            <div className="flex items-start gap-2">
-              <FileText className="h-4 w-4 mt-0.5 text-muted-foreground" />
-              <div className="text-sm space-y-1">
-                <p className="font-medium">File Format Requirements:</p>
-                <ul className="list-disc list-inside text-muted-foreground space-y-1">
-                  <li><strong>Required columns:</strong> Name, Price</li>
-                  <li><strong>Optional columns:</strong> Stock, Unit, SKU, Category, Barcode, Cost, Description, Low Stock Threshold, Is Active</li>
-                  <li>First row should contain headers</li>
-                  <li>Categories will be auto-created if they don't exist</li>
-                  <li>SKU will be auto-generated if not provided</li>
-                  <li>Maximum 1000 products per import</li>
-                </ul>
+          <div className="space-y-4">
+            {/* Business Type Info */}
+            {businessType && (
+              <div className="bg-primary/5 border border-primary/20 p-3 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Info className="h-4 w-4 text-primary" />
+                  <p className="text-sm font-medium">
+                    Importing for: <Badge variant="outline">{businessType}</Badge>
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Field Requirements */}
+            <div className="border rounded-lg">
+              <details className="group">
+                <summary className="flex items-center justify-between p-3 cursor-pointer text-sm font-medium hover:bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    View Required & Optional Fields
+                  </div>
+                  <span className="text-muted-foreground group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <div className="p-4 pt-0 border-t">
+                  <div className="space-y-4 pt-2">
+                    {/* Required Fields */}
+                    <div>
+                      <p className="text-sm font-semibold mb-2 text-green-700 dark:text-green-400">
+                        ✅ Required Columns:
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {requiredFields.map((field) => (
+                          <div key={field.name} className="text-xs bg-green-50 dark:bg-green-950/20 p-2 rounded">
+                            <span className="font-medium">{field.label}</span>
+                            <span className="text-muted-foreground ml-1">({field.name})</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Universal Optional Fields */}
+                    <div>
+                      <p className="text-sm font-semibold mb-2">⚠️ Universal Optional Columns:</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                        {optionalFields
+                          .filter(f => !businessSpecificFields.some(bsf => bsf.name === f.name))
+                          .map((field) => (
+                            <div key={field.name} className="text-xs bg-muted p-2 rounded">
+                              <div className="font-medium">{field.label}</div>
+                              <div className="text-muted-foreground text-[10px] mt-0.5">
+                                {field.name} - {field.description}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+
+                    {/* Business-Specific Fields */}
+                    {businessSpecificFields.length > 0 && (
+                      <div>
+                        <p className="text-sm font-semibold mb-2 text-blue-700 dark:text-blue-400">
+                          🎯 {businessType} Specific Columns:
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {businessSpecificFields.map((field) => (
+                            <div key={field.name} className="text-xs bg-blue-50 dark:bg-blue-950/20 p-2 rounded border border-blue-200 dark:border-blue-800">
+                              <div className="font-medium">{field.label}</div>
+                              <div className="text-muted-foreground text-[10px] mt-0.5">
+                                {field.name} - {field.description}
+                              </div>
+                              <div className="text-[10px] text-muted-foreground mt-1">
+                                Example: {field.example}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </details>
+            </div>
+
+            {/* Quick Info */}
+            <div className="bg-muted p-3 rounded-lg">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <div className="text-xs space-y-1 text-muted-foreground">
+                  <p>• First row should contain headers</p>
+                  <p>• Categories will be auto-created if they don't exist</p>
+                  <p>• SKU will be auto-generated if not provided</p>
+                  <p>• Empty variation_name creates a "Default" variation</p>
+                  <p>• Maximum 1000 products per import</p>
+                </div>
               </div>
             </div>
           </div>
@@ -219,9 +359,14 @@ export function ImportProductsModal({ open, onOpenChange, onSuccess }: ImportPro
             </div>
           )}
 
-          <Button variant="outline" className="w-full" disabled>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={handleDownloadTemplate}
+            disabled={!businessType}
+          >
             <Download className="mr-2 h-4 w-4" />
-            Download Sample Template (Coming Soon)
+            Download Sample Template
           </Button>
         </div>
 

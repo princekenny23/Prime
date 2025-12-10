@@ -19,8 +19,6 @@ import { useState, useEffect } from "react"
 import { customerService } from "@/lib/services/customerService"
 import { saleService } from "@/lib/services/saleService"
 import { useBusinessStore } from "@/stores/businessStore"
-import { useRealAPI } from "@/lib/utils/api-config"
-import { getCustomer } from "@/lib/mockApi"
 
 export default function CustomerDetailPage() {
   const params = useParams()
@@ -29,7 +27,6 @@ export default function CustomerDetailPage() {
   const [customer, setCustomer] = useState<any>(null)
   const [purchases, setPurchases] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const useReal = useRealAPI()
 
   useEffect(() => {
     const loadCustomerData = async () => {
@@ -37,29 +34,23 @@ export default function CustomerDetailPage() {
       
       setIsLoading(true)
       try {
-        if (useReal) {
-          const [customerData, salesData] = await Promise.all([
-            customerService.get(customerId),
-            saleService.list({ tenant: currentBusiness.id, customer: customerId, status: "completed", limit: 50 }),
-          ])
-          
-          setCustomer(customerData)
-          
-          // Transform sales to purchases
-          const sales = Array.isArray(salesData) ? salesData : salesData.results || []
-          setPurchases(sales.map((sale: any) => ({
-            id: sale.id,
-            date: sale.created_at || sale.date,
-            saleId: sale.receipt_number || sale.id,
-            items: sale.items?.length || 0,
-            total: sale.total,
-            points: Math.floor(sale.total / 10) || 0, // Calculate points (1 point per 10 currency units)
-          })))
-        } else {
-          const mockCustomer = getCustomer(customerId)
-          setCustomer(mockCustomer)
-          setPurchases([])
-        }
+        const [customerData, salesData] = await Promise.all([
+          customerService.get(customerId),
+          saleService.list({ tenant: currentBusiness.id, customer: customerId, status: "completed", limit: 50 }),
+        ])
+        
+        setCustomer(customerData)
+        
+        // Transform sales to purchases
+        const sales = Array.isArray(salesData) ? salesData : salesData.results || []
+        setPurchases(sales.map((sale: any) => ({
+          id: sale.id,
+          date: sale.created_at || sale.date,
+          saleId: sale.receipt_number || sale.id,
+          items: sale.items?.length || 0,
+          total: sale.total,
+          points: Math.floor(sale.total / 10) || 0, // Calculate points (1 point per 10 currency units)
+        })))
       } catch (error) {
         console.error("Failed to load customer data:", error)
       } finally {
@@ -68,7 +59,7 @@ export default function CustomerDetailPage() {
     }
     
     loadCustomerData()
-  }, [customerId, currentBusiness, useReal])
+  }, [customerId, currentBusiness])
 
   if (isLoading || !customer) {
     return (

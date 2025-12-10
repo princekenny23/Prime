@@ -37,7 +37,7 @@ interface TenantContextType {
   setCurrentTenant: (tenant: Tenant | null) => void
   setCurrentOutlet: (outlet: Outlet | null) => void
   setOutlets: (outlets: Outlet[]) => void
-  switchOutlet: (outletId: string) => void
+  switchOutlet: (outletId: string) => Promise<void>
   isLoading: boolean
 }
 
@@ -46,7 +46,19 @@ const TenantContext = createContext<TenantContextType | undefined>(undefined)
 export function TenantProvider({ children }: { children: ReactNode }) {
   const { currentBusiness, currentOutlet: businessOutlet, outlets: businessOutlets, loadOutlets } = useBusinessStore()
   const [currentTenant, setCurrentTenant] = useState<Tenant | null>(null)
-  const [currentOutlet, setCurrentOutlet] = useState<Outlet | null>(null)
+  const [currentOutlet, setCurrentOutletState] = useState<Outlet | null>(null)
+  
+  // Wrapper to set outlet and update localStorage
+  const setCurrentOutlet = (outlet: Outlet | null) => {
+    setCurrentOutletState(outlet)
+    if (typeof window !== "undefined") {
+      if (outlet) {
+        localStorage.setItem("currentOutletId", String(outlet.id))
+      } else {
+        localStorage.removeItem("currentOutletId")
+      }
+    }
+  }
   const [outlets, setOutlets] = useState<Outlet[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const useReal = useRealAPI()
@@ -263,12 +275,52 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
   }, [currentBusiness?.id, useReal]) // Only depend on business ID, not the whole object or outlets
 
-  const switchOutlet = (outletId: string) => {
-    const outlet = outlets.find((o) => o.id === outletId)
-    if (outlet && outlet.isActive) {
-      setCurrentOutlet(outlet)
-      // In production, you might want to refetch data for the new outlet
-      // This could trigger a refresh of dashboard data, sales, inventory, etc.
+  const switchOutlet = async (outletId: string): Promise<void> => {
+    const outlet = outlets.find((o) => String(o.id) === String(outletId))
+    
+    if (!outlet) {
+      throw new Error(`Outlet with ID ${outletId} not found`)
+    }
+    
+    if (!outlet.isActive) {
+      throw new Error(`Cannot switch to inactive outlet: ${outlet.name}`)
+    }
+    
+    // Update tenant context
+    setCurrentOutlet(outlet)
+    
+    // Also update business store to keep them in sync
+    useBusinessStore.setState({ 
+      currentOutlet: {
+        id: outlet.id,
+        businessId: outlet.tenantId,
+        name: outlet.name,
+        address: outlet.address,
+        phone: outlet.phone,
+        isActive: outlet.isActive,
+        settings: outlet.settings,
+        createdAt: new Date().toISOString(),
+      }
+    })
+    
+    console.log("Switched outlet:", {
+      outletId: outlet.id,
+      outletName: outlet.name,
+      tenantId: outlet.tenantId
+    })
+    
+    // Store outlet ID in localStorage for API client
+    if (typeof window !== "undefined") {
+      localStorage.setItem("currentOutletId", String(outlet.id))
+      
+      // Dispatch custom event to notify all components of outlet change
+      window.dispatchEvent(new CustomEvent("outlet-changed", {
+        detail: {
+          outletId: outlet.id,
+          outletName: outlet.name,
+          outlet: outlet
+        }
+      }))
     }
   }
 

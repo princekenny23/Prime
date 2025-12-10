@@ -23,7 +23,7 @@ import { useState, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { userService } from "@/lib/services/userService"
 import { useBusinessStore } from "@/stores/businessStore"
-import type { User as UserType } from "@/lib/types/mock-data"
+import type { User as UserType } from "@/lib/types"
 
 interface AddEditUserModalProps {
   open: boolean

@@ -7,15 +7,24 @@ import {
   Store,
   Menu,
   X,
-  Search,
   User,
   LogOut,
   Clock,
-  RefreshCw,
+  ChevronDown,
+  Check,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useTenant } from "@/contexts/tenant-context"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useToast } from "@/components/ui/use-toast"
 import { useRole } from "@/contexts/role-context"
 import { NotificationBell } from "@/components/dashboard/notification-bell"
 import { PageBreadcrumb } from "@/components/dashboard/page-breadcrumb"
@@ -35,13 +44,15 @@ import { getIndustrySidebarConfig, fullNavigation, type NavigationItem } from "@
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isSwitchingOutlet, setIsSwitchingOutlet] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
-  const { currentTenant, currentOutlet, isLoading } = useTenant()
+  const { currentTenant, currentOutlet, outlets, switchOutlet, isLoading } = useTenant()
   const { hasPermission, role } = useRole()
   const { activeShift } = useShift()
   const { user } = useAuthStore()
   const { currentBusiness } = useBusinessStore()
+  const { toast } = useToast()
 
   // Check if user is SaaS admin (no businessId)
   const isSaaSAdmin = user && !user.businessId
@@ -55,8 +66,21 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     allNavigation = fullNavigation
   } else {
     // Regular business users get industry-specific navigation
-    const industry = (currentBusiness?.type || currentTenant?.businessType) as "retail" | "restaurant" | "bar" | null | undefined
+    // Only use currentBusiness.type - don't fall back to tenant as it may be from a different business
+    const industry = currentBusiness?.type as "wholesale and retail" | "restaurant" | "bar" | null | undefined
     allNavigation = getIndustrySidebarConfig(industry)
+    
+    // Update Dashboard link to point to the correct dashboard based on business type
+    const dashboardIndex = allNavigation.findIndex(item => item.name === "Dashboard")
+    if (dashboardIndex !== -1 && currentBusiness) {
+      if (currentBusiness.type === "restaurant") {
+        allNavigation[dashboardIndex] = { ...allNavigation[dashboardIndex], href: "/dashboard/restaurant/dashboard" }
+      } else if (currentBusiness.type === "bar") {
+        allNavigation[dashboardIndex] = { ...allNavigation[dashboardIndex], href: "/dashboard/bar/dashboard" }
+      } else if (currentBusiness.type === "wholesale and retail") {
+        allNavigation[dashboardIndex] = { ...allNavigation[dashboardIndex], href: "/dashboard/retail/dashboard" }
+      }
+    }
   }
   
   // Filter navigation based on user role
@@ -182,14 +206,68 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <Menu className="h-5 w-5" />
             </Button>
 
-            {/* Tenant and Outlet Info - Display only, no switching */}
+            {/* Tenant and Outlet Info with Switcher */}
             {!isAdminRoute && !isLoading && currentTenant && (
               <div className="flex items-center gap-4 mr-4">
                 <div className="flex items-center gap-2 text-sm">
                   <span className="text-muted-foreground">Tenant:</span>
                   <span className="font-medium">{currentTenant.name}</span>
                 </div>
-                {currentOutlet ? (
+                {outlets.length > 1 && currentOutlet ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 gap-2"
+                        disabled={isSwitchingOutlet}
+                      >
+                        <Store className="h-4 w-4" />
+                        <span className="font-medium">{currentOutlet.name}</span>
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuLabel>Switch Outlet</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {outlets
+                        .filter(o => o.isActive)
+                        .map((outlet) => (
+                          <DropdownMenuItem
+                            key={outlet.id}
+                            onClick={async () => {
+                              setIsSwitchingOutlet(true)
+                              try {
+                                await switchOutlet(outlet.id)
+                                toast({
+                                  title: "Outlet Switched",
+                                  description: `Switched to ${outlet.name}`,
+                                })
+                                // Trigger page refresh to update all data
+                                router.refresh()
+                              } catch (error: any) {
+                                toast({
+                                  title: "Error",
+                                  description: error.message || "Failed to switch outlet",
+                                  variant: "destructive",
+                                })
+                              } finally {
+                                setIsSwitchingOutlet(false)
+                              }
+                            }}
+                            disabled={isSwitchingOutlet || currentOutlet.id === outlet.id}
+                            className={currentOutlet.id === outlet.id ? "bg-accent" : ""}
+                          >
+                            <Store className="h-4 w-4 mr-2" />
+                            <span className="flex-1">{outlet.name}</span>
+                            {currentOutlet.id === outlet.id && (
+                              <Check className="h-4 w-4 text-primary" />
+                            )}
+                          </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : currentOutlet ? (
                   <div className="flex items-center gap-2 text-sm">
                     <Store className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">{currentOutlet.name}</span>
@@ -203,37 +281,25 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
             )}
 
-            <div className="flex-1 max-w-xl mx-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <input
-                  type="search"
-                  placeholder="Search..."
-                  className="w-full pl-10 pr-4 py-2 rounded-lg border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 ml-auto">
               {/* Shift Status Indicator */}
-              {activeShift && (
-                <Badge variant="outline" className="flex items-center gap-1.5 px-3 py-1.5">
-                  <Clock className="h-3.5 w-3.5" />
-                  <span className="text-xs">
-                    Shift: {format(new Date(activeShift.startTime), "HH:mm")}
-                  </span>
-                </Badge>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  window.location.reload()
-                }}
-                title="Refresh page"
-              >
-                <RefreshCw className="h-5 w-5" />
-              </Button>
+              {activeShift && (() => {
+                if (!activeShift.startTime) return null
+                try {
+                  const date = new Date(activeShift.startTime)
+                  if (isNaN(date.getTime())) return null
+                  return (
+                    <Badge variant="outline" className="flex items-center gap-1.5 px-3 py-1.5">
+                      <Clock className="h-3.5 w-3.5" />
+                      <span className="text-xs">
+                        Shift: {format(date, "HH:mm")}
+                      </span>
+                    </Badge>
+                  )
+                } catch {
+                  return null
+                }
+              })()}
               <NotificationBell />
               <Button 
                 variant="ghost" 

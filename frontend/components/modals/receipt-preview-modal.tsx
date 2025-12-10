@@ -30,6 +30,7 @@ interface ReceiptPreviewModalProps {
   discount: number
   tax: number
   total: number
+  saleType?: "retail" | "wholesale"
   onPrint: () => void
   onSkip: () => void
 }
@@ -42,6 +43,7 @@ export function ReceiptPreviewModal({
   discount,
   tax,
   total,
+  saleType = "retail",
   onPrint,
   onSkip,
 }: ReceiptPreviewModalProps) {
@@ -69,7 +71,9 @@ export function ReceiptPreviewModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Receipt Preview</DialogTitle>
+          <DialogTitle>
+            {saleType === "wholesale" ? "Wholesale" : "Retail"} Receipt Preview
+          </DialogTitle>
           <DialogDescription>
             Review the receipt before printing
           </DialogDescription>

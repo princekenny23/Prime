@@ -24,7 +24,7 @@ import { inventoryService } from "@/lib/services/inventoryService"
 import { productService } from "@/lib/services/productService"
 import { useBusinessStore } from "@/stores/businessStore"
 import { useTenant } from "@/contexts/tenant-context"
-import type { Product } from "@/lib/types/mock-data"
+import type { Product } from "@/lib/types"
 import { Plus, Trash2, X } from "lucide-react"
 
 interface StockAdjustmentModalProps {

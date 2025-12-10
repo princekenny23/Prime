@@ -56,33 +56,87 @@ export default function SetupOutletPage() {
       return
     }
     
-    if (!formData.outletName) {
+    if (!formData.outletName || !formData.outletName.trim()) {
       setError("Outlet name is required")
+      return
+    }
+
+    if (!currentBusiness.id) {
+      setError("Invalid business ID. Please go back and complete business setup again.")
       return
     }
 
     setIsLoading(true)
     
     try {
-      // Create outlet via API
+      // Ensure we have a valid business ID (tenant ID)
+      const tenantId = String(currentBusiness.id).trim()
+      if (!tenantId) {
+        throw new Error("Business ID is missing. Please complete business setup first.")
+      }
+
+      // Create outlet via API - backend expects 'tenant' field, but we send 'businessId'
+      // The outletService will map businessId to tenant
       const outlet = await outletService.create({
-        businessId: currentBusiness.id,
-        name: formData.outletName || `${currentBusiness.name} - Main`,
-        address: formData.address || "",
-        phone: formData.phone || "",
-        email: formData.email || "",
+        businessId: tenantId,
+        name: formData.outletName.trim() || `${currentBusiness.name} - Main`,
+        address: formData.address?.trim() || "",
+        phone: formData.phone?.trim() || "",
+        email: formData.email?.trim() || "",
         isActive: true,
-      } as any)
+      })
+      
+      if (!outlet || !outlet.id) {
+        throw new Error("Outlet was created but no ID was returned. Please try again.")
+      }
       
       // Set as current outlet and reload outlets
-      await loadOutlets(currentBusiness.id)
-      setCurrentOutlet(outlet.id)
+      try {
+        await loadOutlets(currentBusiness.id)
+        setCurrentOutlet(outlet.id)
+      } catch (loadError) {
+        console.warn("Could not reload outlets, but outlet was created:", loadError)
+        // Continue anyway - outlet was created successfully
+        setCurrentOutlet(outlet.id)
+      }
       
       setIsLoading(false)
       router.push("/onboarding/add-first-user")
     } catch (err: any) {
       console.error("Error creating outlet:", err)
-      setError(err.message || "Failed to create outlet. Please try again.")
+      
+      // Extract error message from various error formats
+      let errorMessage = "Failed to create outlet. Please try again."
+      
+      if (err?.message) {
+        errorMessage = err.message
+      } else if (err?.response?.data) {
+        // Handle DRF error format
+        const data = err.response.data
+        if (typeof data === 'string') {
+          errorMessage = data
+        } else if (data.detail) {
+          errorMessage = data.detail
+        } else if (data.errors) {
+          // Format validation errors
+          const errorList = Object.entries(data.errors).map(([field, errors]: [string, any]) => {
+            const errorText = Array.isArray(errors) ? errors.join(', ') : String(errors)
+            return `${field}: ${errorText}`
+          })
+          errorMessage = errorList.join('; ')
+        } else if (data.tenant) {
+          errorMessage = Array.isArray(data.tenant) ? data.tenant[0] : data.tenant
+        }
+      } else if (err?.data) {
+        // Handle other error formats
+        if (err.data.detail) {
+          errorMessage = err.data.detail
+        } else if (typeof err.data === 'string') {
+          errorMessage = err.data
+        }
+      }
+      
+      setError(errorMessage)
       setIsLoading(false)
     }
   }

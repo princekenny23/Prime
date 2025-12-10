@@ -1,5 +1,7 @@
 "use client"
 
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -14,23 +16,84 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Plus, Search, Utensils, DollarSign, Edit, Trash2 } from "lucide-react"
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { AddEditMenuItemModal } from "@/components/modals/add-edit-menu-item-modal"
+import { productService } from "@/lib/services/productService"
+import { useBusinessStore } from "@/stores/businessStore"
+import { useRealAPI } from "@/lib/utils/api-config"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function MenuPage() {
+  const router = useRouter()
+  const { toast } = useToast()
+  const { currentBusiness, currentOutlet } = useBusinessStore()
+  
+  // Redirect if not restaurant business
+  useEffect(() => {
+    if (currentBusiness && currentBusiness.type !== "restaurant") {
+      router.push("/dashboard")
+    }
+  }, [currentBusiness, router])
+  
+  // Show loading while checking business type
+  if (!currentBusiness || currentBusiness.type !== "restaurant") {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </DashboardLayout>
+    )
+  }
+  const useReal = useRealAPI()
   const [searchTerm, setSearchTerm] = useState("")
   const [showAddMenuItem, setShowAddMenuItem] = useState(false)
   const [selectedMenuItem, setSelectedMenuItem] = useState<any>(null)
+  const [menuItems, setMenuItems] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Mock menu items
-  const menuItems = [
-    { id: "1", name: "Burger", category: "Main Course", price: 12.99, available: true, description: "Classic beef burger" },
-    { id: "2", name: "Pizza", category: "Main Course", price: 15.99, available: true, description: "Margherita pizza" },
-    { id: "3", name: "Pasta", category: "Main Course", price: 13.99, available: true, description: "Spaghetti carbonara" },
-    { id: "4", name: "Salad", category: "Appetizer", price: 8.99, available: true, description: "Fresh garden salad" },
-    { id: "5", name: "Soup", category: "Appetizer", price: 6.99, available: false, description: "Tomato soup" },
-    { id: "6", name: "Ice Cream", category: "Dessert", price: 5.99, available: true, description: "Vanilla ice cream" },
-  ]
+  const loadMenuItems = useCallback(async () => {
+    if (!currentBusiness) {
+      setMenuItems([])
+      setIsLoading(false)
+      return
+    }
+    
+    setIsLoading(true)
+    try {
+      if (useReal) {
+        const response = await productService.list({ 
+          businessId: currentBusiness.id, 
+          is_active: true 
+        })
+        const products = Array.isArray(response) ? response : response.results || []
+        setMenuItems(products.map((product: any) => ({
+          id: product.id,
+          name: product.name,
+          category: product.category?.name || "Uncategorized",
+          price: parseFloat(product.price) || 0,
+          available: product.isActive !== false,
+          description: product.description || "",
+        })))
+      } else {
+        setMenuItems([])
+      }
+    } catch (error: any) {
+      console.error("Failed to load menu items:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load menu items. Please try again.",
+        variant: "destructive",
+      })
+      setMenuItems([])
+    } finally {
+      setIsLoading(false)
+    }
+  }, [currentBusiness, useReal, toast])
+
+  useEffect(() => {
+    loadMenuItems()
+  }, [loadMenuItems])
 
   const filteredItems = menuItems.filter(item =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -126,7 +189,20 @@ export default function MenuPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredItems.map((item) => (
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      <p className="text-muted-foreground">Loading menu items...</p>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredItems.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      <p className="text-muted-foreground">No menu items found</p>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredItems.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">{item.name}</TableCell>
                     <TableCell>
@@ -163,7 +239,8 @@ export default function MenuPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>
@@ -173,7 +250,13 @@ export default function MenuPage() {
       {/* Modals */}
       <AddEditMenuItemModal
         open={showAddMenuItem}
-        onOpenChange={setShowAddMenuItem}
+        onOpenChange={(open) => {
+          setShowAddMenuItem(open)
+          if (!open) {
+            setSelectedMenuItem(null)
+            loadMenuItems() // Refresh menu items after modal closes
+          }
+        }}
         menuItem={selectedMenuItem}
       />
     </DashboardLayout>

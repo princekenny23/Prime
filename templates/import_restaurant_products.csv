@@ -1,0 +1,7 @@
+product_name,category,variation_name,price,cost,preparation_time,is_menu_item,track_inventory,variation_sku,unit,low_stock_threshold,outlet,quantity,is_active,sort_order
+Pizza Margherita,Main Course,Small (8"),45.00,20.00,15,Yes,No,PIZZA-SMALL,serving,0,Kitchen,0,Yes,1
+Pizza Margherita,Main Course,Medium (12"),65.00,30.00,15,Yes,No,PIZZA-MEDIUM,serving,0,Kitchen,0,Yes,2
+Pizza Margherita,Main Course,Large (16"),85.00,40.00,15,Yes,No,PIZZA-LARGE,serving,0,Kitchen,0,Yes,3
+Soft Drink,Drinks,,15.00,5.00,0,Yes,Yes,DRINK-SOFT,bottle,20,Bar,50,Yes,0
+Service Charge,Services,,10.00,0.00,0,No,No,SERVICE-CHARGE,service,0,Kitchen,0,Yes,0
+

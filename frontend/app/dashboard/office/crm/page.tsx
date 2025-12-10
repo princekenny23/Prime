@@ -76,10 +76,14 @@ export default function CRMPage() {
   
   // Credit statistics
   const creditEnabledCustomers = customers.filter(c => c.credit_enabled).length
-  const totalOutstanding = customers.reduce((sum, c) => sum + (c.outstanding_balance || 0), 0)
+  const totalOutstanding = customers.reduce((sum, c) => {
+    const balance = Number(c.outstanding_balance) || 0
+    return sum + balance
+  }, 0)
   const overdueCustomers = customers.filter(c => {
     // This would ideally come from credit summary, but for now we'll check if they have outstanding balance
-    return c.credit_enabled && (c.outstanding_balance || 0) > 0
+    const balance = Number(c.outstanding_balance) || 0
+    return c.credit_enabled && balance > 0
   }).length
 
   return (
@@ -151,7 +155,7 @@ export default function CRMPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {currentBusiness?.currencySymbol || "MWK"} {totalOutstanding.toFixed(2)}
+                {currentBusiness?.currencySymbol || "MWK"} {Number(totalOutstanding).toFixed(2)}
               </div>
             </CardContent>
           </Card>
@@ -235,7 +239,7 @@ export default function CRMPage() {
                               {customer.credit_status || 'active'}
                             </Badge>
                             <div className="text-xs text-muted-foreground">
-                              Limit: {currentBusiness?.currencySymbol || "MWK"} {(customer.credit_limit || 0).toFixed(2)}
+                              Limit: {currentBusiness?.currencySymbol || "MWK"} {Number(customer.credit_limit || 0).toFixed(2)}
                             </div>
                           </div>
                         ) : (
@@ -243,13 +247,13 @@ export default function CRMPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {customer.credit_enabled && (customer.outstanding_balance || 0) > 0 ? (
+                        {customer.credit_enabled && (Number(customer.outstanding_balance) || 0) > 0 ? (
                           <div className="space-y-1">
                             <span className="font-medium text-orange-600">
-                              {currentBusiness?.currencySymbol || "MWK"} {(customer.outstanding_balance || 0).toFixed(2)}
+                              {currentBusiness?.currencySymbol || "MWK"} {Number(customer.outstanding_balance || 0).toFixed(2)}
                             </span>
                             <div className="text-xs text-muted-foreground">
-                              Available: {currentBusiness?.currencySymbol || "MWK"} {(customer.available_credit || 0).toFixed(2)}
+                              Available: {currentBusiness?.currencySymbol || "MWK"} {Number(customer.available_credit || 0).toFixed(2)}
                             </div>
                           </div>
                         ) : (

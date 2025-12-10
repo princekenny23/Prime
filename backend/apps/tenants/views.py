@@ -5,11 +5,13 @@ from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.contrib.auth import get_user_model
+import logging
 from .models import Tenant
 from .serializers import TenantSerializer
 from .permissions import IsSaaSAdmin, TenantFilterMixin
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class TenantViewSet(viewsets.ModelViewSet, TenantFilterMixin):
@@ -31,6 +33,31 @@ class TenantViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         if self.action == 'create':
             return [IsAuthenticated()]
         return [IsAuthenticated()]
+    
+    def create(self, request, *args, **kwargs):
+        """Override create to log validation errors"""
+        logger.info(f"Creating tenant with data: {request.data}")
+        logger.info(f"User: {request.user}, Is SaaS Admin: {getattr(request.user, 'is_saas_admin', False)}")
+        
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid():
+            logger.error(f"Tenant validation errors: {serializer.errors}")
+            # Return detailed error message
+            error_detail = serializer.errors
+            if isinstance(error_detail, dict):
+                # Format errors nicely
+                error_messages = []
+                for field, errors in error_detail.items():
+                    if isinstance(errors, list):
+                        error_messages.extend([f"{field}: {error}" for error in errors])
+                    else:
+                        error_messages.append(f"{field}: {errors}")
+                error_detail = {'detail': '; '.join(error_messages), 'errors': serializer.errors}
+            return Response(error_detail, status=status.HTTP_400_BAD_REQUEST)
+        
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
     
     def perform_create(self, serializer):
         """Set tenant for regular users during creation"""

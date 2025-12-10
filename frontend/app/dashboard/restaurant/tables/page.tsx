@@ -1,67 +1,107 @@
 "use client"
 
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Plus, Grid, Users, Clock, ArrowLeftRight, Merge } from "lucide-react"
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { AddEditTableModal } from "@/components/modals/add-edit-table-modal"
 import { MergeSplitTablesModal } from "@/components/modals/merge-split-tables-modal"
 import { TransferTableModal } from "@/components/modals/transfer-table-modal"
 import { useBusinessStore } from "@/stores/businessStore"
-import { useRealAPI } from "@/lib/utils/api-config"
-import { useEffect } from "react"
+import { tableService, Table } from "@/lib/services/tableService"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function TablesPage() {
+  const router = useRouter()
   const { currentBusiness, currentOutlet } = useBusinessStore()
+  
+  // Redirect if not restaurant business
+  useEffect(() => {
+    if (currentBusiness && currentBusiness.type !== "restaurant") {
+      router.push("/dashboard")
+    }
+  }, [currentBusiness, router])
+  
+  // Show loading while checking business type
+  if (!currentBusiness || currentBusiness.type !== "restaurant") {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </DashboardLayout>
+    )
+  }
+  const { toast } = useToast()
   const [showAddTable, setShowAddTable] = useState(false)
   const [showMergeSplit, setShowMergeSplit] = useState(false)
   const [showTransfer, setShowTransfer] = useState(false)
-  const [selectedTable, setSelectedTable] = useState<any>(null)
+  const [selectedTable, setSelectedTable] = useState<Table | null>(null)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  const [tables, setTables] = useState<any[]>([])
+  const [tables, setTables] = useState<Table[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const useReal = useRealAPI()
 
-  useEffect(() => {
-    const loadTables = async () => {
-      if (!currentBusiness) return
-      
-      setIsLoading(true)
-      try {
-        if (useReal) {
-          // TODO: Implement tableService when backend is ready
-          // const response = await tableService.list({ tenant: currentBusiness.id, outlet: currentOutlet?.id })
-          // setTables(response.results || [])
-          setTables([])
-        } else {
-          // Simulation mode - empty for now
-          setTables([])
-        }
-      } catch (error) {
-        console.error("Failed to load tables:", error)
-        setTables([])
-      } finally {
-        setIsLoading(false)
-      }
+  const loadTables = useCallback(async () => {
+    if (!currentBusiness) {
+      setTables([])
+      setIsLoading(false)
+      return
     }
     
-    loadTables()
-  }, [currentBusiness, currentOutlet, useReal])
+    setIsLoading(true)
+    try {
+      const filters: any = { is_active: true }
+      if (currentOutlet?.id) {
+        filters.outlet = currentOutlet.id.toString()
+      }
+      const response = await tableService.list(filters)
+      setTables(response.results || [])
+    } catch (error: any) {
+      console.error("Failed to load tables:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load tables. Please try again.",
+        variant: "destructive",
+      })
+      setTables([])
+    } finally {
+      setIsLoading(false)
+    }
+  }, [currentBusiness, currentOutlet, toast])
 
-  const occupiedCount = tables.filter(t => t.status === "Occupied").length
-  const availableCount = tables.filter(t => t.status === "Available").length
-  const reservedCount = tables.filter(t => t.status === "Reserved").length
+  useEffect(() => {
+    loadTables()
+  }, [loadTables])
+
+  // Map backend status (lowercase) to display format
+  const getStatusDisplay = (status: string) => {
+    const statusMap: Record<string, string> = {
+      'occupied': 'Occupied',
+      'reserved': 'Reserved',
+      'available': 'Available',
+      'out_of_service': 'Out of Service'
+    }
+    return statusMap[status] || status
+  }
+
+  const occupiedCount = tables.filter(t => t.status === "occupied").length
+  const availableCount = tables.filter(t => t.status === "available").length
+  const reservedCount = tables.filter(t => t.status === "reserved").length
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Occupied":
+      case "occupied":
         return "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200 border-red-200 dark:border-red-800"
-      case "Reserved":
+      case "reserved":
         return "bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-200 border-yellow-200 dark:border-yellow-800"
-      case "Available":
+      case "available":
         return "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200 border-green-200 dark:border-green-800"
+      case "out_of_service":
+        return "bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-200 border-gray-200 dark:border-gray-800"
       default:
         return ""
     }
@@ -180,22 +220,14 @@ export default function TablesPage() {
                       <Users className="h-3 w-3 inline mr-1" />
                       {table.capacity} seats
                     </div>
-                    {table.status === "Occupied" && (
-                      <div className="text-xs space-y-1">
-                        <div>{table.guests} guests</div>
-                        <div>{table.orderId}</div>
-                        <div className="flex items-center justify-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {table.time}
-                        </div>
+                    {table.location && (
+                      <div className="text-xs text-muted-foreground mb-1">
+                        {table.location}
                       </div>
                     )}
-                    {table.status === "Reserved" && (
-                      <div className="text-xs">
-                        <Clock className="h-3 w-3 inline mr-1" />
-                        {table.time}
-                      </div>
-                    )}
+                    <Badge className={getStatusColor(table.status)}>
+                      {getStatusDisplay(table.status)}
+                    </Badge>
                   </div>
                 ))}
               </div>
@@ -205,8 +237,9 @@ export default function TablesPage() {
                   <div
                     key={table.id}
                     className={`p-4 border rounded-lg cursor-pointer hover:bg-muted transition-colors ${
-                      table.status === "Occupied" ? "border-red-200" :
-                      table.status === "Reserved" ? "border-yellow-200" :
+                      table.status === "occupied" ? "border-red-200" :
+                      table.status === "reserved" ? "border-yellow-200" :
+                      table.status === "out_of_service" ? "border-gray-200" :
                       "border-green-200"
                     }`}
                     onClick={() => {
@@ -218,20 +251,20 @@ export default function TablesPage() {
                       <div className="flex items-center gap-4">
                         <div className="font-bold text-lg">Table {table.number}</div>
                         <Badge className={getStatusColor(table.status)}>
-                          {table.status}
+                          {getStatusDisplay(table.status)}
                         </Badge>
                         <div className="text-sm text-muted-foreground">
                           Capacity: {table.capacity}
                         </div>
-                        {table.status === "Occupied" && (
-                          <>
-                            <div className="text-sm">
-                              {table.guests} guests • {table.orderId}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              Since {table.time}
-                            </div>
-                          </>
+                        {table.location && (
+                          <div className="text-sm text-muted-foreground">
+                            Location: {table.location}
+                          </div>
+                        )}
+                        {typeof table.outlet === 'object' && table.outlet && (
+                          <div className="text-sm text-muted-foreground">
+                            Outlet: {table.outlet.name}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -246,8 +279,14 @@ export default function TablesPage() {
       {/* Modals */}
       <AddEditTableModal
         open={showAddTable}
-        onOpenChange={setShowAddTable}
+        onOpenChange={(open) => {
+          setShowAddTable(open)
+          if (!open) {
+            setSelectedTable(null)
+          }
+        }}
         table={selectedTable}
+        onSuccess={loadTables}
       />
       <MergeSplitTablesModal
         open={showMergeSplit}

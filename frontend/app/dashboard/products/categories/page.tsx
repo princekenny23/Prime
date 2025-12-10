@@ -17,7 +17,7 @@ import Link from "next/link"
 import { AddCategoryModal } from "@/components/modals/add-category-modal"
 import { categoryService } from "@/lib/services/productService"
 import { useBusinessStore } from "@/stores/businessStore"
-import type { Category } from "@/lib/types/mock-data"
+import type { Category } from "@/lib/types"
 
 export default function CategoriesPage() {
   const { currentBusiness } = useBusinessStore()

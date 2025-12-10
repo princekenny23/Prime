@@ -22,7 +22,7 @@ import { api } from "@/lib/api"
 import { Building2, Plus, Users, DollarSign, Store, TrendingUp, Loader2 } from "lucide-react"
 import { useBusinessStore } from "@/stores/businessStore"
 import Link from "next/link"
-import type { Business } from "@/lib/types/mock-data"
+import type { Business } from "@/lib/types"
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -240,12 +240,23 @@ export default function AdminDashboard() {
               <Card 
                 key={business.id}
                 className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
-                onClick={() => {
-                  // Set current business and redirect to its dashboard
-                  setCurrentBusiness(business.id)
-                  setTimeout(() => {
-                    router.push(`/dashboard/${business.type}`)
-                  }, 100)
+                onClick={async () => {
+                  // Set current business and redirect to its dashboard (Square POS-like)
+                  try {
+                    await setCurrentBusiness(business.id)
+                    // Redirect immediately to the correct dashboard based on business type
+                    if (business.type === "wholesale and retail") {
+                      router.push("/dashboard/retail")
+                    } else if (business.type === "restaurant") {
+                      router.push("/dashboard/restaurant/dashboard")
+                    } else if (business.type === "bar") {
+                      router.push("/dashboard/bar/dashboard")
+                    } else {
+                      router.push("/dashboard")
+                    }
+                  } catch (error) {
+                    console.error("Failed to set business:", error)
+                  }
                 }}
               >
                 <CardHeader>

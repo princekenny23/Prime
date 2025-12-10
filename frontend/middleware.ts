@@ -9,7 +9,7 @@ const roleRoutes: Record<string, string[]> = {
     "/dashboard/pos",
     "/dashboard/products",
     "/dashboard/inventory",
-    "/dashboard/outlets",
+    "/dashboard/office/outlets",
     "/dashboard/reports",
     "/dashboard/customers",
     "/dashboard/staff",
@@ -39,7 +39,7 @@ const roleRoutes: Record<string, string[]> = {
     "/dashboard/pos",
     "/dashboard/products",
     "/dashboard/inventory",
-    "/dashboard/outlets",
+    "/dashboard/office/outlets",
     "/dashboard/reports",
     "/dashboard/customers",
     "/dashboard/notifications",
@@ -49,6 +49,21 @@ const roleRoutes: Record<string, string[]> = {
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // Decode URL-encoded pathname to handle spaces properly
+  const decodedPathname = decodeURIComponent(pathname)
+
+  // Redirect /dashboard/wholesale and retail (or URL-encoded versions) to /dashboard/retail
+  // This handles legacy URLs or URLs with spaces
+  if (pathname === "/dashboard/wholesale and retail" || 
+      pathname === "/dashboard/wholesale and retail/" ||
+      pathname.includes("wholesale%20and%20retail") || 
+      pathname.includes("wholesale+and+retail")) {
+    const url = request.nextUrl.clone()
+    // Replace with /dashboard/retail
+    url.pathname = pathname.replace(/\/dashboard\/wholesale(?:%20|\+)?and(?:%20|\+)?retail/g, "/dashboard/retail")
+    return NextResponse.redirect(url)
+  }
 
   // Skip middleware for public routes
   if (

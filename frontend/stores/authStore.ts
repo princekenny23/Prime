@@ -1,10 +1,8 @@
 // Zustand Store for Authentication
 import { create } from "zustand"
 import { persist, createJSONStorage } from "zustand/middleware"
-import type { User } from "@/lib/types/mock-data"
-import { getUserByEmail, addUser, updateUser } from "@/lib/mockApi"
+import type { User } from "@/lib/types"
 import { authService } from "@/lib/services/authService"
-import { useRealAPI } from "@/lib/utils/api-config"
 
 interface AuthState {
   user: User | null
@@ -27,57 +25,16 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true })
         
         try {
-          // ALWAYS use real API for login - bypass useRealAPI() check
-          // Check if API URL is configured
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"
-          const shouldUseReal = apiUrl.includes("localhost:8000") || process.env.NEXT_PUBLIC_USE_REAL_API === "true"
-          
-          if (shouldUseReal) {
-            // Use real API
-            console.log("Using real API for login")
-            const response = await authService.login(email, password)
-            console.log("Login successful, setting user state")
-            set({ 
-              user: response.user, 
-              isAuthenticated: true,
-              isLoading: false 
-            })
-            return { success: true, user: response.user }
-          } else {
-            console.log("Using mock API (real API not configured)")
-            // Use mock API (simulation mode)
-            if (!email || !email.trim()) {
-              set({ isLoading: false })
-              return { success: false, error: "Email is required" }
-            }
-            
-            const emailLower = email.trim().toLowerCase()
-            const isSaaSAdmin = emailLower === "admin@primepos.com" || 
-                               emailLower.includes("@primepos") ||
-                               (emailLower.includes("admin") && password === "admin123")
-            
-            let user = getUserByEmail(email.trim())
-            
-            if (!user) {
-              const emailParts = email.trim().split("@")
-              user = addUser({
-                id: `user_${Date.now()}`,
-                email: email.trim(),
-                name: emailParts[0] || "User",
-                role: "admin",
-                businessId: isSaaSAdmin ? "" : "",
-                outletIds: [],
-                createdAt: new Date().toISOString(),
-              })
-            } else {
-              if (isSaaSAdmin && user.businessId) {
-                user = updateUser(user.id, { businessId: "" }) || user
-              }
-            }
-            
-            set({ user, isAuthenticated: true, isLoading: false })
-            return { success: true, user }
-          }
+          // Use real API for login
+          console.log("Using real API for login")
+          const response = await authService.login(email, password)
+          console.log("Login successful, setting user state")
+          set({ 
+            user: response.user, 
+            isAuthenticated: true,
+            isLoading: false 
+          })
+          return { success: true, user: response.user }
         } catch (error: any) {
           set({ isLoading: false })
           return { 
@@ -112,8 +69,6 @@ export const useAuthStore = create<AuthState>()(
       },
       
       refreshUser: async () => {
-        if (!useRealAPI()) return
-        
         try {
           const user = await authService.getCurrentUser()
           set({ user, isAuthenticated: true })

@@ -3,12 +3,12 @@
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import Link from "next/link"
 import { 
-  Network, 
   Tag, 
   Sliders, 
   ClipboardCheck,
   ArrowRightLeft,
-  Package
+  Package,
+  AlertTriangle
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -25,16 +25,6 @@ interface InventoryOptionCard {
 
 const inventoryOptions: InventoryOptionCard[] = [
   {
-    id: "outlets-settings",
-    title: "Outlets Settings",
-    href: "/dashboard/outlets",
-    icon: Network,
-    bgColor: "bg-blue-900",
-    iconColor: "text-white",
-    textColor: "text-white",
-    description: "Manage outlet configurations"
-  },
-  {
     id: "stock-items",
     title: "Stock & Items",
     href: "/dashboard/products",
@@ -43,6 +33,16 @@ const inventoryOptions: InventoryOptionCard[] = [
     iconColor: "text-gray-700",
     textColor: "text-foreground",
     description: "View and manage all products"
+  },
+  {
+    id: "low-stock",
+    title: "Low Stock",
+    href: "/dashboard/inventory/low-stock",
+    icon: AlertTriangle,
+    bgColor: "bg-blue-900",
+    iconColor: "text-white",
+    textColor: "text-white",
+    description: "View and reorder low stock items"
   },
   {
     id: "stock-control",

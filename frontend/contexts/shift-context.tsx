@@ -57,7 +57,23 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
           // Use real API
           try {
             const active = await shiftService.getActive(currentOutlet.id)
-            setActiveShiftState(active)
+            if (active) {
+              // Transform to context format
+              const contextShift: Shift = {
+                id: active.id,
+                outletId: active.outletId,
+                tillId: active.tillId,
+                userId: active.userId,
+                operatingDate: active.operatingDate,
+                openingCashBalance: active.openingCashBalance,
+                floatingCash: active.floatingCash,
+                notes: active.notes,
+                status: active.status,
+                startTime: active.startTime,
+                endTime: active.endTime,
+              }
+              setActiveShiftState(contextShift)
+            }
           } catch (error: any) {
             // No active shift found is OK
             if (!error.message?.includes("404") && !error.message?.includes("No active shift")) {
@@ -68,7 +84,22 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
           // Load shift history
           try {
             const history = await shiftService.getHistory({ outlet: currentOutlet.id })
-            setShiftHistory(history)
+            // Transform to context format
+            const contextHistory: Shift[] = history.map(h => ({
+              id: h.id,
+              outletId: h.outletId,
+              tillId: h.tillId,
+              userId: h.userId,
+              operatingDate: h.operatingDate,
+              openingCashBalance: h.openingCashBalance,
+              floatingCash: h.floatingCash,
+              notes: h.notes,
+              status: h.status,
+              startTime: h.startTime,
+              endTime: h.endTime,
+              closingCashBalance: h.closingCashBalance,
+            }))
+            setShiftHistory(contextHistory)
           } catch (error) {
             console.error("Error loading shift history:", error)
           }
@@ -123,11 +154,25 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
         till_id: shiftData.tillId,
         operating_date: shiftData.operatingDate,
         opening_cash_balance: shiftData.openingCashBalance,
-        floating_cash: shiftData.floatingCash,
-        notes: shiftData.notes,
+        floating_cash: shiftData.floatingCash || 0,
+        notes: shiftData.notes || "",
       })
-      setActiveShiftState(newShift)
-      return newShift
+      // Transform to context format
+      const contextShift: Shift = {
+        id: newShift.id,
+        outletId: newShift.outletId,
+        tillId: newShift.tillId,
+        userId: newShift.userId,
+        operatingDate: newShift.operatingDate,
+        openingCashBalance: newShift.openingCashBalance,
+        floatingCash: newShift.floatingCash,
+        notes: newShift.notes,
+        status: newShift.status,
+        startTime: newShift.startTime,
+        endTime: newShift.endTime,
+      }
+      setActiveShiftState(contextShift)
+      return contextShift
     } else {
       // Simulation mode - use localStorage
       const exists = await checkShiftExists(shiftData.outletId, shiftData.tillId, shiftData.operatingDate)

@@ -1,5 +1,5 @@
 // Dashboard Stats Utilities - Generate industry-specific stats
-import type { Business } from "../types/mock-data"
+import type { Business } from "../types"
 import { saleService } from "../services/saleService"
 import { productService } from "../services/productService"
 
@@ -42,21 +42,24 @@ export async function generateKPIData(
     const yesterdayStr = yesterday.toISOString().split("T")[0]
     
     const [todayStats, yesterdayStats, productsData] = await Promise.all([
-      saleService.getStats({ start_date: today, end_date: today }),
-      saleService.getStats({ start_date: yesterdayStr, end_date: yesterdayStr }),
-      productService.list({ is_active: true }),
+      saleService.getStats({ start_date: today, end_date: today }).catch(() => ({ total_revenue: 0, today_revenue: 0, total_sales: 0, today_sales: 0 })),
+      saleService.getStats({ start_date: yesterdayStr, end_date: yesterdayStr }).catch(() => ({ total_revenue: 0, today_revenue: 0, total_sales: 0, today_sales: 0 })),
+      productService.list({ is_active: true }).catch(() => ({ results: [], count: 0 })),
     ])
     
-    const salesChange = yesterdayStats.today_revenue > 0
-      ? ((todayStats.today_revenue - yesterdayStats.today_revenue) / yesterdayStats.today_revenue) * 100
-      : todayStats.today_revenue > 0 ? 100 : 0
+    const todayRevenue = todayStats.today_revenue || todayStats.total_revenue || 0
+    const yesterdayRevenue = yesterdayStats.today_revenue || yesterdayStats.total_revenue || 0
+    
+    const salesChange = yesterdayRevenue > 0
+      ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100
+      : todayRevenue > 0 ? 100 : 0
     
     return {
-      sales: { value: todayStats.today_revenue, change: salesChange },
+      sales: { value: todayRevenue, change: salesChange },
       customers: { value: 0, change: 0 }, // TODO: Get from customerService
-      products: { value: Array.isArray(productsData) ? productsData.length : productsData.count || 0, change: 0 },
+      products: { value: Array.isArray(productsData) ? productsData.length : (productsData.count || productsData.results?.length || 0), change: 0 },
       expenses: { value: 0, change: 0 }, // TODO: Get from expenses API
-      profit: { value: todayStats.today_revenue, change: salesChange }, // TODO: Calculate properly with expenses
+      profit: { value: todayRevenue, change: salesChange }, // TODO: Calculate properly with expenses
     }
   } catch (error) {
     console.error("Failed to load KPI data from API:", error)
@@ -87,8 +90,8 @@ export async function generateChartData(
       date.setDate(date.getDate() - i)
       const dateStr = date.toISOString().split("T")[0]
       
-      const stats = await saleService.getStats({ start_date: dateStr, end_date: dateStr })
-      const dayTotal = stats.today_revenue || 0
+      const stats = await saleService.getStats({ start_date: dateStr, end_date: dateStr }).catch(() => ({ total_revenue: 0, today_revenue: 0 }))
+      const dayTotal = stats.today_revenue || stats.total_revenue || 0
       const dayProfit = dayTotal * 0.7 // TODO: Calculate profit properly with expenses
       
       days.push({

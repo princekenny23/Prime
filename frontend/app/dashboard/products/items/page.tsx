@@ -20,15 +20,16 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Plus, Search, Package, Upload, Filter, MoreVertical, Folder, Trash2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { AddEditProductModal } from "@/components/modals/add-edit-product-modal"
 import { ImportProductsModal } from "@/components/modals/import-products-modal"
-import { productService, categoryService } from "@/lib/services/productService"
+import { productService, categoryService, variationService } from "@/lib/services/productService"
 import { useBusinessStore } from "@/stores/businessStore"
 import { useTenant } from "@/contexts/tenant-context"
 import { useToast } from "@/components/ui/use-toast"
-import type { Product, Category } from "@/lib/types/mock-data"
+import type { Product, Category } from "@/lib/types"
 
 export default function ProductsItemsPage() {
   const { currentBusiness } = useBusinessStore()
@@ -41,6 +42,7 @@ export default function ProductsItemsPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [variationCounts, setVariationCounts] = useState<Record<string, number>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
 
@@ -102,6 +104,20 @@ export default function ProductsItemsPage() {
       
       setProducts(filteredProducts)
       setCategories(categoriesResponse || [])
+      
+      // Load variation counts for all products
+      const counts: Record<string, number> = {}
+      await Promise.all(
+        filteredProducts.map(async (product) => {
+          try {
+            const variations = await variationService.list({ product: product.id })
+            counts[product.id] = variations.length
+          } catch (error) {
+            counts[product.id] = 0
+          }
+        })
+      )
+      setVariationCounts(counts)
     } catch (error) {
       console.error("Failed to load products:", error)
       setProducts([])
@@ -266,6 +282,7 @@ export default function ProductsItemsPage() {
                     <TableHead>Product</TableHead>
                     <TableHead>SKU</TableHead>
                     <TableHead>Category</TableHead>
+                    <TableHead>Variations</TableHead>
                     <TableHead>Cost</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead>Stock</TableHead>
@@ -292,6 +309,11 @@ export default function ProductsItemsPage() {
                         </TableCell>
                         <TableCell>{product.sku || "N/A"}</TableCell>
                         <TableCell>{categoryName}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {variationCounts[product.id] !== undefined ? variationCounts[product.id] : "—"} variation{variationCounts[product.id] !== 1 ? "s" : ""}
+                          </Badge>
+                        </TableCell>
                         <TableCell>MWK {product.cost ? product.cost.toFixed(2) : "0.00"}</TableCell>
                         <TableCell>MWK {product.price.toFixed(2)}</TableCell>
                         <TableCell>{product.stock}</TableCell>

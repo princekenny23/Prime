@@ -20,7 +20,7 @@ import { useAuthStore } from "@/stores/authStore"
 import { useBusinessStore } from "@/stores/businessStore"
 import { tenantService } from "@/lib/services/tenantService"
 import { authService } from "@/lib/services/authService"
-import type { BusinessType } from "@/lib/types/mock-data"
+import type { BusinessType } from "@/lib/types"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function SetupBusinessPage() {
@@ -157,13 +157,13 @@ export default function SetupBusinessPage() {
                   <SelectValue placeholder="Select business type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="retail">Retail Store</SelectItem>
+                  <SelectItem value="wholesale and retail">Wholesale and Retail</SelectItem>
                   <SelectItem value="restaurant">Restaurant</SelectItem>
                   <SelectItem value="bar">Bar/Nightclub</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Only retail, restaurant, and bar are supported at this time
+                Only wholesale and retail, restaurant, and bar are supported at this time
               </p>
             </div>
 

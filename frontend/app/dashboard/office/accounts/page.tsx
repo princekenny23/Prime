@@ -31,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import type { User } from "@/lib/types/mock-data"
+import type { User } from "@/lib/types"
 
 export default function AccountsPage() {
   const { currentBusiness } = useBusinessStore()

@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'django_filters',
+    'channels',
     
     # Local apps
     'apps.accounts',
@@ -39,10 +40,14 @@ INSTALLED_APPS = [
     'apps.inventory',
     'apps.sales',
     'apps.customers',
+    # 'apps.payments',  # Removed - new implementation pending
     'apps.staff',
     'apps.suppliers',
     'apps.shifts',
+    'apps.restaurant',
     'apps.reports',
+    'apps.activity_logs',
+    'apps.notifications',
     'apps.admin.apps.AdminConfig',  # Use explicit config to avoid label conflict
 ]
 
@@ -56,6 +61,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'apps.tenants.middleware.TenantMiddleware',
+    'apps.activity_logs.middleware.ActivityLogMiddleware',
 ]
 
 ROOT_URLCONF = 'primepos.urls'
@@ -129,7 +135,7 @@ AUTH_USER_MODEL = 'accounts.User'
 # REST Framework Configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'apps.tenants.authentication.TenantJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -168,6 +174,30 @@ CORS_ALLOWED_ORIGINS = config(
 )
 
 CORS_ALLOW_CREDENTIALS = True
+
+# Allow custom headers for outlet isolation
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'x-outlet-id',  # Custom header for outlet data isolation
+]
+
+# Channels Configuration
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
+}
 
 # Logging
 LOGGING = {

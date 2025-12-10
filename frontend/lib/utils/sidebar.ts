@@ -1,8 +1,9 @@
 // Sidebar Configuration Utilities
-import type { BusinessType } from "../types/mock-data"
+import type { BusinessType } from "../types"
 import {
   LayoutDashboard,
   ShoppingCart,
+  ShoppingBag,
   Package,
   Building2,
   History,
@@ -18,6 +19,17 @@ import {
   Wine,
   CreditCard,
   FlaskConical,
+  Wallet,
+  DollarSign,
+  Tag,
+  Gift,
+  Users,
+  Receipt,
+  Monitor,
+  UtensilsCrossed,
+  List,
+  UserCog,
+  Package2,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -31,36 +43,33 @@ export interface NavigationItem {
 // Full navigation menu (common for all industries)
 export const fullNavigation: NavigationItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard" },
-  { name: "Sales", href: "/dashboard/sales", icon: ShoppingCart, permission: "sales" },
-  { name: "POS", href: "/dashboard/pos", icon: ShoppingCart, permission: "pos" },
-  { name: "Products", href: "/dashboard/products", icon: Package, permission: "products" },
+  { name: "Sales", href: "/dashboard/sales", icon: ShoppingBag, permission: "sales" },
+  { name: "Sales / POS", href: "/dashboard/pos", icon: Monitor, permission: "pos" },
   { name: "Inventory", href: "/dashboard/inventory", icon: Package, permission: "inventory" },
   { name: "Office", href: "/dashboard/office", icon: Building2, permission: "office" },
-  { name: "Shift History", href: "/dashboard/shift-history", icon: History, permission: "pos" },
   { name: "Admin", href: "/admin", icon: Shield, permission: "admin" },
   { name: "Settings", href: "/dashboard/settings", icon: Settings, permission: "settings" },
 ]
 
-// Retail-specific navigation items
+// Wholesale/Retail-specific navigation items (MVP: Deliveries only)
 export const retailNavigation: NavigationItem[] = [
-  { name: "Returns", href: "/dashboard/retail/returns", icon: RotateCcw, permission: "sales" },
-  { name: "Suppliers", href: "/dashboard/retail/suppliers", icon: Truck, permission: "inventory" },
-  { name: "Purchase Orders", href: "/dashboard/retail/purchase-orders", icon: ClipboardList, permission: "inventory" },
+  { name: "Wholesale", href: "/dashboard/retail", icon: ShoppingCart, permission: "pos" },
 ]
 
-// Restaurant-specific navigation items
+// Universal navigation items (available for all business types)
+// Note: Returns, Discounts, and Credits are now under Sales Hub (/dashboard/sales)
+export const universalNavigation: NavigationItem[] = [
+  // These features are now accessible via Sales Hub landing page
+]
+
+// Restaurant-specific navigation items - Now consolidated into landing page
 export const restaurantNavigation: NavigationItem[] = [
-  { name: "Tables", href: "/dashboard/restaurant/tables", icon: Square, permission: "pos" },
-  { name: "Kitchen Orders", href: "/dashboard/restaurant/kitchen-orders", icon: ChefHat, permission: "pos" },
-  { name: "Menu Builder", href: "/dashboard/restaurant/menu", icon: BookOpen, permission: "products" },
-  { name: "Reservations", href: "/dashboard/restaurant/reservations", icon: Calendar, permission: "pos" },
+  { name: "Restaurant", href: "/dashboard/restaurant", icon: UtensilsCrossed, permission: "pos" },
 ]
 
-// Bar-specific navigation items
+// Bar-specific navigation items - Now consolidated into landing page
 export const barNavigation: NavigationItem[] = [
-  { name: "Drinks Menu", href: "/dashboard/bar/drinks", icon: Wine, permission: "products" },
-  { name: "Bar Tabs", href: "/dashboard/bar/tabs", icon: CreditCard, permission: "sales" },
-  { name: "Mix Recipes", href: "/dashboard/bar/recipes", icon: FlaskConical, permission: "products" },
+  { name: "Bar", href: "/dashboard/bar", icon: Wine, permission: "pos" },
 ]
 
 /**
@@ -79,8 +88,11 @@ export function getIndustrySidebarConfig(
     return baseNavigation
   }
   
+  // Universal navigation items are available for all business types
+  const universal = [...universalNavigation]
+  
   switch (industry) {
-    case "retail":
+    case "wholesale and retail":
       return [...baseNavigation, ...retailNavigation]
     case "restaurant":
       return [...baseNavigation, ...restaurantNavigation]

@@ -740,6 +740,16 @@ For support and questions, contact the development team.
 
 ## 📈 SaaS Progress & MVP Status
 
+### 🎯 **Current Focus: Wholesale & Retail MVP (Primary Client)**
+
+**Status**: **85% Complete** - Production ready for cash-only operations  
+**Target**: Square POS feature parity for wholesale & retail businesses  
+**Timeline**: 4-6 weeks to full MVP
+
+See **[WHOLESALE_RETAIL_SQUARE_POS_ROADMAP.md](./WHOLESALE_RETAIL_SQUARE_POS_ROADMAP.md)** for detailed implementation plan.
+
+---
+
 ### ✅ **Completed (Production Ready)**
 
 #### **Core Infrastructure**
@@ -750,8 +760,21 @@ For support and questions, contact the development team.
 - ✅ Comprehensive API with RESTful endpoints
 - ✅ Database migrations and schema management
 
+#### **Wholesale & Retail Specific Features** 🎯 **PRIMARY FOCUS**
+- ✅ **Dual Pricing System** - Retail and wholesale prices per product
+- ✅ **Wholesale Quantity Thresholds** - Minimum wholesale quantity enforcement
+- ✅ **Wholesale Toggle** - Enable/disable wholesale per product
+- ✅ **Unified POS** - Single interface supporting both retail and wholesale sales
+- ✅ **Auto-Purchase Orders** - Supplier-optional auto-PO system (fully implemented)
+- ✅ **Supplier Management** - Complete supplier CRUD operations
+- ✅ **Low Stock Alerts** - Variation-level and product-level alerts
+- ✅ **Bulk Import/Export** - Excel templates for wholesale/retail products
+- ✅ **Business-Specific Fields** - Advanced columns in Excel import (volume, alcohol %, prep time, etc.)
+
 #### **Sales & Transactions**
 - ✅ **Cash-only sales** - Fully operational with atomic transactions
+- ✅ **Wholesale Sales** - Automatic price selection based on quantity
+- ✅ **Retail Sales** - Standard retail pricing
 - ✅ **Sale creation** - `POST /api/v1/sales/` with stock deduction
 - ✅ **Cash checkout** - `POST /api/v1/sales/checkout-cash/` endpoint
 - ✅ **Stock validation** - Prevents sales when stock insufficient
@@ -781,6 +804,7 @@ For support and questions, contact the development team.
 - ✅ **Inventory tracking toggle** - Per-variation control over inventory tracking
 - ✅ **Bulk import/export** - Excel/CSV support with variation and per-outlet stock initialization
 - ✅ **Excel import templates** - Pre-configured templates for Retail, Wholesale, Bar, and Restaurant business types
+- ✅ **Business-Specific Fields** - Volume (ml), Alcohol %, Prep Time, Menu Item status in import/export
 
 #### **Customer Management**
 - ✅ **Customer CRUD** - Complete customer management
@@ -816,62 +840,116 @@ For support and questions, contact the development team.
 
 ### ⏳ **In Progress / Partially Implemented**
 
-#### **Payment Methods**
+#### **Payment Methods** 🔴 **CRITICAL FOR WHOLESALE/RETAIL MVP**
 - ⚠️ **Card payments** - Backend structure exists, gateway integration pending
   - Models and services ready
   - Frontend UI disabled (MVP: cash only)
-  - TODO: Integrate with payment gateway (Stripe, Square, etc.)
+  - **Priority**: 🔴 CRITICAL - Needed for wholesale/retail clients
+  - **Estimated**: 2-3 weeks
+  - TODO: Integrate with payment gateway (Stripe, Square, Paystack)
 
 - ⚠️ **Mobile Money** - Backend structure exists, provider integration pending
   - Models and services ready
   - Frontend UI disabled (MVP: cash only)
+  - **Priority**: 🔴 CRITICAL - Needed for African markets
+  - **Estimated**: 1-2 weeks
   - TODO: Integrate with providers (M-Pesa, Airtel Money, etc.)
 
 - ⚠️ **Split payments** - Frontend UI exists, backend logic pending
   - Payment modal has split payment tab
   - Backend needs split payment processing logic
+  - **Priority**: 🟡 HIGH - Common use case
+  - **Estimated**: 3-5 days
 
-#### **Frontend Features**
-- ⚠️ **Loyalty programs** - Frontend UI exists (`app/dashboard/loyalty/`)
-  - Backend API not implemented
-  - TODO: Create loyalty points system
+#### **Receipt System** 🔴 **HIGH PRIORITY FOR WHOLESALE/RETAIL MVP**
+- ⚠️ **Receipt Printing** - Receipt preview exists, no print functionality
+  - Receipt numbers generated automatically
+  - Receipt preview modal exists
+  - **Priority**: 🔴 HIGH - Needed for physical receipts
+  - **Estimated**: 1-2 weeks
+  - TODO: PDF generation, thermal printer integration, email receipts
 
-- ⚠️ **Purchase orders** - Frontend UI exists (`app/dashboard/purchase-orders/`)
-  - Backend API not implemented
-  - TODO: Create purchase order models and APIs
+- ⚠️ **Digital Receipt Storage** - Receipt content not stored in database
+  - **Priority**: 🟡 MEDIUM
+  - **Estimated**: 3-5 days
+  - TODO: Receipt model, storage API, retrieval endpoints
 
-- ⚠️ **Discounts** - Frontend UI exists (`app/dashboard/discounts/`)
-  - Discount can be applied in sales
-  - TODO: Standalone discount management system
+#### **Hardware Integration** 🟡 **MEDIUM PRIORITY**
+- ⚠️ **Barcode Scanner** - Products have barcode field, no scanner integration
+  - Barcode search exists in POS
+  - **Priority**: 🟡 MEDIUM - Improves checkout speed
+  - **Estimated**: 3-5 days
+  - TODO: Keyboard wedge handler, scanner configuration, auto-add to cart
 
+#### **Wholesale & Retail Features** 🟡 **MEDIUM PRIORITY**
 - ⚠️ **Price lists** - Frontend UI exists (`app/dashboard/retail/price-lists/`)
   - Backend API not implemented
+  - **Priority**: 🟡 MEDIUM - Useful for wholesale pricing
+  - **Estimated**: 3-5 days
   - TODO: Create price list models and APIs
+
+- ⚠️ **Customer Groups** - Frontend UI exists (`app/dashboard/retail/customer-groups/`)
+  - Backend API not implemented
+  - **Priority**: 🟡 MEDIUM - Useful for wholesale customers
+  - **Estimated**: 2-3 days
+  - TODO: Create customer group models and APIs
+
+- ⚠️ **Discount Management** - Frontend UI exists (`app/dashboard/discounts/`)
+  - Discount can be applied in sales
+  - **Priority**: 🟡 MEDIUM
+  - **Estimated**: 3-5 days
+  - TODO: Standalone discount management system
+
+#### **Post-MVP Features** 🟢 **LOW PRIORITY**
+- ⚠️ **Loyalty programs** - Frontend UI exists (`app/dashboard/loyalty/`)
+  - Backend API not implemented
+  - **Priority**: 🟢 LOW - Post-MVP
+  - TODO: Create loyalty points system
+
+- ⚠️ **Purchase orders** - ✅ **FULLY IMPLEMENTED** (Auto-PO system complete)
+  - Backend API fully implemented
+  - Supplier-optional auto-PO system working
+  - Frontend UI connected and functional
 
 ---
 
-### ❌ **Not Implemented (MVP Requirements)**
+### ❌ **Not Implemented (Wholesale & Retail MVP Requirements)**
 
-#### **Critical for MVP**
-1. **Card Payment Gateway Integration**
+#### **🔴 Critical for Wholesale & Retail MVP** (4-6 weeks)
+1. **Card Payment Gateway Integration** - **CRITICAL**
    - Current: Backend structure ready, needs gateway API integration
-   - Required: Stripe, Square, or similar payment processor
-   - Impact: High - needed for non-cash businesses
+   - Required: Stripe, Square, or Paystack payment processor
+   - Impact: **HIGH** - Essential for non-cash businesses
+   - **Estimated**: 2-3 weeks
+   - **Priority**: 🔴 URGENT
 
-2. **Mobile Money Integration**
+2. **Mobile Money Integration** - **CRITICAL**
    - Current: Backend structure ready, needs provider APIs
    - Required: M-Pesa, Airtel Money, or similar
-   - Impact: High - needed for African markets
+   - Impact: **HIGH** - Essential for African markets
+   - **Estimated**: 1-2 weeks
+   - **Priority**: 🔴 URGENT
 
-3. **Receipt Printing**
+3. **Receipt Printing** - **HIGH PRIORITY**
    - Current: Receipt preview exists, no print functionality
    - Required: Thermal printer integration or PDF generation
-   - Impact: Medium - needed for physical receipts
+   - Impact: **HIGH** - Essential for physical receipts
+   - **Estimated**: 1-2 weeks
+   - **Priority**: 🔴 HIGH
 
-4. **Barcode Scanner Support**
+4. **Barcode Scanner Support** - **MEDIUM PRIORITY**
    - Current: Products have barcode field, no scanner integration
-   - Required: Barcode scanner hardware integration
-   - Impact: Medium - improves checkout speed
+   - Required: Barcode scanner hardware integration (keyboard wedge)
+   - Impact: **MEDIUM** - Improves checkout speed significantly
+   - **Estimated**: 3-5 days
+   - **Priority**: 🟡 MEDIUM
+
+5. **Split Payment Processing** - **MEDIUM PRIORITY**
+   - Current: Frontend UI exists, backend logic missing
+   - Required: Backend split payment processing
+   - Impact: **MEDIUM** - Common use case
+   - **Estimated**: 3-5 days
+   - **Priority**: 🟡 MEDIUM
 
 #### **Nice to Have (Post-MVP)**
 1. **Loyalty Programs** - Points system, rewards, customer tiers
@@ -929,59 +1007,195 @@ For support and questions, contact the development team.
 
 ---
 
-## 🚀 MVP Launch Readiness: **75% Complete**
+## 🚀 Wholesale & Retail MVP Launch Readiness: **85% Complete**
 
-### **What's Working Now**
-✅ **Cash-only POS is fully operational**
-- Complete sales flow from cart to receipt
+### **What's Working Now** ✅
+✅ **Cash-only POS is fully operational for Wholesale & Retail**
+- Complete sales flow from cart to receipt (cash only)
+- Wholesale pricing automatically applied based on quantity
+- Retail pricing for standard sales
 - Shift management and cash reconciliation
-- Real-time inventory tracking
-- Customer management
-- Basic reporting
+- Real-time inventory tracking (variation-based)
+- Customer management with credit support
+- Supplier management and auto-PO system
+- Low stock alerts (variation-level)
+- Basic reporting (sales, products, cash, P&L)
+- Bulk product import/export with business-specific fields
 
-### **What's Needed for Full MVP**
-1. **Payment Gateway Integration** (2-3 weeks)
-   - Card payment processing
-   - Mobile money integration
+### **What's Needed for Full Wholesale & Retail MVP** 🔴
+1. **Payment Gateway Integration** (2-3 weeks) - **CRITICAL**
+   - Card payment processing (Stripe/Square/Paystack)
+   - Mobile money integration (M-Pesa/Airtel Money)
    - Payment confirmation flows
+   - Transaction logging and audit trail
 
-2. **Receipt Printing** (1 week)
-   - PDF generation
-   - Thermal printer support
+2. **Receipt Printing** (1-2 weeks) - **HIGH PRIORITY**
+   - PDF generation (reportlab/weasyprint)
+   - Thermal printer support (ESC/POS)
    - Email receipt option
+   - Digital receipt storage
 
-3. **Testing & Bug Fixes** (1-2 weeks)
+3. **Split Payments** (3-5 days) - **MEDIUM PRIORITY**
+   - Backend split payment processing logic
+   - Payment allocation validation
+   - Frontend integration
+
+4. **Barcode Scanner** (3-5 days) - **MEDIUM PRIORITY**
+   - Keyboard wedge handler
+   - Scanner configuration UI
+   - Auto-add to cart on scan
+
+5. **Price Lists & Customer Groups** (1 week) - **MEDIUM PRIORITY**
+   - Backend API implementation
+   - Frontend integration
+
+6. **Testing & Bug Fixes** (1-2 weeks)
    - End-to-end testing
    - Performance optimization
    - Security review
 
-**Estimated Time to Full MVP: 4-6 weeks**
+**Estimated Time to Full Wholesale & Retail MVP: 4-6 weeks**
+
+---
+
+## 🔄 Restaurant & Bar Update Strategy
+
+### **How to Update Restaurant & Bar When Wholesale/Retail is Running**
+
+Since Wholesale & Retail is the urgent client, we use a **phased rollout** approach:
+
+#### **1. Multi-Tenant Isolation** ✅ **Already Implemented**
+- Each business type is completely isolated at the database level
+- Tenant-based data separation ensures no cross-contamination
+- Business type stored in `Tenant.type` field
+- All features conditionally rendered based on `businessType`
+
+#### **2. Feature Flag System** (Recommended)
+- Enable features per business type using feature flags
+- Shared features (payments, receipts) can be enabled for all types
+- Business-specific features remain isolated
+
+**Implementation:**
+```python
+# backend/apps/tenants/models.py
+class Tenant(models.Model):
+    feature_flags = models.JSONField(default=dict)
+    # Example: {"card_payments": True, "receipt_printing": True}
+```
+
+#### **3. Gradual Feature Rollout**
+
+**Phase 1: Wholesale & Retail (Weeks 1-6)**
+- ✅ Focus all development on wholesale/retail features
+- ✅ Test with wholesale/retail clients only
+- ✅ Deploy to production for wholesale/retail tenants
+
+**Phase 2: Restaurant & Bar Updates (Weeks 7-10)**
+- ✅ Enable payment gateway for restaurant/bar (reuse wholesale/retail code)
+- ✅ Enable receipt printing for restaurant/bar (reuse wholesale/retail code)
+- ✅ Add restaurant-specific features (reservations, etc.)
+- ✅ Add bar-specific features (tab management, etc.)
+
+#### **4. Code Reusability**
+- ✅ Payment processing logic (reusable across all business types)
+- ✅ Receipt generation (reusable across all business types)
+- ✅ Barcode scanner (reusable across all business types)
+- ✅ Core POS functionality (already shared)
+
+**Business-Specific Components:**
+- Restaurant: Table management, KOT, Kitchen Display
+- Bar: Drink menu, tab management (when implemented)
+- Wholesale/Retail: Price lists, customer groups, wholesale pricing
+
+#### **5. Safe Migration Strategy**
+1. **Additive Changes Only**: New features add new tables/fields
+2. **Backward Compatible**: Old features continue working
+3. **Feature Flags**: Control feature availability per business type
+4. **Gradual Rollout**: Enable features for one business type at a time
+
+**Example:**
+```python
+# Enable receipt printing for wholesale/retail first
+if tenant.type == "wholesale and retail" and feature_flags.get("receipt_printing"):
+    # Enable receipt printing
+
+# Later, enable for restaurant/bar
+if tenant.type in ["restaurant", "bar"] and feature_flags.get("receipt_printing"):
+    # Enable receipt printing (same code, different flag)
+```
+
+See **[WHOLESALE_RETAIL_SQUARE_POS_ROADMAP.md](./WHOLESALE_RETAIL_SQUARE_POS_ROADMAP.md)** for detailed implementation guide.
 
 ---
 
 ## 🎯 Roadmap
 
-### **Phase 1: MVP Completion (Current)**
-- [ ] Card payment gateway integration
-- [ ] Mobile money provider integration
-- [ ] **Digital receipts storage** - Store receipts in database (see implementation guide)
-- [ ] Receipt printing (PDF/Thermal)
-- [ ] Barcode scanner support
-- [ ] Comprehensive testing
+### **Phase 1: Wholesale & Retail MVP Completion** 🔴 **URGENT (Weeks 1-6)**
+**Priority**: Primary client focus - Wholesale & Retail businesses
 
-### **Phase 2: Enhanced Features**
-- [ ] Loyalty programs
-- [ ] Purchase orders
+#### **Week 1-2: Payment Gateway Integration** 🔴 **CRITICAL**
+- [ ] Card payment gateway integration (Stripe/Square/Paystack)
+- [ ] Mobile money provider integration (M-Pesa/Airtel Money)
+- [ ] Payment confirmation flows
+- [ ] Payment error handling and retry logic
+- [ ] Transaction logging and audit trail
+
+#### **Week 2-3: Receipt System** 🔴 **HIGH PRIORITY**
+- [ ] Receipt model and database storage
+- [ ] PDF generation (reportlab/weasyprint)
+- [ ] Thermal printer integration (ESC/POS)
+- [ ] Receipt retrieval API
+- [ ] Email receipt option
+
+#### **Week 3-4: Split Payments & Barcode Scanner** 🟡 **MEDIUM PRIORITY**
+- [ ] Split payment backend processing logic
+- [ ] Payment allocation validation
+- [ ] Barcode scanner keyboard wedge handler
+- [ ] Scanner configuration UI
+- [ ] Auto-add to cart on scan
+
+#### **Week 5: Price Lists & Customer Groups** 🟡 **MEDIUM PRIORITY**
+- [ ] Price list models and APIs
+- [ ] Customer group models and APIs
+- [ ] Frontend integration
+- [ ] POS integration
+
+#### **Week 6: Testing & Polish**
+- [ ] End-to-end testing
+- [ ] Performance optimization
+- [ ] Security audit
+- [ ] Bug fixes
+- [ ] Documentation
+
+**Target**: Full Wholesale & Retail MVP ready for production
+
+---
+
+### **Phase 2: Restaurant & Bar Feature Enablement** (Weeks 7-10)
+**Priority**: Enable shared features for Restaurant & Bar
+
+- [ ] Enable payment gateway for restaurant/bar (reuse Phase 1 code)
+- [ ] Enable receipt printing for restaurant/bar (reuse Phase 1 code)
+- [ ] Enable barcode scanner for restaurant/bar (reuse Phase 1 code)
+- [ ] Restaurant-specific features (reservations, advanced KOT)
+- [ ] Bar-specific features (tab management, mix recipes)
+- [ ] Testing and validation
+
+---
+
+### **Phase 3: Enhanced Features** (Post-MVP)
+- [ ] Loyalty programs (backend API)
 - [ ] Advanced reporting & analytics
 - [ ] Email/SMS notifications
 - [ ] Multi-currency support
+- [ ] Discount management system
 
-### **Phase 3: Scale & Optimize**
+### **Phase 4: Scale & Optimize** (Future)
 - [ ] Real-time notifications (WebSocket)
 - [ ] Offline mode with sync
 - [ ] Mobile app (iOS/Android)
 - [ ] Advanced inventory forecasting
-- [ ] Reservation system
+- [ ] Reservation system (restaurant)
 
 ---
 

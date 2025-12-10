@@ -24,7 +24,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { inventoryService } from "@/lib/services/inventoryService"
 import { productService } from "@/lib/services/productService"
 import { useTenant } from "@/contexts/tenant-context"
-import type { Product } from "@/lib/types/mock-data"
+import type { Product } from "@/lib/types"
 
 interface TransferStockModalProps {
   open: boolean

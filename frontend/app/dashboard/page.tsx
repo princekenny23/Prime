@@ -22,6 +22,7 @@ import { DateRangeFilter } from "@/components/dashboard/date-range-filter"
 import { ViewSaleDetailsModal } from "@/components/modals/view-sale-details-modal"
 import { QuickAddSaleModal } from "@/components/modals/quick-add-sale-modal"
 import { CustomizeDashboardModal } from "@/components/modals/customize-dashboard-modal"
+import { PageRefreshButton } from "@/components/dashboard/page-refresh-button"
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -38,15 +39,33 @@ export default function DashboardPage() {
   const [lowStockItems, setLowStockItems] = useState<any[]>([])
   const [isLoadingData, setIsLoadingData] = useState(true)
   
-  // Redirect to industry-specific dashboard if business is selected
+  // Redirect based on business type (only if on main dashboard, not if already on business-specific dashboard)
   useEffect(() => {
-    if (currentBusiness) {
-      // Redirect to industry-specific dashboard
-      const industryRoute = `/dashboard/${currentBusiness.type}`
-      router.push(industryRoute)
-    } else {
-      // No business selected, go to admin dashboard
+    if (!currentBusiness) {
       router.push("/admin")
+      return
+    }
+    
+    // Only redirect if we're on the main dashboard page, not if already on business-specific dashboard
+    const currentPath = window.location.pathname
+    if (currentPath === "/dashboard" || currentPath === "/dashboard/") {
+      // Redirect retail businesses to their specific dashboard (Square POS-like)
+      if (currentBusiness.type === "wholesale and retail") {
+        router.push("/dashboard/retail")
+        return
+      }
+      
+      // Redirect restaurant to dashboard (not features page)
+      if (currentBusiness.type === "restaurant") {
+        router.push("/dashboard/restaurant/dashboard")
+        return
+      }
+      
+      // Redirect bar to dashboard (not features page)
+      if (currentBusiness.type === "bar") {
+        router.push("/dashboard/bar/dashboard")
+        return
+      }
     }
   }, [currentBusiness, router])
   
@@ -72,16 +91,39 @@ export default function DashboardPage() {
         setTopItems(top)
         
         const products = Array.isArray(productsData) ? productsData : (productsData.results || [])
+        // Check both product-level and variation-level low stock
         const lowStock = products
-          .filter((p: any) => p.low_stock_threshold && p.stock <= p.low_stock_threshold)
-          .map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            sku: p.sku || "N/A",
-            currentStock: p.stock || 0,
-            minStock: p.low_stock_threshold || 0,
-            category: p.category?.name || "General",
-          }))
+          .filter((p: any) => {
+            // Check product-level low stock
+            const productLow = p.low_stock_threshold && p.stock <= p.low_stock_threshold
+            
+            // Check variation-level low stock
+            const variationLow = p.variations?.some((v: any) => 
+              v.track_inventory && 
+              v.low_stock_threshold > 0 && 
+              (v.total_stock || v.stock || 0) <= v.low_stock_threshold
+            )
+            
+            // Also check is_low_stock flag from backend
+            return p.is_low_stock || productLow || variationLow
+          })
+          .map((p: any) => {
+            // Find the variation with lowest stock if any
+            const lowVariation = p.variations?.find((v: any) => 
+              v.track_inventory && 
+              v.low_stock_threshold > 0 && 
+              (v.total_stock || v.stock || 0) <= v.low_stock_threshold
+            )
+            
+            return {
+              id: p.id,
+              name: p.name,
+              sku: p.sku || lowVariation?.sku || "N/A",
+              currentStock: lowVariation ? (lowVariation.total_stock || lowVariation.stock || 0) : (p.stock || 0),
+              minStock: lowVariation ? (lowVariation.low_stock_threshold || 0) : (p.low_stock_threshold || 0),
+              category: p.category?.name || "General",
+            }
+          })
         setLowStockItems(lowStock)
       } catch (error) {
         console.error("Failed to load dashboard data:", error)
@@ -92,6 +134,16 @@ export default function DashboardPage() {
     
     if (currentBusiness) {
       loadDashboardData()
+      
+      // Listen for outlet changes
+      const handleOutletChange = () => {
+        loadDashboardData()
+      }
+      window.addEventListener("outlet-changed", handleOutletChange)
+      
+      return () => {
+        window.removeEventListener("outlet-changed", handleOutletChange)
+      }
     }
   }, [currentBusiness, currentOutlet, tenantOutlet])
 
@@ -116,6 +168,13 @@ export default function DashboardPage() {
     
     if (currentBusiness) {
       loadRecentSales()
+      
+      // Auto-refresh recent sales every 30 seconds for real-time updates
+      const interval = setInterval(() => {
+        loadRecentSales()
+      }, 30000)
+      
+      return () => clearInterval(interval)
     }
   }, [currentBusiness, currentOutlet, tenantOutlet])
 
@@ -130,14 +189,34 @@ export default function DashboardPage() {
   }
   
   // Show loading or nothing while redirecting
-  if (!currentBusiness || isLoadingData || !kpiData) {
+  if (!currentBusiness) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">Loading business...</p>
         </div>
       </DashboardLayout>
     )
+  }
+
+  // Show loading while data is being fetched
+  if (isLoadingData) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Loading dashboard data...</p>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  // Initialize with default KPI data if not loaded
+  const displayKpiData = kpiData || {
+    sales: { value: 0, change: 0 },
+    customers: { value: 0, change: 0 },
+    products: { value: 0, change: 0 },
+    expenses: { value: 0, change: 0 },
+    profit: { value: 0, change: 0 },
   }
 
   return (
@@ -162,6 +241,7 @@ export default function DashboardPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <PageRefreshButton />
             <DateRangeFilter />
             <Button variant="outline" onClick={() => setShowCustomize(true)}>
               <Settings2 className="mr-2 h-4 w-4" />
@@ -175,7 +255,7 @@ export default function DashboardPage() {
         </div>
 
         {/* KPI Cards */}
-        <KPICards data={kpiData} business={currentBusiness} />
+        <KPICards data={displayKpiData} business={currentBusiness} />
 
         {/* Charts and Activity */}
         <div className="grid gap-4 md:grid-cols-2">

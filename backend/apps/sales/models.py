@@ -1,8 +1,6 @@
 from django.db import models
 from django.core.validators import MinValueValidator
-from decimal import Decimal
-from django.db import models
-from django.core.validators import MinValueValidator
+from django.utils import timezone
 from decimal import Decimal
 from apps.tenants.models import Tenant
 from apps.outlets.models import Outlet
@@ -41,6 +39,11 @@ class Sale(models.Model):
     shift = models.ForeignKey('shifts.Shift', on_delete=models.SET_NULL, null=True, blank=True, related_name='sales')
     customer = models.ForeignKey('customers.Customer', on_delete=models.SET_NULL, null=True, blank=True, related_name='purchases')
     
+    # Restaurant-specific fields
+    table = models.ForeignKey('restaurant.Table', on_delete=models.SET_NULL, null=True, blank=True, related_name='orders', help_text="Table for restaurant orders")
+    guests = models.PositiveIntegerField(null=True, blank=True, help_text="Number of guests at table")
+    priority = models.CharField(max_length=20, choices=[('normal', 'Normal'), ('high', 'High'), ('urgent', 'Urgent')], default='normal', help_text="Order priority for kitchen")
+    
     receipt_number = models.CharField(max_length=50, unique=True, db_index=True)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0'))])
     tax = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0'), validators=[MinValueValidator(Decimal('0'))])
@@ -48,6 +51,25 @@ class Sale(models.Model):
     total = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS, default='cash')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='completed')
+    
+    # Cash payment fields (for cash-only sales)
+    cash_received = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        validators=[MinValueValidator(Decimal('0'))],
+        help_text="Cash amount received from customer (for cash payments)"
+    )
+    change_given = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        default=Decimal('0'),
+        validators=[MinValueValidator(Decimal('0'))],
+        help_text="Change given to customer (cash_received - total)"
+    )
     
     # Credit/Accounts Receivable Fields
     due_date = models.DateTimeField(null=True, blank=True, help_text="Payment due date for credit sales")
@@ -110,7 +132,6 @@ class Sale(models.Model):
             self.payment_status = 'partially_paid'
         else:
             # Check if overdue
-            from django.utils import timezone
             if self.due_date and self.due_date < timezone.now():
                 self.payment_status = 'overdue'
             else:
@@ -120,12 +141,31 @@ class Sale(models.Model):
 
 class SaleItem(models.Model):
     """Sale line item model"""
+    KITCHEN_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('preparing', 'Preparing'),
+        ('ready', 'Ready'),
+        ('served', 'Served'),
+        ('cancelled', 'Cancelled'),
+    ]
+    
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='items')
-    product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, related_name='sale_items')
-    product_name = models.CharField(max_length=255)  # Store name in case product is deleted
-    quantity = models.IntegerField(validators=[MinValueValidator(1)])
+    product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, blank=True, related_name='sale_items', help_text="Deprecated: Use variation instead. Kept for backward compatibility.")
+    variation = models.ForeignKey('products.ItemVariation', on_delete=models.SET_NULL, null=True, blank=True, related_name='sale_items', help_text="Item variation sold (preferred)")
+    unit = models.ForeignKey('products.ProductUnit', on_delete=models.SET_NULL, null=True, blank=True, related_name='sale_items', help_text="Product unit used for this sale (e.g., piece, dozen, box)")
+    product_name = models.CharField(max_length=255)  # Store name in case product/variation is deleted
+    variation_name = models.CharField(max_length=255, blank=True, help_text="Variation name snapshot")
+    unit_name = models.CharField(max_length=50, blank=True, help_text="Unit name snapshot (e.g., 'piece', 'dozen')")
+    quantity = models.IntegerField(validators=[MinValueValidator(1)], help_text="Quantity sold in the selected unit")
+    quantity_in_base_units = models.IntegerField(validators=[MinValueValidator(1)], default=1, help_text="Quantity in base units (for inventory deduction)")
     price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
     total = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
+    
+    # Restaurant-specific fields
+    kitchen_status = models.CharField(max_length=20, choices=KITCHEN_STATUS_CHOICES, default='pending', help_text="Kitchen preparation status")
+    notes = models.TextField(blank=True, help_text="Special instructions or modifiers for kitchen")
+    prepared_at = models.DateTimeField(null=True, blank=True, help_text="When item was marked as ready")
+    
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -135,8 +175,213 @@ class SaleItem(models.Model):
         indexes = [
             models.Index(fields=['sale']),
             models.Index(fields=['product']),
+            models.Index(fields=['variation']),
+            models.Index(fields=['unit']),
         ]
 
+    def save(self, *args, **kwargs):
+        """Auto-set product and names from variation/unit if needed"""
+        if self.variation and not self.product:
+            self.product = self.variation.product
+        if self.unit and not self.product:
+            self.product = self.unit.product
+        
+        if self.variation:
+            if not self.product_name:
+                self.product_name = self.variation.product.name
+            if not self.variation_name:
+                self.variation_name = self.variation.name
+        elif self.product and not self.product_name:
+            self.product_name = self.product.name
+        
+        # Store unit name snapshot
+        if self.unit and not self.unit_name:
+            self.unit_name = self.unit.unit_name
+        
+        # Calculate quantity_in_base_units if unit is provided
+        if self.unit and not self.quantity_in_base_units:
+            self.quantity_in_base_units = self.unit.convert_to_base_units(self.quantity)
+        elif not self.unit:
+            # If no unit, quantity_in_base_units equals quantity (assume base unit)
+            self.quantity_in_base_units = self.quantity
+        
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.product_name} x{self.quantity}"
+        display_name = f"{self.product_name}"
+        if self.variation_name:
+            display_name += f" - {self.variation_name}"
+        return f"{display_name} x{self.quantity}"
+
+
+class Delivery(models.Model):
+    """Delivery/Fulfillment model for wholesale orders"""
+    
+    DELIVERY_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('preparing', 'Preparing'),
+        ('ready', 'Ready for Dispatch'),
+        ('in_transit', 'In Transit'),
+        ('delivered', 'Delivered'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+        ('failed', 'Delivery Failed'),
+    ]
+    
+    DELIVERY_METHOD_CHOICES = [
+        ('own_vehicle', 'Own Vehicle'),
+        ('third_party', 'Third Party Courier'),
+        ('customer_pickup', 'Customer Pickup'),
+        ('external_shipping', 'External Shipping Company'),
+    ]
+    
+    # Core relationships
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='deliveries')
+    sale = models.ForeignKey('sales.Sale', on_delete=models.CASCADE, related_name='deliveries', help_text="The sale this delivery fulfills")
+    outlet = models.ForeignKey(Outlet, on_delete=models.CASCADE, related_name='deliveries', help_text="Outlet dispatching the delivery")
+    customer = models.ForeignKey('customers.Customer', on_delete=models.SET_NULL, null=True, blank=True, related_name='deliveries')
+    
+    # Delivery identification
+    delivery_number = models.CharField(max_length=50, unique=True, db_index=True, help_text="Unique delivery reference number")
+    
+    # Delivery details
+    status = models.CharField(max_length=20, choices=DELIVERY_STATUS_CHOICES, default='pending')
+    delivery_method = models.CharField(max_length=20, choices=DELIVERY_METHOD_CHOICES, default='own_vehicle')
+    
+    # Address information
+    delivery_address = models.TextField(help_text="Full delivery address")
+    delivery_city = models.CharField(max_length=100, blank=True)
+    delivery_state = models.CharField(max_length=100, blank=True)
+    delivery_postal_code = models.CharField(max_length=20, blank=True)
+    delivery_country = models.CharField(max_length=100, blank=True)
+    delivery_contact_name = models.CharField(max_length=255, blank=True, help_text="Contact person at delivery address")
+    delivery_contact_phone = models.CharField(max_length=20, blank=True)
+    
+    # Delivery scheduling
+    scheduled_date = models.DateField(null=True, blank=True, help_text="Scheduled delivery date")
+    scheduled_time_start = models.TimeField(null=True, blank=True, help_text="Scheduled delivery time window start")
+    scheduled_time_end = models.TimeField(null=True, blank=True, help_text="Scheduled delivery time window end")
+    actual_delivery_date = models.DateTimeField(null=True, blank=True, help_text="Actual delivery date/time")
+    
+    # Shipping/Courier information
+    courier_name = models.CharField(max_length=255, blank=True, help_text="Name of courier/shipping company")
+    tracking_number = models.CharField(max_length=100, blank=True, help_text="Tracking number for third-party shipping")
+    driver_name = models.CharField(max_length=255, blank=True, help_text="Driver name for own vehicle deliveries")
+    vehicle_number = models.CharField(max_length=50, blank=True, help_text="Vehicle registration number")
+    
+    # Financial
+    delivery_fee = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=Decimal('0'),
+        validators=[MinValueValidator(Decimal('0'))],
+        help_text="Delivery fee charged to customer"
+    )
+    shipping_cost = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=Decimal('0'),
+        validators=[MinValueValidator(Decimal('0'))],
+        help_text="Actual shipping cost (for cost tracking)"
+    )
+    
+    # Notes and metadata
+    notes = models.TextField(blank=True, help_text="Internal notes about delivery")
+    customer_notes = models.TextField(blank=True, help_text="Notes visible to customer")
+    delivery_instructions = models.TextField(blank=True, help_text="Special delivery instructions")
+    
+    # User tracking
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_deliveries')
+    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_deliveries', help_text="User responsible for delivery")
+    delivered_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='completed_deliveries', help_text="User who completed delivery")
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    dispatched_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'sales_delivery'
+        verbose_name = 'Delivery'
+        verbose_name_plural = 'Deliveries'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['tenant']),
+            models.Index(fields=['sale']),
+            models.Index(fields=['customer']),
+            models.Index(fields=['status']),
+            models.Index(fields=['scheduled_date']),
+            models.Index(fields=['delivery_number']),
+        ]
+    
+    def __str__(self):
+        return f"Delivery {self.delivery_number} - {self.get_status_display()}"
+    
+    def save(self, *args, **kwargs):
+        if not self.delivery_number:
+            self.delivery_number = self._generate_delivery_number()
+        super().save(*args, **kwargs)
+    
+    def _generate_delivery_number(self):
+        """Generate unique delivery number"""
+        prefix = "DEL"
+        timestamp = timezone.now().strftime("%Y%m%d%H%M%S")
+        return f"{prefix}-{timestamp}"
+    
+    @property
+    def is_delivered(self):
+        """Check if delivery is completed"""
+        return self.status in ['delivered', 'completed']
+    
+    @property
+    def can_be_cancelled(self):
+        """Check if delivery can be cancelled"""
+        return self.status in ['pending', 'confirmed', 'preparing']
+
+
+class DeliveryItem(models.Model):
+    """Many-to-many relationship between Delivery and SaleItem"""
+    
+    delivery = models.ForeignKey(Delivery, on_delete=models.CASCADE, related_name='delivery_items')
+    sale_item = models.ForeignKey(SaleItem, on_delete=models.CASCADE, related_name='delivery_items')
+    quantity = models.IntegerField(validators=[MinValueValidator(1)], help_text="Quantity being delivered in this delivery")
+    
+    # Status tracking
+    is_delivered = models.BooleanField(default=False, help_text="Whether this item was successfully delivered")
+    delivered_quantity = models.IntegerField(default=0, help_text="Actual quantity delivered (may differ from ordered)")
+    notes = models.TextField(blank=True, help_text="Notes specific to this item delivery")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'sales_deliveryitem'
+        unique_together = [['delivery', 'sale_item']]
+        verbose_name = 'Delivery Item'
+        verbose_name_plural = 'Delivery Items'
+    
+    def __str__(self):
+        return f"{self.delivery.delivery_number} - {self.sale_item.product_name} x{self.quantity}"
+
+
+class DeliveryStatusHistory(models.Model):
+    """Track status changes for audit trail"""
+    
+    delivery = models.ForeignKey(Delivery, on_delete=models.CASCADE, related_name='status_history')
+    status = models.CharField(max_length=20)
+    previous_status = models.CharField(max_length=20, blank=True)
+    changed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'sales_deliverystatushistory'
+        ordering = ['-created_at']
+        verbose_name = 'Delivery Status History'
+        verbose_name_plural = 'Delivery Status Histories'
+    
+    def __str__(self):
+        return f"{self.delivery.delivery_number} - {self.status} at {self.created_at}"
 

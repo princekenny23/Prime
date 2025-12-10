@@ -1,162 +1,130 @@
 "use client"
 
-
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
-import { useBusinessStore } from "@/stores/businessStore"
-import { useAuthStore } from "@/stores/authStore"
-import { useTenant } from "@/contexts/tenant-context"
-import { KPICards } from "@/components/dashboard/kpi-cards"
-import { SalesChart } from "@/components/dashboard/sales-chart"
-import { RecentActivity } from "@/components/dashboard/recent-activity"
-import { LowStockAlerts } from "@/components/dashboard/low-stock-alerts"
-import { TopSellingItems } from "@/components/dashboard/top-selling-items"
-import { generateKPIData, generateChartData, generateActivityData, generateTopSellingItems } from "@/lib/utils/dashboard-stats"
-import { productService } from "@/lib/services/productService"
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { 
+  LayoutDashboard,
+  ShoppingCart,
+  Users,
+  FileText,
+  Truck,
+} from "lucide-react"
+import { cn } from "@/lib/utils"
 
-export default function RetailDashboard() {
-  const { currentBusiness, currentOutlet: businessOutlet, loadBusinesses, loadOutlets } = useBusinessStore()
-  const { currentOutlet: tenantOutlet, isLoading: tenantLoading } = useTenant()
-  const { isAuthenticated } = useAuthStore()
-  const router = useRouter()
-  const [kpiData, setKpiData] = useState<any>(null)
-  const [lowStockItems, setLowStockItems] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [chartData, setChartData] = useState<any[]>([])
-  const [activities, setActivities] = useState<any[]>([])
-  const [topItems, setTopItems] = useState<any[]>([])
-  
-  // Use tenant outlet if available, otherwise fall back to business store outlet
-  const currentOutlet = tenantOutlet || businessOutlet
-  
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push("/auth/login")
-      return
-    }
-    
-    // If no current business, try to restore from user's tenant
-    if (!currentBusiness) {
-      const { user } = useAuthStore.getState()
-      if (user?.tenant) {
-        const tenantId = typeof user.tenant === 'object' 
-          ? String(user.tenant.id || user.tenant) 
-          : String(user.tenant)
-        console.log("Restoring business from user tenant:", tenantId)
-        const { setCurrentBusiness } = useBusinessStore.getState()
-        setCurrentBusiness(tenantId).catch((error: any) => {
-          console.error("Failed to restore business:", error)
-          router.push("/admin")
-        })
-        return // Wait for business to be restored
-      }
-      router.push("/admin")
-      return
-    }
-    
-    if (currentBusiness.type !== "retail") {
-      router.push(`/dashboard/${currentBusiness.type}`)
-      return
-    }
-    
-    loadBusinesses()
-    
-    // Load outlets if not already loaded
-    if (currentBusiness) {
-      loadOutlets(currentBusiness.id)
-    }
-    
-    // Load dashboard data
-    const loadData = async () => {
-      setIsLoading(true)
-      try {
-        const outletId = currentOutlet?.id
-        const [kpi, productsData] = await Promise.all([
-          generateKPIData(currentBusiness.id, currentBusiness, outletId),
-          productService.getLowStock().catch(() => []),
-        ])
-        
-        setKpiData(kpi)
-        
-        const products = Array.isArray(productsData) ? productsData : []
-        const lowStock = products
-          .filter((p: any) => p.lowStockThreshold && p.stock <= p.lowStockThreshold)
-          .map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            sku: p.sku || "N/A",
-            currentStock: p.stock || 0,
-            minStock: p.lowStockThreshold || 0,
-            category: p.category?.name || "General",
-          }))
-        setLowStockItems(lowStock)
-      } catch (error) {
-        console.error("Failed to load dashboard data:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    
-    loadData()
-  }, [currentBusiness, currentOutlet, isAuthenticated, router, loadBusinesses, loadOutlets])
-  
-  useEffect(() => {
-    const loadDashboardData = async () => {
-      if (!currentBusiness || !currentOutlet) return
-      
-      try {
-        const outletId = currentOutlet.id
-        const [chart, activity, top] = await Promise.all([
-          generateChartData(currentBusiness.id, outletId),
-          generateActivityData(currentBusiness.id, outletId),
-          generateTopSellingItems(currentBusiness.id, outletId),
-        ])
-        setChartData(chart)
-        setActivities(activity)
-        setTopItems(top)
-      } catch (error) {
-        console.error("Failed to load dashboard data:", error)
-      }
-    }
-    
-    loadDashboardData()
-  }, [currentBusiness, currentOutlet])
-  
-  if (!currentBusiness || currentBusiness.type !== "retail" || isLoading || tenantLoading || !kpiData) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </DashboardLayout>
-    )
-  }
-  
+interface RetailOptionCard {
+  id: string
+  title: string
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  bgColor: string
+  iconColor: string
+  textColor: string
+  description?: string
+}
+
+const retailOptions: RetailOptionCard[] = [
+ 
+  {
+    id: "wholesale",
+    title: "Wholesale",
+    href: "/dashboard/retail/wholesale",
+    icon: ShoppingCart,
+    bgColor: "bg-gray-100",
+    iconColor: "text-gray-700",
+    textColor: "text-foreground",
+    description: "Manage wholesale pricing and quantities"
+  },
+  {
+    id: "customer-groups",
+    title: "Customer Groups",
+    href: "/dashboard/retail/customer-groups",
+    icon: Users,
+    bgColor: "bg-blue-900",
+    iconColor: "text-white",
+    textColor: "text-white",
+    description: "Organize customers into groups for pricing"
+  },
+  {
+    id: "price-lists",
+    title: "Price Lists",
+    href: "/dashboard/retail/price-lists",
+    icon: FileText,
+    bgColor: "bg-gray-100",
+    iconColor: "text-gray-700",
+    textColor: "text-foreground",
+    description: "Create and manage custom price lists"
+  },
+  {
+    id: "deliveries",
+    title: "Deliveries",
+    href: "/dashboard/retail/deliveries",
+    icon: Truck,
+    bgColor: "bg-blue-900",
+    iconColor: "text-white",
+    textColor: "text-white",
+    description: "Track and manage delivery orders"
+  },
+]
+
+export default function RetailPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header - No action buttons, just title */}
+        {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold">Retail Dashboard</h1>
+          <h1 className="text-3xl font-bold">Wholesale & Retail Management</h1>
           <p className="text-muted-foreground mt-1">
-            Business overview for {currentBusiness.name}
+            Select an option to manage your wholesale and retail operations
           </p>
         </div>
 
-        {/* KPI Cards */}
-        <KPICards data={kpiData} business={currentBusiness} />
+        {/* Option Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {retailOptions.map((option) => {
+            const Icon = option.icon
+            const isFullColor = option.bgColor.includes("900")
+            
+            return (
+              <Link
+                key={option.id}
+                href={option.href}
+                className="group block"
+              >
+                <div
+                  className={cn(
+                    "relative h-52 rounded-xl shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] cursor-pointer overflow-hidden",
+                    option.bgColor
+                  )}
+                >
+                  {/* Icon Section - Centered */}
+                  <div className={cn(
+                    "absolute top-8 left-1/2 transform -translate-x-1/2",
+                    isFullColor ? "opacity-100" : "opacity-90"
+                  )}>
+                    <Icon className={cn("h-12 w-12", option.iconColor)} />
+                  </div>
 
-        {/* Charts and Activity */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <SalesChart data={chartData} type="area" />
-          <RecentActivity activities={activities} business={currentBusiness} />
-        </div>
+                  {/* Title Section */}
+                  <div className={cn(
+                    "absolute bottom-0 left-0 right-0 p-5 rounded-b-xl",
+                    isFullColor 
+                      ? option.bgColor 
+                      : "bg-white"
+                  )}>
+                    <h3 className={cn(
+                      "font-semibold text-lg text-center",
+                      isFullColor ? option.textColor : "text-foreground"
+                    )}>
+                      {option.title}
+                    </h3>
+                  </div>
 
-        {/* Low Stock and Top Selling */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <LowStockAlerts items={lowStockItems} />
-          <TopSellingItems items={topItems} business={currentBusiness} />
+                  {/* Hover Overlay */}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-200" />
+                </div>
+              </Link>
+            )
+          })}
         </div>
       </div>
     </DashboardLayout>

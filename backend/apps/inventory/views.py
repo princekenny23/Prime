@@ -8,23 +8,142 @@ from django.db import transaction
 from django.utils import timezone
 from decimal import Decimal
 import logging
-from .models import StockMovement, StockTake, StockTakeItem
-from .serializers import StockMovementSerializer, StockTakeSerializer, StockTakeItemSerializer
-from apps.products.models import Product
+from .models import StockMovement, StockTake, StockTakeItem, LocationStock
+from .serializers import StockMovementSerializer, StockTakeSerializer, StockTakeItemSerializer, LocationStockSerializer
+from apps.products.models import Product, ItemVariation
 from apps.tenants.permissions import TenantFilterMixin
 
 logger = logging.getLogger(__name__)
 
 
-class StockMovementViewSet(viewsets.ReadOnlyModelViewSet, TenantFilterMixin):
-    """Stock movement ViewSet (read-only)"""
-    queryset = StockMovement.objects.select_related('product', 'outlet', 'user')
+class StockMovementViewSet(viewsets.ModelViewSet, TenantFilterMixin):
+    """Stock movement ViewSet with variation support"""
+    queryset = StockMovement.objects.select_related('product', 'variation', 'variation__product', 'outlet', 'user')
     serializer_class = StockMovementSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['tenant', 'product', 'outlet', 'movement_type']
+    filterset_fields = ['tenant', 'product', 'variation', 'outlet', 'movement_type']
     ordering_fields = ['created_at']
     ordering = ['-created_at']
+    
+    def get_queryset(self):
+        """Ensure tenant filtering is applied correctly"""
+        # Ensure user.tenant is loaded
+        user = self.request.user
+        if not hasattr(user, '_tenant_loaded'):
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+                user = User.objects.select_related('tenant').get(pk=user.pk)
+                self.request.user = user
+                user._tenant_loaded = True
+            except User.DoesNotExist:
+                pass
+        
+        is_saas_admin = getattr(user, 'is_saas_admin', False)
+        request_tenant = getattr(self.request, 'tenant', None)
+        user_tenant = getattr(user, 'tenant', None)
+        
+        # Use request.tenant first (set by middleware), then fall back to user.tenant
+        tenant = request_tenant or user_tenant
+        
+        logger.info(f"StockMovementViewSet.get_queryset - User: {user.email}, is_saas_admin: {is_saas_admin}, user_tenant_id: {user_tenant.id if user_tenant else None}, request_tenant_id: {request_tenant.id if request_tenant else None}")
+        
+        # Get base queryset
+        queryset = StockMovement.objects.select_related('product', 'variation', 'variation__product', 'outlet', 'user').all()
+        
+        # Apply tenant filter - CRITICAL for security
+        if not is_saas_admin:
+            if tenant:
+                queryset = queryset.filter(tenant=tenant)
+                count = queryset.count()
+                logger.info(f"Applied tenant filter: {tenant.id} ({tenant.name}) - {count} movements found")
+            else:
+                logger.error(f"CRITICAL: No tenant found for user {user.email} (ID: {user.id}). User must have a tenant assigned to view inventory.")
+                logger.error(f"User tenant: {user_tenant}, Request tenant: {request_tenant}")
+                # Return empty queryset for security
+                return queryset.none()
+        
+        # Apply outlet filter if provided (for outlet isolation)
+        outlet = self.get_outlet_for_request(self.request)
+        if outlet:
+            queryset = queryset.filter(outlet=outlet)
+            logger.info(f"Applied outlet filter: {outlet.id} ({outlet.name})")
+        # Also check explicit outlet filter in query params (for backward compatibility)
+        elif self.request.query_params.get('outlet'):
+            outlet_id = self.request.query_params.get('outlet')
+            try:
+                queryset = queryset.filter(outlet_id=outlet_id)
+                logger.info(f"Applied outlet filter from query params: {outlet_id}")
+            except (ValueError, TypeError):
+                pass
+        
+        return queryset
+    
+    def perform_create(self, serializer):
+        """Create stock movement and update LocationStock if variation is provided"""
+        tenant = getattr(self.request, 'tenant', None) or self.request.user.tenant
+        if not tenant:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("Tenant is required")
+        
+        variation = serializer.validated_data.get('variation')
+        outlet = serializer.validated_data.get('outlet')
+        movement_type = serializer.validated_data.get('movement_type')
+        quantity = serializer.validated_data.get('quantity')
+        
+        # Save the movement
+        movement = serializer.save(tenant=tenant, user=self.request.user)
+        
+        # Update LocationStock if variation is provided and track_inventory is enabled
+        if variation and variation.track_inventory and outlet:
+            location_stock, created = LocationStock.objects.get_or_create(
+                tenant=tenant,
+                variation=variation,
+                outlet=outlet,
+                defaults={'quantity': 0}
+            )
+            
+            # Update stock based on movement type
+            if movement_type in ['sale', 'transfer_out', 'damage', 'expiry']:
+                location_stock.quantity = max(0, location_stock.quantity - quantity)
+            elif movement_type in ['purchase', 'transfer_in', 'return', 'adjustment']:
+                if movement_type == 'adjustment':
+                    # For adjustments, quantity can be positive or negative
+                    location_stock.quantity = max(0, location_stock.quantity + quantity)
+                else:
+                    location_stock.quantity += quantity
+            location_stock.save()
+            
+            # Check for low stock and create notification (Square POS-like)
+            if variation.track_inventory and location_stock.quantity <= variation.low_stock_threshold:
+                try:
+                    from apps.notifications.services import NotificationService
+                    # Only notify if stock is actually low (not just at threshold)
+                    if location_stock.quantity < variation.low_stock_threshold or (
+                        location_stock.quantity == variation.low_stock_threshold and variation.low_stock_threshold > 0
+                    ):
+                        # Check if notification already exists for this variation to avoid duplicates
+                        from apps.notifications.models import Notification
+                        from django.utils import timezone
+                        from datetime import timedelta
+                        recent_notification = Notification.objects.filter(
+                            tenant=tenant,
+                            type='stock',
+                            resource_type='ItemVariation',
+                            resource_id=str(variation.id),
+                            read=False,
+                            created_at__gte=timezone.now() - timedelta(hours=1)
+                        ).exists()
+                        
+                        if not recent_notification:
+                            NotificationService.notify_low_stock(variation, outlet)
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Failed to create low stock notification: {str(e)}")
+        
+        return movement
     
     def list(self, request, *args, **kwargs):
         """Override list to add logging"""
@@ -35,17 +154,32 @@ class StockMovementViewSet(viewsets.ReadOnlyModelViewSet, TenantFilterMixin):
         return response
 
 
-class StockTakeItemViewSet(viewsets.ModelViewSet):
+class StockTakeItemViewSet(viewsets.ModelViewSet, TenantFilterMixin):
     """Stock take item ViewSet"""
-    queryset = StockTakeItem.objects.select_related('product', 'stock_take')
+    queryset = StockTakeItem.objects.select_related('product', 'stock_take', 'stock_take__tenant')
     serializer_class = StockTakeItemSerializer
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
+        """Filter stock take items by tenant through stock_take"""
+        queryset = super().get_queryset()
+        # SaaS admins can see all stock take items
+        if self.request.user.is_saas_admin:
+            queryset = queryset
+        else:
+            # Regular users only see stock take items from their tenant's stock takes
+            tenant = getattr(self.request, 'tenant', None) or self.request.user.tenant
+            if tenant:
+                queryset = queryset.filter(stock_take__tenant=tenant)
+            else:
+                return queryset.none()
+        
+        # Filter by stock_take if provided in URL
         stock_take_id = self.kwargs.get('stock_take_pk')
         if stock_take_id:
-            return self.queryset.filter(stock_take_id=stock_take_id)
-        return self.queryset.none()
+            queryset = queryset.filter(stock_take_id=stock_take_id)
+        
+        return queryset
     
     def get_serializer_context(self):
         """Add request to serializer context"""
@@ -89,6 +223,37 @@ class StockTakeViewSet(viewsets.ModelViewSet, TenantFilterMixin):
     filterset_fields = ['tenant', 'outlet', 'status', 'operating_date']
     ordering_fields = ['created_at', 'operating_date']
     ordering = ['-created_at']
+    
+    def get_queryset(self):
+        """Ensure tenant filtering is applied correctly"""
+        # Ensure user.tenant is loaded
+        user = self.request.user
+        if not hasattr(user, '_tenant_loaded'):
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+                user = User.objects.select_related('tenant').get(pk=user.pk)
+                self.request.user = user
+                user._tenant_loaded = True
+            except User.DoesNotExist:
+                pass
+        
+        is_saas_admin = getattr(user, 'is_saas_admin', False)
+        request_tenant = getattr(self.request, 'tenant', None)
+        user_tenant = getattr(user, 'tenant', None)
+        tenant = request_tenant or user_tenant
+        
+        # Get base queryset
+        queryset = StockTake.objects.select_related('tenant', 'outlet', 'user').prefetch_related('items').all()
+        
+        # Apply tenant filter - CRITICAL for security
+        if not is_saas_admin:
+            if tenant:
+                queryset = queryset.filter(tenant=tenant)
+            else:
+                return queryset.none()
+        
+        return queryset
     
     def get_serializer_context(self):
         """Add request to serializer context"""
@@ -163,10 +328,49 @@ class StockTakeViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                     notes=''
                 )
     
+    def update(self, request, *args, **kwargs):
+        """Override update to ensure tenant matches"""
+        instance = self.get_object()
+        tenant = getattr(request, 'tenant', None) or request.user.tenant
+        
+        # Verify tenant matches (unless SaaS admin or tenant admin)
+        from apps.tenants.permissions import is_admin_user
+        if not is_admin_user(request.user) and tenant and instance.tenant != tenant:
+            return Response(
+                {"detail": "You do not have permission to update this stock take."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        return super().update(request, *args, **kwargs)
+    
+    def destroy(self, request, *args, **kwargs):
+        """Override destroy to ensure tenant matches"""
+        instance = self.get_object()
+        tenant = getattr(request, 'tenant', None) or request.user.tenant
+        
+        # Verify tenant matches (unless SaaS admin or tenant admin)
+        from apps.tenants.permissions import is_admin_user
+        if not is_admin_user(request.user) and tenant and instance.tenant != tenant:
+            return Response(
+                {"detail": "You do not have permission to delete this stock take."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        return super().destroy(request, *args, **kwargs)
+    
     @action(detail=True, methods=['post'])
     def complete(self, request, pk=None):
         """Complete stock take and apply adjustments"""
         stock_take = self.get_object()
+        tenant = getattr(request, 'tenant', None) or request.user.tenant
+        
+        # CRITICAL: Verify tenant matches (unless SaaS admin or tenant admin)
+        from apps.tenants.permissions import is_admin_user
+        if not is_admin_user(request.user) and tenant and stock_take.tenant != tenant:
+            return Response(
+                {"detail": "You do not have permission to complete this stock take."},
+                status=status.HTTP_403_FORBIDDEN
+            )
         
         if stock_take.status != 'running':
             return Response(
@@ -178,7 +382,11 @@ class StockTakeViewSet(viewsets.ModelViewSet, TenantFilterMixin):
             # Apply adjustments
             for item in stock_take.items.all():
                 if item.difference != 0:
+                    # CRITICAL: Ensure product belongs to tenant
                     product = item.product
+                    if product.tenant != stock_take.tenant:
+                        logger.warning(f"Product {product.id} tenant mismatch in stock take {stock_take.id}")
+                        continue
                     product.stock += item.difference
                     product.save()
                     
@@ -469,3 +677,164 @@ def receive(request):
         response_data["message"] += f", {len(errors)} failed"
     
     return Response(response_data, status=status.HTTP_201_CREATED)
+
+
+class LocationStockViewSet(viewsets.ModelViewSet, TenantFilterMixin):
+    """Location Stock ViewSet - per-location inventory for variations"""
+    queryset = LocationStock.objects.select_related('variation', 'variation__product', 'outlet', 'tenant')
+    serializer_class = LocationStockSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['tenant', 'variation', 'outlet']
+    search_fields = ['variation__name', 'variation__product__name', 'variation__sku', 'variation__barcode']
+    ordering_fields = ['variation__name', 'quantity', 'updated_at']
+    ordering = ['variation__product__name', 'variation__name']
+    
+    def get_queryset(self):
+        """Filter by tenant"""
+        user = self.request.user
+        is_saas_admin = getattr(user, 'is_saas_admin', False)
+        request_tenant = getattr(self.request, 'tenant', None)
+        user_tenant = getattr(user, 'tenant', None)
+        tenant = request_tenant or user_tenant
+        
+        queryset = LocationStock.objects.select_related('variation', 'variation__product', 'outlet', 'tenant').all()
+        
+        if not is_saas_admin:
+            if tenant:
+                queryset = queryset.filter(tenant=tenant)
+            else:
+                return queryset.none()
+        
+        # Apply outlet filter if provided (for outlet isolation)
+        outlet = self.get_outlet_for_request(self.request)
+        if outlet:
+            queryset = queryset.filter(outlet=outlet)
+        # Also check explicit outlet filter in query params (for backward compatibility)
+        elif self.request.query_params.get('outlet'):
+            outlet_id = self.request.query_params.get('outlet')
+            try:
+                queryset = queryset.filter(outlet_id=outlet_id)
+            except (ValueError, TypeError):
+                pass
+        
+        # Filter by variation if provided
+        variation_id = self.request.query_params.get('variation')
+        if variation_id:
+            queryset = queryset.filter(variation_id=variation_id)
+        
+        # Filter by product if provided
+        product_id = self.request.query_params.get('product')
+        if product_id:
+            queryset = queryset.filter(variation__product_id=product_id)
+        
+        return queryset
+    
+    def perform_create(self, serializer):
+        """Set tenant and validate"""
+        tenant = getattr(self.request, 'tenant', None) or self.request.user.tenant
+        if not tenant:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("Tenant is required")
+        
+        variation = serializer.validated_data.get('variation')
+        outlet = serializer.validated_data.get('outlet')
+        
+        # Verify tenant matches
+        if variation.product.tenant != tenant:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Variation does not belong to your tenant")
+        
+        if outlet.tenant != tenant:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Outlet does not belong to your tenant")
+        
+        serializer.save(tenant=tenant)
+    
+    @action(detail=False, methods=['post'])
+    def bulk_update(self, request):
+        """Bulk update stock for multiple variations at specific outlets"""
+        updates = request.data.get('updates', [])
+        outlet_id = request.data.get('outlet')
+        
+        if not outlet_id:
+            return Response(
+                {'error': 'outlet is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            from apps.outlets.models import Outlet
+            outlet = Outlet.objects.get(pk=outlet_id)
+        except Outlet.DoesNotExist:
+            return Response(
+                {'error': 'Outlet not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        tenant = getattr(request, 'tenant', None) or request.user.tenant
+        if outlet.tenant != tenant:
+            return Response(
+                {'error': 'Outlet does not belong to your tenant'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        results = []
+        errors = []
+        
+        with transaction.atomic():
+            for update in updates:
+                variation_id = update.get('variation_id')
+                quantity = update.get('quantity', 0)
+                movement_type = update.get('movement_type', 'adjustment')
+                reason = update.get('reason', 'Bulk update')
+                
+                if not variation_id:
+                    errors.append({'error': 'variation_id is required', 'update': update})
+                    continue
+                
+                try:
+                    variation = ItemVariation.objects.get(pk=variation_id, product__tenant=tenant)
+                except ItemVariation.DoesNotExist:
+                    errors.append({'error': f'Variation {variation_id} not found', 'update': update})
+                    continue
+                
+                # Get or create LocationStock
+                location_stock, created = LocationStock.objects.get_or_create(
+                    tenant=tenant,
+                    variation=variation,
+                    outlet=outlet,
+                    defaults={'quantity': 0}
+                )
+                
+                # Update quantity
+                old_quantity = location_stock.quantity
+                location_stock.quantity = max(0, quantity)  # Ensure non-negative
+                location_stock.save()
+                
+                # Create stock movement record
+                StockMovement.objects.create(
+                    tenant=tenant,
+                    variation=variation,
+                    outlet=outlet,
+                    user=request.user,
+                    movement_type=movement_type,
+                    quantity=location_stock.quantity - old_quantity,
+                    reason=reason,
+                    reference_id=f"BULK-{request.user.id}"
+                )
+                
+                results.append({
+                    'variation_id': variation_id,
+                    'variation_name': variation.name,
+                    'old_quantity': old_quantity,
+                    'new_quantity': location_stock.quantity,
+                    'difference': location_stock.quantity - old_quantity
+                })
+        
+        return Response({
+            'success': len(results),
+            'errors': len(errors),
+            'results': results,
+            'error_details': errors
+        }, status=status.HTTP_200_OK)

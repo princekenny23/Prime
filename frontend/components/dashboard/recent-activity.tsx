@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { ShoppingCart, Package, UserPlus, DollarSign, AlertCircle } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { formatCurrency } from "@/lib/utils/currency"
-import type { Business } from "@/lib/types/mock-data"
+import type { Business } from "@/lib/types"
 
 interface Activity {
   id: string

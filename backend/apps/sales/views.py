@@ -6,11 +6,12 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db import transaction
 from django.utils import timezone
-from datetime import datetime
-from .models import Sale, SaleItem
-from .serializers import SaleSerializer, SaleItemSerializer
-from apps.products.models import Product
-from apps.inventory.models import StockMovement
+from datetime import datetime, timedelta
+from decimal import Decimal, InvalidOperation
+from .models import Sale, SaleItem, Delivery, DeliveryItem, DeliveryStatusHistory
+from .serializers import SaleSerializer, SaleItemSerializer, DeliverySerializer, DeliveryItemSerializer, DeliveryStatusHistorySerializer
+from apps.products.models import Product, ProductUnit, ItemVariation
+from apps.inventory.models import StockMovement, LocationStock
 from apps.tenants.permissions import TenantFilterMixin
 
 
@@ -26,7 +27,46 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
     ordering = ['-created_at']
     
     def get_queryset(self):
-        queryset = super().get_queryset()
+        """Ensure tenant filtering is applied correctly"""
+        # Ensure user.tenant is loaded
+        user = self.request.user
+        if not hasattr(user, '_tenant_loaded'):
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+                user = User.objects.select_related('tenant').get(pk=user.pk)
+                self.request.user = user
+                user._tenant_loaded = True
+            except User.DoesNotExist:
+                pass
+        
+        is_saas_admin = getattr(user, 'is_saas_admin', False)
+        request_tenant = getattr(self.request, 'tenant', None)
+        user_tenant = getattr(user, 'tenant', None)
+        tenant = request_tenant or user_tenant
+        
+        # Get base queryset
+        queryset = Sale.objects.select_related('tenant', 'outlet', 'user', 'shift', 'customer').prefetch_related('items').all()
+        
+        # Apply tenant filter - CRITICAL for security
+        if not is_saas_admin:
+            if tenant:
+                queryset = queryset.filter(tenant=tenant)
+            else:
+                return queryset.none()
+        
+        # Apply outlet filter if provided (for outlet isolation)
+        outlet = self.get_outlet_for_request(self.request)
+        if outlet:
+            queryset = queryset.filter(outlet=outlet)
+        # Also check explicit outlet filter in query params (for backward compatibility)
+        elif self.request.query_params.get('outlet'):
+            outlet_id = self.request.query_params.get('outlet')
+            try:
+                queryset = queryset.filter(outlet_id=outlet_id)
+            except (ValueError, TypeError):
+                pass
+        
         # Filter by date range if provided
         start_date = self.request.query_params.get('start_date')
         end_date = self.request.query_params.get('end_date')
@@ -36,75 +76,240 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
             queryset = queryset.filter(created_at__lte=end_date)
         return queryset
     
+    def update(self, request, *args, **kwargs):
+        """Override update to ensure tenant matches"""
+        instance = self.get_object()
+        tenant = getattr(request, 'tenant', None) or request.user.tenant
+        
+        # Verify tenant matches (unless SaaS admin or tenant admin)
+        from apps.tenants.permissions import is_admin_user
+        if not is_admin_user(request.user) and tenant and instance.tenant != tenant:
+            return Response(
+                {"detail": "You do not have permission to update this sale."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        return super().update(request, *args, **kwargs)
+    
+    def destroy(self, request, *args, **kwargs):
+        """Override destroy to ensure tenant matches"""
+        instance = self.get_object()
+        tenant = getattr(request, 'tenant', None) or request.user.tenant
+        
+        # Verify tenant matches (unless SaaS admin or tenant admin)
+        from apps.tenants.permissions import is_admin_user
+        if not is_admin_user(request.user) and tenant and instance.tenant != tenant:
+            return Response(
+                {"detail": "You do not have permission to delete this sale."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        return super().destroy(request, *args, **kwargs)
+    
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         """Create sale with atomic stock deduction"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"Creating sale - User: {request.user.email}, Data: {request.data}")
+        
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            logger.warning(f"Sale validation failed: {serializer.errors}")
+            # Return detailed validation errors
+            return Response(
+                {"detail": "Validation failed", "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         # Set tenant and user
         tenant = getattr(request, 'tenant', None) or request.user.tenant
         if not tenant:
+            logger.error("No tenant found for user")
             return Response({"detail": "User must have a tenant"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        logger.info(f"Sale validated - Tenant: {tenant.id}, Outlet: {serializer.validated_data.get('outlet')}")
         
         items_data = serializer.validated_data.pop('items_data')
         
+        # Extract restaurant-specific fields if present
+        table_id = serializer.validated_data.pop('table_id', None)
+        guests = serializer.validated_data.pop('guests', None)
+        priority = serializer.validated_data.pop('priority', 'normal')
+        
+        # Get outlet object (already validated in serializer)
+        outlet_id = serializer.validated_data.pop('outlet')
+        from apps.outlets.models import Outlet
+        outlet = Outlet.objects.get(id=outlet_id, tenant=tenant)
+        
+        # Get shift object if provided (already validated in serializer)
+        shift = None
+        shift_id = serializer.validated_data.pop('shift', None)
+        if shift_id:
+            from apps.shifts.models import Shift
+            shift = Shift.objects.get(id=shift_id, outlet__tenant=tenant)
+        
+        # Get customer object if provided (already validated in serializer)
+        customer = None
+        customer_id = serializer.validated_data.pop('customer', None)
+        if customer_id:
+            from apps.customers.models import Customer
+            customer = Customer.objects.get(id=customer_id, tenant=tenant)
+        
         # Generate receipt number
         receipt_number = self._generate_receipt_number(tenant)
+        
+        # Get table if provided
+        table = None
+        if table_id:
+            from apps.restaurant.models import Table
+            try:
+                table = Table.objects.get(id=table_id, tenant=tenant)
+            except Table.DoesNotExist:
+                logger.warning(f"Table {table_id} not found, continuing without table")
         
         # Create sale
         sale = Sale.objects.create(
             receipt_number=receipt_number,
             user=request.user,
             tenant=tenant,
+            outlet=outlet,
+            shift=shift,
+            customer=customer,
+            table=table,
+            guests=guests,
+            priority=priority,
             **serializer.validated_data
         )
         
+        logger.info(f"Sale created: {sale.id}, Receipt: {receipt_number}")
+        
         # Process items and deduct stock
-        total_subtotal = 0
-        for item_data in items_data:
+        total_subtotal = Decimal('0')
+        sale_type = request.data.get('sale_type', 'retail')  # 'retail' or 'wholesale'
+        
+        for idx, item_data in enumerate(items_data):
             product_id = item_data.get('product_id')
-            quantity = item_data.get('quantity', 1)
-            price = item_data.get('price')
+            variation_id = item_data.get('variation_id')
+            unit_id = item_data.get('unit_id')  # Optional: unit for multi-unit selling
+            quantity = int(item_data.get('quantity', 1))
+            price_str = str(item_data.get('price', '0'))
             
-            if not product_id or not price:
-                raise serializers.ValidationError("Each item must have product_id and price")
+            if not product_id:
+                raise serializers.ValidationError(f"Item {idx + 1}: product_id is required")
             
             try:
-                product = Product.objects.select_for_update().get(id=product_id, tenant=tenant)
-            except Product.DoesNotExist:
-                raise serializers.ValidationError(f"Product {product_id} not found")
+                price = Decimal(price_str)
+            except (InvalidOperation, ValueError):
+                raise serializers.ValidationError(f"Item {idx + 1}: Invalid price format")
             
-            # Check stock
-            if product.stock < quantity:
-                raise serializers.ValidationError(f"Insufficient stock for {product.name}. Available: {product.stock}")
+            if price <= 0:
+                raise serializers.ValidationError(f"Item {idx + 1}: Price must be greater than 0")
+            
+            if quantity <= 0:
+                raise serializers.ValidationError(f"Item {idx + 1}: Quantity must be greater than 0")
+            
+            try:
+                product = Product.objects.select_for_update().get(id=product_id, tenant=tenant, outlet=outlet)
+            except Product.DoesNotExist:
+                raise serializers.ValidationError(f"Item {idx + 1}: Product {product_id} not found or does not belong to your tenant/outlet")
+            
+            # Get variation if provided
+            variation = None
+            if variation_id:
+                try:
+                    variation = ItemVariation.objects.select_for_update().get(
+                        id=variation_id,
+                        product=product,
+                        is_active=True
+                    )
+                except ItemVariation.DoesNotExist:
+                    raise serializers.ValidationError(f"Item {idx + 1}: Variation {variation_id} not found or inactive")
+            
+            # Get unit if provided
+            unit = None
+            quantity_in_base_units = quantity
+            unit_name = product.unit  # Default to product's base unit
+            
+            if unit_id:
+                try:
+                    unit = ProductUnit.objects.get(id=unit_id, product=product, is_active=True)
+                    # Convert quantity to base units using conversion_factor
+                    quantity_in_base_units = unit.convert_to_base_units(quantity)
+                    unit_name = unit.unit_name
+                    # Use unit price if not explicitly provided
+                    if not price_str or price_str == '0':
+                        price = unit.get_price(sale_type)
+                except ProductUnit.DoesNotExist:
+                    raise serializers.ValidationError(f"Item {idx + 1}: Unit {unit_id} not found or inactive")
+            
+            # Check stock availability
+            if variation:
+                # Use LocationStock for variation-based inventory
+                location_stock, created = LocationStock.objects.select_for_update().get_or_create(
+                    variation=variation,
+                    outlet=outlet,
+                    tenant=tenant,
+                    defaults={'quantity': 0}
+                )
+                available_stock = location_stock.quantity
+                
+                if available_stock < quantity_in_base_units:
+                    raise serializers.ValidationError(
+                        f"Item {idx + 1}: Insufficient stock for {product.name} - {variation.name}. "
+                        f"Available: {available_stock} {product.unit}, Requested: {quantity_in_base_units} {product.unit}"
+                    )
+                
+                # Deduct from LocationStock
+                location_stock.quantity -= quantity_in_base_units
+                location_stock.save()
+            else:
+                # Fallback to product.stock (legacy)
+                if product.stock < quantity_in_base_units:
+                    raise serializers.ValidationError(
+                        f"Item {idx + 1}: Insufficient stock for {product.name}. "
+                        f"Available: {product.stock} {product.unit}, Requested: {quantity_in_base_units} {product.unit}"
+                    )
+                
+                # Deduct from product stock
+                product.stock -= quantity_in_base_units
+                product.save()
             
             # Calculate item total
-            item_total = price * quantity
+            item_total = price * Decimal(quantity)
             total_subtotal += item_total
             
+            # Extract item notes and kitchen_status if provided
+            item_notes = item_data.get('notes', '')
+            kitchen_status = item_data.get('kitchen_status', 'pending')
+            
             # Create sale item
-            SaleItem.objects.create(
+            sale_item = SaleItem.objects.create(
                 sale=sale,
                 product=product,
+                variation=variation,
+                unit=unit,
                 product_name=product.name,
+                variation_name=variation.name if variation else '',
+                unit_name=unit_name,
                 quantity=quantity,
+                quantity_in_base_units=quantity_in_base_units,
                 price=price,
-                total=item_total
+                total=item_total,
+                notes=item_notes,
+                kitchen_status=kitchen_status
             )
             
-            # Deduct stock
-            product.stock -= quantity
-            product.save()
-            
-            # Record stock movement
+            # Record stock movement (use base units)
             StockMovement.objects.create(
                 tenant=tenant,
                 product=product,
+                variation=variation,
                 outlet=sale.outlet,
                 user=request.user,
                 movement_type='sale',
-                quantity=quantity,
+                quantity=quantity_in_base_units,
                 reference_id=str(sale.id)
             )
         
@@ -131,7 +336,6 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                 )
             
             # Set due date and payment status
-            from datetime import timedelta
             sale.due_date = timezone.now() + timedelta(days=sale.customer.payment_terms_days)
             sale.amount_paid = Decimal('0')
             sale.payment_status = 'unpaid'
@@ -139,14 +343,324 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         
         sale.save()
         
+        # Create Kitchen Order Ticket (KOT) if this is a restaurant order with a table
+        if table and sale.status == 'pending':
+            from apps.restaurant.models import KitchenOrderTicket
+            
+            # Generate unique KOT number (deterministic based on timestamp and count)
+            date_str = timezone.now().strftime('%Y%m%d')
+            # Get count of KOTs for today to ensure uniqueness
+            today_kot_count = KitchenOrderTicket.objects.filter(
+                kot_number__startswith=f"KOT-{date_str}"
+            ).count()
+            kot_number = f"KOT-{date_str}-{today_kot_count + 1:04d}"
+            
+            # Ensure KOT number is unique (in case of race condition)
+            counter = 1
+            while KitchenOrderTicket.objects.filter(kot_number=kot_number).exists():
+                kot_number = f"KOT-{date_str}-{today_kot_count + 1 + counter:04d}"
+                counter += 1
+            
+            KitchenOrderTicket.objects.create(
+                tenant=tenant,
+                outlet=sale.outlet,
+                sale=sale,
+                table=table,
+                kot_number=kot_number,
+                status='pending',
+                priority=priority,
+                notes=sale.notes
+            )
+        
         # Update customer if provided
         if sale.customer:
             sale.customer.total_spent += sale.total
             sale.customer.last_visit = timezone.now()
             sale.customer.save()
         
+        # Create notification for completed sale (Square POS-like)
+        try:
+            from apps.notifications.services import NotificationService
+            NotificationService.notify_sale_completed(sale)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to create sale notification: {str(e)}")
+        
         response_serializer = SaleSerializer(sale)
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+    
+    @transaction.atomic
+    @action(detail=False, methods=['post'], url_path='checkout-cash')
+    def checkout_cash(self, request):
+        """
+        Cash-only checkout endpoint
+        
+        Input:
+        {
+            "outlet": <outlet_id>,
+            "shift": <shift_id>,  # REQUIRED - must be open
+            "items": [
+                {"product_id": 1, "quantity": 2, "price": "10.00"},
+                ...
+            ],
+            "cash_received": "25.00",
+            "subtotal": "20.00",
+            "tax": "0.00",
+            "discount": "0.00",
+            "customer": <customer_id> (optional)
+        }
+        
+        Output:
+        {
+            "sale_id": <id>,
+            "receipt_number": "...",
+            "total": "20.00",
+            "change": "5.00",
+            "items": [...],
+            "shift": {...}
+        }
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        tenant = getattr(request, 'tenant', None) or request.user.tenant
+        if not tenant:
+            return Response(
+                {"detail": "User must have a tenant"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate required fields
+        outlet_id = request.data.get('outlet')
+        shift_id = request.data.get('shift')
+        items = request.data.get('items', [])
+        cash_received_str = request.data.get('cash_received')
+        
+        if not outlet_id:
+            return Response(
+                {"detail": "outlet is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not shift_id:
+            return Response(
+                {"detail": "shift is required for cash sales"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not items or len(items) == 0:
+            return Response(
+                {"detail": "items array cannot be empty"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not cash_received_str:
+            return Response(
+                {"detail": "cash_received is required for cash checkout"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            cash_received = Decimal(str(cash_received_str))
+        except (InvalidOperation, ValueError):
+            return Response(
+                {"detail": "cash_received must be a valid number"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate outlet belongs to tenant
+        from apps.outlets.models import Outlet
+        try:
+            outlet = Outlet.objects.get(id=outlet_id, tenant=tenant)
+        except Outlet.DoesNotExist:
+            return Response(
+                {"detail": "Outlet not found or does not belong to your tenant"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Validate shift exists, belongs to tenant, and is OPEN
+        from apps.shifts.models import Shift
+        try:
+            shift = Shift.objects.select_related('outlet', 'outlet__tenant').get(
+                id=shift_id,
+                outlet__tenant=tenant
+            )
+        except Shift.DoesNotExist:
+            return Response(
+                {"detail": "Shift not found or does not belong to your tenant"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if shift.status != 'OPEN':
+            return Response(
+                {"detail": f"Cannot process sale. Shift is {shift.status}. Please open a shift first."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Process items and validate stock
+        total_subtotal = Decimal('0')
+        sale_items_data = []
+        
+        for idx, item in enumerate(items):
+            product_id = item.get('product_id')
+            quantity = int(item.get('quantity', 1))
+            price_str = str(item.get('price', '0'))
+            
+            if not product_id:
+                return Response(
+                    {"detail": f"Item {idx + 1}: product_id is required"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            try:
+                price = Decimal(price_str)
+            except (InvalidOperation, ValueError):
+                return Response(
+                    {"detail": f"Item {idx + 1}: Invalid price format"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if price <= 0:
+                return Response(
+                    {"detail": f"Item {idx + 1}: Price must be greater than 0"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if quantity <= 0:
+                return Response(
+                    {"detail": f"Item {idx + 1}: Quantity must be greater than 0"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get product with lock for stock check
+            try:
+                product = Product.objects.select_for_update().get(id=product_id, tenant=tenant)
+            except Product.DoesNotExist:
+                return Response(
+                    {"detail": f"Item {idx + 1}: Product {product_id} not found or does not belong to your tenant"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check stock
+            if product.stock < quantity:
+                return Response(
+                    {"detail": f"Item {idx + 1}: Insufficient stock for {product.name}. Available: {product.stock}, Requested: {quantity}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            item_total = price * Decimal(quantity)
+            total_subtotal += item_total
+            
+            sale_items_data.append({
+                'product': product,
+                'product_id': product_id,
+                'product_name': product.name,
+                'quantity': quantity,
+                'price': price,
+                'total': item_total,
+            })
+        
+        # Calculate totals
+        subtotal = Decimal(str(request.data.get('subtotal', total_subtotal)))
+        tax = Decimal(str(request.data.get('tax', '0')))
+        discount = Decimal(str(request.data.get('discount', '0')))
+        total = subtotal + tax - discount
+        
+        # Validate cash_received >= total
+        if cash_received < total:
+            return Response(
+                {"detail": f"Insufficient cash received. Total: {total}, Received: {cash_received}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        change_given = cash_received - total
+        
+        # Generate receipt number
+        receipt_number = self._generate_receipt_number(tenant)
+        
+        # Get customer if provided
+        customer = None
+        customer_id = request.data.get('customer')
+        if customer_id:
+            from apps.customers.models import Customer
+            try:
+                customer = Customer.objects.get(id=customer_id, tenant=tenant)
+            except Customer.DoesNotExist:
+                logger.warning(f"Customer {customer_id} not found, continuing without customer")
+        
+        # Create sale with atomic transaction
+        sale = Sale.objects.create(
+            receipt_number=receipt_number,
+            user=request.user,
+            tenant=tenant,
+            outlet=outlet,
+            shift=shift,
+            customer=customer,
+            subtotal=subtotal,
+            tax=tax,
+            discount=discount,
+            total=total,
+            payment_method='cash',
+            status='completed',
+            cash_received=cash_received,
+            change_given=change_given,
+            notes=request.data.get('notes', '')
+        )
+        
+        # Create sale items and deduct stock
+        for item_data in sale_items_data:
+            SaleItem.objects.create(
+                sale=sale,
+                product=item_data['product'],
+                product_name=item_data['product_name'],
+                quantity=item_data['quantity'],
+                price=item_data['price'],
+                total=item_data['total'],
+            )
+            
+            # Deduct stock
+            product = item_data['product']
+            product.stock -= item_data['quantity']
+            product.save()
+            
+            # Record stock movement
+            StockMovement.objects.create(
+                tenant=tenant,
+                product=product,
+                outlet=outlet,
+                user=request.user,
+                movement_type='sale',
+                quantity=item_data['quantity'],
+                reference_id=str(sale.id)
+            )
+        
+        # Update customer if provided
+        if customer:
+            customer.total_spent += total
+            customer.last_visit = timezone.now()
+            customer.save()
+        
+        # Cash movement creation removed - new payment system will handle this
+        
+        # Return response
+        response_serializer = SaleSerializer(sale)
+        shift_serializer = None
+        try:
+            from apps.shifts.serializers import ShiftSerializer
+            shift_serializer = ShiftSerializer(shift)
+        except Exception:
+            pass
+        
+        return Response({
+            "sale_id": sale.id,
+            "receipt_number": sale.receipt_number,
+            "total": str(total),
+            "change": str(change_given),
+            "cash_received": str(cash_received),
+            "items": response_serializer.data.get('items', []),
+            "shift": shift_serializer.data if shift_serializer else {"id": shift.id, "status": shift.status}
+        }, status=status.HTTP_201_CREATED)
     
     def _generate_receipt_number(self, tenant):
         """Generate unique receipt number"""
@@ -158,6 +672,15 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
     def refund(self, request, pk=None):
         """Process refund for a sale"""
         sale = self.get_object()
+        tenant = getattr(request, 'tenant', None) or request.user.tenant
+        
+        # Verify tenant matches (unless SaaS admin)
+        from apps.tenants.permissions import is_admin_user
+        if not is_admin_user(request.user) and tenant and sale.tenant != tenant:
+            return Response(
+                {"detail": "You do not have permission to refund this sale."},
+                status=status.HTTP_403_FORBIDDEN
+            )
         
         if sale.status == 'refunded':
             return Response(
@@ -168,10 +691,11 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         refund_reason = request.data.get('reason', '')
         
         with transaction.atomic():
-            # Restore stock for all items
+            # Restore stock for all items - ensure product belongs to tenant
             for item in sale.items.all():
                 if item.product:
-                    product = Product.objects.select_for_update().get(id=item.product.id)
+                    # CRITICAL: Verify product belongs to tenant
+                    product = Product.objects.select_for_update().get(id=item.product.id, tenant=sale.tenant)
                     product.stock += item.quantity
                     product.save()
                     
@@ -224,4 +748,206 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
             'today_sales': today_sales,
             'today_revenue': float(today_revenue),
         })
+
+
+class DeliveryViewSet(viewsets.ModelViewSet, TenantFilterMixin):
+    """
+    ViewSet for managing deliveries
+    """
+    queryset = Delivery.objects.select_related('tenant', 'sale', 'customer', 'outlet', 'created_by', 'assigned_to', 'delivered_by').prefetch_related('delivery_items', 'status_history')
+    serializer_class = DeliverySerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['tenant', 'sale', 'customer', 'outlet', 'status', 'delivery_method']
+    search_fields = ['delivery_number', 'delivery_address', 'tracking_number', 'customer__name']
+    ordering_fields = ['scheduled_date', 'created_at', 'actual_delivery_date']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        """Apply tenant filtering"""
+        queryset = super().get_queryset()
+        return self.filter_by_tenant(queryset)
+    
+    def perform_create(self, serializer):
+        """Set tenant and created_by, and create delivery items for all sale items"""
+        tenant = getattr(self.request, 'tenant', None) or self.request.user.tenant
+        delivery = serializer.save(tenant=tenant, created_by=self.request.user)
+        
+        # Automatically create delivery items for all sale items
+        if delivery.sale:
+            from .models import DeliveryItem
+            for sale_item in delivery.sale.items.all():
+                DeliveryItem.objects.create(
+                    delivery=delivery,
+                    sale_item=sale_item,
+                    quantity=sale_item.quantity,
+                    is_delivered=False,
+                    delivered_quantity=0
+                )
+        
+        # Create notification for new delivery (Square POS-like)
+        try:
+            from apps.notifications.services import NotificationService
+            NotificationService.notify_delivery_created(delivery)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to create delivery notification: {str(e)}")
+    
+    @action(detail=True, methods=['post'])
+    def confirm(self, request, pk=None):
+        """Confirm delivery (move from pending to confirmed)"""
+        delivery = self.get_object()
+        if delivery.status != 'pending':
+            return Response(
+                {"detail": f"Cannot confirm delivery with status '{delivery.status}'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        old_status = delivery.status
+        delivery.status = 'confirmed'
+        delivery.confirmed_at = timezone.now()
+        delivery.save()
+        # Create status history
+        DeliveryStatusHistory.objects.create(
+            delivery=delivery,
+            status='confirmed',
+            previous_status='pending',
+            changed_by=request.user
+        )
+        
+        # Create notification for delivery status change (Square POS-like)
+        try:
+            from apps.notifications.services import NotificationService
+            NotificationService.notify_delivery_status_changed(delivery, old_status, 'confirmed')
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to create delivery status notification: {str(e)}")
+        
+        serializer = self.get_serializer(delivery)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def dispatch(self, request, pk=None):
+        """Mark delivery as dispatched (ready or in_transit)"""
+        delivery = self.get_object()
+        new_status = request.data.get('status', 'in_transit')  # 'ready' or 'in_transit'
+        if new_status not in ['ready', 'in_transit']:
+            return Response(
+                {"detail": "Status must be 'ready' or 'in_transit'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        previous_status = delivery.status
+        delivery.status = new_status
+        delivery.dispatched_at = timezone.now()
+        # Update tracking info if provided
+        if 'tracking_number' in request.data:
+            delivery.tracking_number = request.data['tracking_number']
+        if 'courier_name' in request.data:
+            delivery.courier_name = request.data['courier_name']
+        if 'driver_name' in request.data:
+            delivery.driver_name = request.data['driver_name']
+        if 'vehicle_number' in request.data:
+            delivery.vehicle_number = request.data['vehicle_number']
+        delivery.save()
+        # Create status history
+        DeliveryStatusHistory.objects.create(
+            delivery=delivery,
+            status=new_status,
+            previous_status=previous_status,
+            changed_by=request.user,
+            notes=request.data.get('notes', '')
+        )
+        
+        # Create notification for delivery status change (Square POS-like)
+        try:
+            from apps.notifications.services import NotificationService
+            NotificationService.notify_delivery_status_changed(delivery, previous_status, new_status)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to create delivery status notification: {str(e)}")
+        
+        serializer = self.get_serializer(delivery)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def complete(self, request, pk=None):
+        """Mark delivery as completed"""
+        delivery = self.get_object()
+        if delivery.status not in ['in_transit', 'delivered']:
+            return Response(
+                {"detail": f"Cannot complete delivery with status '{delivery.status}'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        previous_status = delivery.status
+        delivery.status = 'completed'
+        delivery.actual_delivery_date = timezone.now()
+        delivery.completed_at = timezone.now()
+        delivery.delivered_by = request.user
+        delivery.save()
+        
+        # Mark delivery items as delivered
+        delivery.delivery_items.update(is_delivered=True)
+        
+        # Create status history
+        DeliveryStatusHistory.objects.create(
+            delivery=delivery,
+            status='completed',
+            previous_status=previous_status,
+            changed_by=request.user,
+            notes=request.data.get('notes', '')
+        )
+        
+        # Create notification for delivery status change (Square POS-like)
+        try:
+            from apps.notifications.services import NotificationService
+            NotificationService.notify_delivery_status_changed(delivery, previous_status, 'completed')
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to create delivery status notification: {str(e)}")
+        
+        serializer = self.get_serializer(delivery)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        """Cancel delivery"""
+        delivery = self.get_object()
+        if not delivery.can_be_cancelled:
+            return Response(
+                {"detail": f"Cannot cancel delivery with status '{delivery.status}'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        previous_status = delivery.status
+        delivery.status = 'cancelled'
+        delivery.save()
+        # Create status history
+        DeliveryStatusHistory.objects.create(
+            delivery=delivery,
+            status='cancelled',
+            previous_status=previous_status,
+            changed_by=request.user,
+            notes=request.data.get('reason', '')
+        )
+        serializer = self.get_serializer(delivery)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def pending(self, request):
+        """Get all pending deliveries"""
+        queryset = self.filter_queryset(self.get_queryset())
+        queryset = queryset.filter(status='pending')
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def scheduled_today(self, request):
+        """Get deliveries scheduled for today"""
+        today = timezone.now().date()
+        queryset = self.filter_queryset(self.get_queryset())
+        queryset = queryset.filter(scheduled_date=today, status__in=['confirmed', 'preparing', 'ready', 'in_transit'])
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 

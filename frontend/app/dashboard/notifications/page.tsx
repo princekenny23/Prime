@@ -4,8 +4,9 @@ import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Bell, Check, CheckCheck, Trash2, Filter } from "lucide-react"
-import { useState } from "react"
+import { Bell, Check, CheckCheck, Trash2, Filter, Loader2, Settings } from "lucide-react"
+import Link from "next/link"
+import { useState, useEffect } from "react"
 import { ViewNotificationDetailsModal } from "@/components/modals/view-notification-details-modal"
 import {
   AlertDialog,
@@ -24,61 +25,88 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { notificationService, type Notification } from "@/lib/services/notificationService"
+import { useBusinessStore } from "@/stores/businessStore"
+import { PageRefreshButton } from "@/components/dashboard/page-refresh-button"
+import { useWebSocketNotifications } from "@/hooks/useWebSocketNotifications"
 
 export default function NotificationsPage() {
+  const { currentBusiness } = useBusinessStore()
   const [showDetails, setShowDetails] = useState(false)
   const [showMarkAllRead, setShowMarkAllRead] = useState(false)
-  const [selectedNotification, setSelectedNotification] = useState<any>(null)
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null)
   const [filter, setFilter] = useState<string>("all")
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [summary, setSummary] = useState<any>(null)
+  
+  // Use WebSocket hook for real-time notifications
+  const { isConnected, unreadCount: wsUnreadCount, latestNotification } = useWebSocketNotifications()
 
-  // Mock notifications
-  const notifications = [
-    {
-      id: "1",
-      type: "sale",
-      title: "New Sale Completed",
-      message: "Sale #1001 completed for $125.50",
-      timestamp: "2024-01-15T10:30:00",
-      read: false,
-      priority: "normal",
-    },
-    {
-      id: "2",
-      type: "stock",
-      title: "Low Stock Alert",
-      message: "Product B is running low (12 units remaining)",
-      timestamp: "2024-01-15T09:15:00",
-      read: false,
-      priority: "high",
-    },
-    {
-      id: "3",
-      type: "payment",
-      title: "Payment Received",
-      message: "Payment of $89.99 received via Card",
-      timestamp: "2024-01-15T08:45:00",
-      read: true,
-      priority: "normal",
-    },
-    {
-      id: "4",
-      type: "customer",
-      title: "New Customer Registered",
-      message: "John Doe has been added to your customer database",
-      timestamp: "2024-01-14T16:20:00",
-      read: true,
-      priority: "low",
-    },
-    {
-      id: "5",
-      type: "report",
-      title: "Daily Report Ready",
-      message: "Your daily sales report for January 14 is ready",
-      timestamp: "2024-01-14T23:59:00",
-      read: false,
-      priority: "normal",
-    },
-  ]
+  useEffect(() => {
+    if (!currentBusiness) return
+
+    loadNotifications()
+    loadSummary()
+
+    // Auto-refresh every 30 seconds (as fallback if WebSocket fails)
+    const interval = setInterval(() => {
+      loadNotifications()
+      loadSummary()
+    }, 30000)
+
+    return () => clearInterval(interval)
+  }, [currentBusiness, filter])
+
+  // Update notifications list when new notification arrives via WebSocket
+  useEffect(() => {
+    if (latestNotification) {
+      // Add new notification to the top of the list
+      setNotifications((prev) => {
+        // Check if notification already exists (avoid duplicates)
+        const exists = prev.some((n) => n.id === latestNotification.id)
+        if (exists) {
+          // Update existing notification
+          return prev.map((n) => n.id === latestNotification.id ? latestNotification : n)
+        }
+        // Add new notification at the top
+        return [latestNotification, ...prev]
+      })
+      // Reload summary to update counts (don't reload full list to avoid flicker)
+      loadSummary()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestNotification])
+
+  const loadNotifications = async () => {
+    if (!currentBusiness) return
+
+    try {
+      setIsLoading(true)
+      const filters: any = { page_size: 100 }
+      if (filter === "unread") filters.read = false
+      if (filter === "read") filters.read = true
+
+      const response = await notificationService.list(filters)
+      setNotifications(response.results || [])
+    } catch (error) {
+      console.error("Failed to load notifications:", error)
+      setNotifications([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const loadSummary = async () => {
+    if (!currentBusiness) return
+
+    try {
+      const data = await notificationService.getSummary()
+      setSummary(data)
+    } catch (error) {
+      console.error("Failed to load summary:", error)
+    }
+  }
 
   const filteredNotifications = notifications.filter(notif => {
     if (filter === "unread") return !notif.read
@@ -86,19 +114,38 @@ export default function NotificationsPage() {
     return true
   })
 
-  const unreadCount = notifications.filter(n => !n.read).length
+  // Use WebSocket unread count if available, otherwise calculate from notifications
+  const unreadCount = wsUnreadCount !== undefined ? wsUnreadCount : notifications.filter(n => !n.read).length
 
-  const handleMarkAsRead = (id: string) => {
-    // In production, this would call API
+  const handleMarkAsRead = async (id: string | number) => {
+    try {
+      await notificationService.markRead(id)
+      // Update local state immediately
+      setNotifications((prev) =>
+        prev.map((n) => n.id === id ? { ...n, read: true } : n)
+      )
+      // Reload to ensure sync
+      loadNotifications()
+      loadSummary()
+    } catch (error) {
+      console.error("Failed to mark as read:", error)
+    }
   }
 
-  const handleMarkAllAsRead = () => {
-    // In production, this would call API
-    setShowMarkAllRead(false)
+  const handleMarkAllAsRead = async () => {
+    try {
+      await notificationService.markAllRead()
+      setShowMarkAllRead(false)
+      loadNotifications()
+      loadSummary()
+    } catch (error) {
+      console.error("Failed to mark all as read:", error)
+    }
   }
 
-  const handleDelete = (id: string) => {
-    // In production, this would call API
+  const handleDelete = async (id: string | number) => {
+    // Note: Delete endpoint not implemented yet, would need to be added to backend
+    console.log("Delete notification:", id)
   }
 
   const getNotificationIcon = (type: string) => {
@@ -111,10 +158,20 @@ export default function NotificationsPage() {
         return "💳"
       case "customer":
         return "👤"
+      case "staff":
+        return "👥"
       case "report":
         return "📊"
-      default:
+      case "system":
         return "🔔"
+      case "shift":
+        return "🕐"
+      case "inventory":
+        return "📦"
+      case "delivery":
+        return "🚚"
+      default:
+        return "📢"
     }
   }
 
@@ -137,9 +194,21 @@ export default function NotificationsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Notifications</h1>
-            <p className="text-muted-foreground">View and manage your notifications</p>
+            <p className="text-muted-foreground">
+              View and manage your notifications
+              {!isConnected && (
+                <span className="ml-2 text-xs text-yellow-600">(WebSocket disconnected - using polling)</span>
+              )}
+            </p>
           </div>
           <div className="flex gap-2">
+            <Link href="/dashboard/settings/notifications">
+              <Button variant="outline">
+                <Settings className="mr-2 h-4 w-4" />
+                Notification Preferences
+              </Button>
+            </Link>
+            <PageRefreshButton />
             {unreadCount > 0 && (
               <Button
                 variant="outline"
@@ -160,7 +229,7 @@ export default function NotificationsPage() {
               <Bell className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{notifications.length}</div>
+              <div className="text-2xl font-bold">{summary?.total || notifications.length}</div>
             </CardContent>
           </Card>
 
@@ -170,7 +239,7 @@ export default function NotificationsPage() {
               <Bell className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{unreadCount}</div>
+              <div className="text-2xl font-bold text-orange-600">{summary?.unread || unreadCount}</div>
             </CardContent>
           </Card>
 
@@ -181,11 +250,31 @@ export default function NotificationsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {notifications.length - unreadCount}
+                {summary?.read || (notifications.length - unreadCount)}
               </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Notification Preferences Quick Link */}
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold mb-1">Manage Your Notification Preferences</h3>
+                <p className="text-sm text-muted-foreground">
+                  Customize which notifications you receive and how you receive them
+                </p>
+              </div>
+              <Link href="/dashboard/settings/notifications">
+                <Button>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Open Preferences
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Filters */}
         <Card>
@@ -214,74 +303,78 @@ export default function NotificationsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {filteredNotifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`p-4 border rounded-lg cursor-pointer hover:bg-muted transition-colors ${
-                    !notification.read ? "bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800" : ""
-                  }`}
-                  onClick={() => {
-                    setSelectedNotification(notification)
-                    setShowDetails(true)
-                  }}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3 flex-1">
-                      <div className="text-2xl">{getNotificationIcon(notification.type)}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-semibold">{notification.title}</h4>
-                          {!notification.read && (
-                            <Badge variant="default" className="h-4 px-1.5 text-xs">
-                              New
-                            </Badge>
-                          )}
-                          <Badge
-                            variant="outline"
-                            className={`h-4 px-1.5 text-xs ${getPriorityColor(notification.priority)}`}
-                          >
-                            {notification.priority}
-                          </Badge>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredNotifications.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    No notifications found
+                  </div>
+                ) : (
+                  filteredNotifications.map((notification) => (
+                    <div
+                      key={notification.id}
+                      className={`p-4 border rounded-lg cursor-pointer hover:bg-muted transition-colors ${
+                        !notification.read ? "bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800" : ""
+                      }`}
+                      onClick={() => {
+                        setSelectedNotification(notification)
+                        setShowDetails(true)
+                        if (!notification.read) {
+                          handleMarkAsRead(notification.id)
+                        }
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3 flex-1">
+                          <div className="text-2xl">{getNotificationIcon(notification.type)}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-semibold">{notification.title}</h4>
+                              {!notification.read && (
+                                <Badge variant="default" className="h-4 px-1.5 text-xs">
+                                  New
+                                </Badge>
+                              )}
+                              <Badge
+                                variant="outline"
+                                className={`h-4 px-1.5 text-xs ${getPriorityColor(notification.priority)}`}
+                              >
+                                {notification.priority}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-2">
+                              {notification.message}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(notification.created_at).toLocaleString()}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {notification.message}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(notification.timestamp).toLocaleString()}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          {!notification.read && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleMarkAsRead(notification.id)
+                              }}
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {!notification.read && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleMarkAsRead(notification.id)
-                          }}
-                        >
-                          <Check className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDelete(notification.id)
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  ))
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

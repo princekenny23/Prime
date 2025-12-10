@@ -11,6 +11,9 @@ class TenantMiddleware(MiddlewareMixin):
     """
     Middleware to extract tenant from JWT token and set request.tenant
     SaaS admins bypass tenant filtering
+    
+    This middleware runs before DRF authentication, so it sets request.tenant
+    which can be used by TenantFilterMixin even if DRF authentication overrides request.user
     """
     def process_request(self, request):
         request.tenant = None
@@ -32,18 +35,18 @@ class TenantMiddleware(MiddlewareMixin):
             user_id = untyped_token.get('user_id')
             
             if user_id:
+                # Load user with tenant relationship
                 user = User.objects.select_related('tenant').get(id=user_id)
                 
                 # SaaS admins don't have tenant restrictions
                 if user.is_saas_admin:
                     request.tenant = None
-                    request.user = user
                 elif user.tenant:
+                    # Set tenant on request for TenantFilterMixin to use
                     request.tenant = user.tenant
-                    request.user = user
                     
         except (TokenError, InvalidToken, User.DoesNotExist):
-            # Invalid token or user not found
+            # Invalid token or user not found - let DRF authentication handle it
             pass
 
         return None

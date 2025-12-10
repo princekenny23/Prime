@@ -1,0 +1,7 @@
+product_name,category,variation_name,price,cost,variation_sku,variation_barcode,track_inventory,unit,low_stock_threshold,outlet,quantity,is_active,sort_order
+Coca Cola,Beverages,330ml Can,25.00,15.00,COKE-330ML,1234567890123,Yes,pcs,10,Main Store,100,Yes,1
+Coca Cola,Beverages,500ml Bottle,30.00,18.00,COKE-500ML,1234567890124,Yes,pcs,10,Main Store,80,Yes,2
+Coca Cola,Beverages,1.5L Bottle,45.00,28.00,COKE-1.5L,1234567890125,Yes,pcs,5,Main Store,50,Yes,3
+Bread White,Bakery,,15.00,8.00,BREAD-WHITE,9876543210123,Yes,pcs,20,Main Store,200,Yes,0
+Milk Fresh,Dairy,,35.00,22.00,MILK-FRESH,9876543210124,Yes,l,15,Main Store,150,Yes,0
+

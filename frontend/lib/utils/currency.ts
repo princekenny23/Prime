@@ -1,5 +1,5 @@
 // Currency Formatting Utilities
-import type { Business } from "../types/mock-data"
+import type { Business } from "../types"
 
 /**
  * Format currency amount using business currency settings

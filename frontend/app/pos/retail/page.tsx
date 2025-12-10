@@ -4,7 +4,7 @@ import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useBusinessStore } from "@/stores/businessStore"
 import { useShift } from "@/contexts/shift-context"
-import { RetailPOS } from "@/components/pos/retail-pos"
+import { UnifiedPOS } from "@/components/pos/unified-pos"
 import { RegisterClosedScreen } from "@/components/pos/register-closed-screen"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 
@@ -51,7 +51,7 @@ export default function RetailPOSPage() {
 
   return (
     <DashboardLayout>
-      <RetailPOS />
+      <UnifiedPOS />
     </DashboardLayout>
   )
 }

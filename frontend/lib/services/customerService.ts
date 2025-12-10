@@ -4,6 +4,7 @@ export interface Customer {
   id: string
   tenant?: string
   outlet?: string
+  outlet_id?: string | number
   name: string
   email?: string
   phone?: string

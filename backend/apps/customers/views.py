@@ -24,17 +24,104 @@ class CustomerViewSet(viewsets.ModelViewSet, TenantFilterMixin):
     ordering_fields = ['name', 'created_at', 'total_spent']
     ordering = ['name']
     
+    def get_queryset(self):
+        """Ensure tenant filtering is applied correctly"""
+        # Ensure user.tenant is loaded
+        user = self.request.user
+        if not hasattr(user, '_tenant_loaded'):
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+                user = User.objects.select_related('tenant').get(pk=user.pk)
+                self.request.user = user
+                user._tenant_loaded = True
+            except User.DoesNotExist:
+                pass
+        
+        is_saas_admin = getattr(user, 'is_saas_admin', False)
+        request_tenant = getattr(self.request, 'tenant', None)
+        user_tenant = getattr(user, 'tenant', None)
+        tenant = request_tenant or user_tenant
+        
+        # Get base queryset
+        queryset = Customer.objects.all()
+        
+        # Apply tenant filter - CRITICAL for security
+        if not is_saas_admin:
+            if tenant:
+                queryset = queryset.filter(tenant=tenant)
+            else:
+                return queryset.none()
+        
+        return queryset
+    
+    def get_serializer_context(self):
+        """Add request to serializer context"""
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+    
     def perform_create(self, serializer):
+        """Always set tenant from request context (frontend doesn't send it)"""
         tenant = getattr(self.request, 'tenant', None) or self.request.user.tenant
-        if not serializer.validated_data.get('tenant'):
-            serializer.save(tenant=tenant)
-        else:
-            serializer.save()
+        if not tenant:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("Tenant is required. Please ensure you are authenticated and have a tenant assigned.")
+        customer = serializer.save(tenant=tenant)
+        
+        # Create notification for new customer (Square POS-like)
+        try:
+            from apps.notifications.services import NotificationService
+            NotificationService.notify_customer_created(customer)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to create customer notification: {str(e)}")
+    
+    def update(self, request, *args, **kwargs):
+        """Override update to ensure tenant matches"""
+        instance = self.get_object()
+        tenant = getattr(request, 'tenant', None) or request.user.tenant
+        
+        # Verify tenant matches (unless SaaS admin or tenant admin)
+        from apps.tenants.permissions import is_admin_user
+        if not is_admin_user(request.user) and tenant and instance.tenant != tenant:
+            return Response(
+                {"detail": "You do not have permission to update this customer."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        return super().update(request, *args, **kwargs)
+    
+    def destroy(self, request, *args, **kwargs):
+        """Override destroy to ensure tenant matches"""
+        instance = self.get_object()
+        tenant = getattr(request, 'tenant', None) or request.user.tenant
+        
+        # Verify tenant matches (unless SaaS admin or tenant admin)
+        from apps.tenants.permissions import is_admin_user
+        if not is_admin_user(request.user) and tenant and instance.tenant != tenant:
+            return Response(
+                {"detail": "You do not have permission to delete this customer."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        return super().destroy(request, *args, **kwargs)
     
     @action(detail=True, methods=['post'])
     def adjust_points(self, request, pk=None):
         """Adjust customer loyalty points"""
         customer = self.get_object()
+        tenant = getattr(request, 'tenant', None) or request.user.tenant
+        
+        # Verify tenant matches (unless SaaS admin)
+        from apps.tenants.permissions import is_admin_user
+        if not is_admin_user(request.user) and tenant and customer.tenant != tenant:
+            return Response(
+                {"detail": "You do not have permission to adjust points for this customer."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         points = request.data.get('points')
         transaction_type = request.data.get('type', 'adjusted')
         reason = request.data.get('reason', '')
@@ -127,6 +214,16 @@ class CustomerViewSet(viewsets.ModelViewSet, TenantFilterMixin):
     def adjust_credit(self, request, pk=None):
         """Adjust customer credit limit or payment terms"""
         customer = self.get_object()
+        tenant = getattr(request, 'tenant', None) or request.user.tenant
+        
+        # Verify tenant matches (unless SaaS admin)
+        from apps.tenants.permissions import is_admin_user
+        if not is_admin_user(request.user) and tenant and customer.tenant != tenant:
+            return Response(
+                {"detail": "You do not have permission to adjust credit for this customer."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         credit_limit = request.data.get('credit_limit')
         payment_terms_days = request.data.get('payment_terms_days')
         credit_enabled = request.data.get('credit_enabled')
@@ -161,15 +258,35 @@ class CreditPaymentViewSet(viewsets.ModelViewSet, TenantFilterMixin):
     ordering = ['-payment_date', '-created_at']
     
     def get_queryset(self):
-        queryset = super().get_queryset()
-        # Filter by tenant
-        if self.request.user.is_saas_admin:
-            return queryset
-        if hasattr(self.request, 'tenant') and self.request.tenant:
-            return queryset.filter(tenant=self.request.tenant)
-        if self.request.user.tenant:
-            return queryset.filter(tenant=self.request.user.tenant)
-        return queryset.none()
+        """Ensure tenant filtering is applied correctly"""
+        # Ensure user.tenant is loaded
+        user = self.request.user
+        if not hasattr(user, '_tenant_loaded'):
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+                user = User.objects.select_related('tenant').get(pk=user.pk)
+                self.request.user = user
+                user._tenant_loaded = True
+            except User.DoesNotExist:
+                pass
+        
+        is_saas_admin = getattr(user, 'is_saas_admin', False)
+        request_tenant = getattr(self.request, 'tenant', None)
+        user_tenant = getattr(user, 'tenant', None)
+        tenant = request_tenant or user_tenant
+        
+        # Get base queryset
+        queryset = CreditPayment.objects.select_related('customer', 'sale', 'user').all()
+        
+        # Apply tenant filter - CRITICAL for security
+        if not is_saas_admin:
+            if tenant:
+                queryset = queryset.filter(tenant=tenant)
+            else:
+                return queryset.none()
+        
+        return queryset
     
     def perform_create(self, serializer):
         tenant = getattr(self.request, 'tenant', None) or self.request.user.tenant

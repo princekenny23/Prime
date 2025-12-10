@@ -3,6 +3,8 @@ from django.core.validators import MinValueValidator
 from decimal import Decimal
 from apps.outlets.models import Outlet, Till
 from apps.accounts.models import User
+from apps.tenants.models import Tenant
+# Sale imported in methods to avoid circular import
 
 
 class Shift(models.Model):
@@ -26,6 +28,15 @@ class Shift(models.Model):
     
     start_time = models.DateTimeField(auto_now_add=True)
     end_time = models.DateTimeField(null=True, blank=True)
+    
+    # Enhanced fields
+    device_id = models.CharField(max_length=255, blank=True, help_text="Device identifier for multi-device tracking")
+    sync_status = models.CharField(max_length=20, choices=[('synced', 'Synced'), ('pending', 'Pending'), ('conflict', 'Conflict')], default='synced')
+    
+    @property
+    def cashier(self):
+        """Alias for user (cashier) - for backward compatibility"""
+        return self.user
 
     class Meta:
         db_table = 'shifts_shift'
@@ -39,8 +50,10 @@ class Shift(models.Model):
             models.Index(fields=['user']),
             models.Index(fields=['operating_date']),
             models.Index(fields=['status']),
+            models.Index(fields=['device_id']),
         ]
 
     def __str__(self):
         return f"{self.outlet.name} - {self.till.name} - {self.operating_date}"
+
 

@@ -37,8 +37,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { customerService } from "@/lib/services/customerService"
 import { useBusinessStore } from "@/stores/businessStore"
-import { useRealAPI } from "@/lib/utils/api-config"
-import { getCustomers } from "@/lib/mockApi"
 
 export default function CustomersPage() {
   const { currentBusiness, currentOutlet, outlets } = useBusinessStore()
@@ -53,7 +51,6 @@ export default function CustomersPage() {
   const [customerToDelete, setCustomerToDelete] = useState<string | null>(null)
   const [customers, setCustomers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const useReal = useRealAPI()
 
   useEffect(() => {
     const loadCustomers = async () => {
@@ -61,16 +58,12 @@ export default function CustomersPage() {
       
       setIsLoading(true)
       try {
-        if (useReal) {
-          const response = await customerService.list({
-            tenant: currentBusiness.id,
-            outlet: outletFilter !== "all" ? outletFilter : undefined,
-            is_active: true,
-          })
-          setCustomers(Array.isArray(response) ? response : response.results || [])
-        } else {
-          setCustomers(getCustomers(currentBusiness.id))
-        }
+        const response = await customerService.list({
+          tenant: currentBusiness.id,
+          outlet: outletFilter !== "all" ? outletFilter : undefined,
+          is_active: true,
+        })
+        setCustomers(Array.isArray(response) ? response : response.results || [])
       } catch (error) {
         console.error("Failed to load customers:", error)
         setCustomers([])

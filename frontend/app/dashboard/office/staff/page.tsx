@@ -20,11 +20,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, User, Mail, Phone, Shield, MapPin, Edit, Key, UserX } from "lucide-react"
+import { Plus, Search, User, Mail, Phone, Shield, MapPin, Edit, Key, UserX, Settings } from "lucide-react"
 import { useState, useEffect, useCallback } from "react"
 import { AddEditStaffModal } from "@/components/modals/add-edit-staff-modal"
 import { AssignRoleOutletModal } from "@/components/modals/assign-role-outlet-modal"
 import { ResetPasswordModal } from "@/components/modals/reset-password-modal"
+import { AddEditRoleModal } from "@/components/modals/add-edit-role-modal"
 import { staffService, roleService, type Staff, type Role } from "@/lib/services/staffService"
 import { useBusinessStore } from "@/stores/businessStore"
 import { useRealAPI } from "@/lib/utils/api-config"
@@ -50,7 +51,9 @@ export default function StaffPage() {
   const [showAssignRole, setShowAssignRole] = useState(false)
   const [showResetPassword, setShowResetPassword] = useState(false)
   const [showDeactivate, setShowDeactivate] = useState(false)
+  const [showAddRole, setShowAddRole] = useState(false)
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null)
+  const [selectedRole, setSelectedRole] = useState<Role | null>(null)
   const [staffToDeactivate, setStaffToDeactivate] = useState<string | null>(null)
   const [staff, setStaff] = useState<Staff[]>([])
   const [roles, setRoles] = useState<Role[]>([])
@@ -164,13 +167,25 @@ export default function StaffPage() {
             <h1 className="text-3xl font-bold">Staff Management</h1>
             <p className="text-muted-foreground">Manage your staff members and their roles</p>
           </div>
-          <Button onClick={() => {
-            setSelectedStaff(null)
-            setShowAddStaff(true)
-          }}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Staff
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline"
+              onClick={() => {
+                setSelectedRole(null)
+                setShowAddRole(true)
+              }}
+            >
+              <Shield className="mr-2 h-4 w-4" />
+              Create Role
+            </Button>
+            <Button onClick={() => {
+              setSelectedStaff(null)
+              setShowAddStaff(true)
+            }}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Staff
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -314,7 +329,18 @@ export default function StaffPage() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <MapPin className="h-3 w-3 text-muted-foreground" />
-                          <span>{member.outlets?.length || 0} outlet{(member.outlets?.length || 0) !== 1 ? "s" : ""}</span>
+                          {member.outlets && member.outlets.length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-sm">{member.outlets.length} outlet{(member.outlets.length !== 1 ? "s" : "")}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {Array.isArray(member.outlets) 
+                                  ? member.outlets.map((o: any) => typeof o === 'object' ? o.name : o).join(", ")
+                                  : "N/A"}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">No outlets</span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -390,6 +416,18 @@ export default function StaffPage() {
         open={showResetPassword}
         onOpenChange={setShowResetPassword}
         staff={selectedStaff}
+      />
+      <AddEditRoleModal
+        open={showAddRole}
+        onOpenChange={(open) => {
+          setShowAddRole(open)
+          if (!open) setSelectedRole(null)
+        }}
+        role={selectedRole}
+        onSuccess={() => {
+          loadRoles()
+          loadStaff() // Reload staff to refresh role names
+        }}
       />
 
       {/* Deactivate Confirmation */}

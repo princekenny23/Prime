@@ -39,7 +39,7 @@ export function EditTenantModal({ open, onOpenChange, tenant, onUpdate }: EditTe
     name: "",
     email: "",
     phone: "",
-    type: "retail" as "retail" | "restaurant" | "bar",
+    type: "wholesale and retail" as "wholesale and retail" | "restaurant" | "bar",
     address: "",
   })
 
@@ -55,7 +55,7 @@ export function EditTenantModal({ open, onOpenChange, tenant, onUpdate }: EditTe
           name: fullTenant.name || "",
           email: fullTenant.email || "",
           phone: fullTenant.phone || "",
-          type: (fullTenant.type as "retail" | "restaurant" | "bar") || "retail",
+          type: (fullTenant.type as "wholesale and retail" | "restaurant" | "bar") || "wholesale and retail",
           address: fullTenant.address || "",
         })
       } catch (error: any) {
@@ -64,7 +64,7 @@ export function EditTenantModal({ open, onOpenChange, tenant, onUpdate }: EditTe
           name: tenant.name || "",
           email: tenant.email || "",
           phone: tenant.phone || "",
-          type: (tenant.type as "retail" | "restaurant" | "bar") || "retail",
+          type: (tenant.type as "wholesale and retail" | "restaurant" | "bar") || "wholesale and retail",
           address: "",
         })
         console.error("Failed to load tenant details:", error)
@@ -180,14 +180,14 @@ export function EditTenantModal({ open, onOpenChange, tenant, onUpdate }: EditTe
             <Label htmlFor="type">Business Type *</Label>
             <Select
               value={formData.type}
-              onValueChange={(value) => setFormData({ ...formData, type: value as "retail" | "restaurant" | "bar" })}
+              onValueChange={(value) => setFormData({ ...formData, type: value as "wholesale and retail" | "restaurant" | "bar" })}
               required
             >
               <SelectTrigger id="type">
                 <SelectValue placeholder="Select business type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="retail">Retail Store</SelectItem>
+                <SelectItem value="wholesale and retail">Wholesale and Retail</SelectItem>
                 <SelectItem value="restaurant">Restaurant</SelectItem>
                 <SelectItem value="bar">Bar/Nightclub</SelectItem>
               </SelectContent>

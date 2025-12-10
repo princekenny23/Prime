@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table"
 import { TrendingUp } from "lucide-react"
 import { formatCurrency } from "@/lib/utils/currency"
-import type { Business } from "@/lib/types/mock-data"
+import type { Business } from "@/lib/types"
 
 interface TopSellingItem {
   id: string

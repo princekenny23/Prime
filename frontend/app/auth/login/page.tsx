@@ -10,9 +10,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/stores/authStore"
 import { useBusinessStore } from "@/stores/businessStore"
-import { getBusinesses } from "@/lib/mockApi"
 import { tenantService } from "@/lib/services/tenantService"
-import { useRealAPI } from "@/lib/utils/api-config"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -68,10 +66,19 @@ export default function LoginPage() {
           await setCurrentBusiness(String(tenant.id))
           
           // Get the business type from tenant data to determine dashboard route
-          const businessType = tenant.type as "retail" | "restaurant" | "bar"
+          const businessType = tenant.type as "wholesale and retail" | "restaurant" | "bar"
           
           // Redirect to the appropriate dashboard based on business type
-          const dashboardRoute = `/dashboard/${businessType}`
+          let dashboardRoute: string
+          if (businessType === "wholesale and retail") {
+            dashboardRoute = "/dashboard/retail"
+          } else if (businessType === "restaurant") {
+            dashboardRoute = "/dashboard/restaurant/dashboard"
+          } else if (businessType === "bar") {
+            dashboardRoute = "/dashboard/bar/dashboard"
+          } else {
+            dashboardRoute = "/dashboard"
+          }
           console.log("Redirecting to dashboard:", dashboardRoute)
           router.push(dashboardRoute)
           return
@@ -84,24 +91,19 @@ export default function LoginPage() {
       }
       
       // Fallback: Check if any businesses exist (shouldn't reach here for regular users)
-      let businesses: any[] = []
       try {
-        if (useRealAPI()) {
-          businesses = await tenantService.list()
+        const businesses = await tenantService.list()
+        if (businesses.length === 0) {
+          // No businesses exist, go to onboarding
+          router.push("/onboarding/setup-business")
         } else {
-          businesses = getBusinesses()
+          // Businesses exist, go to admin dashboard to select
+          router.push("/admin")
         }
       } catch (error) {
         console.error("Failed to load businesses:", error)
-        businesses = getBusinesses() // Fallback
-      }
-      
-      if (businesses.length === 0) {
-        // No businesses exist, go to onboarding
+        // On error, go to onboarding
         router.push("/onboarding/setup-business")
-      } else {
-        // Businesses exist, go to admin dashboard to select
-        router.push("/admin")
       }
     } else {
       setError(result.error || "Login failed. Please try again.")

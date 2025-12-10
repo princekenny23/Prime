@@ -1,5 +1,5 @@
 import { api, apiEndpoints } from "@/lib/api"
-import type { User } from "@/lib/types/mock-data"
+import type { User } from "@/lib/types"
 
 export interface CreateUserData {
   email: string

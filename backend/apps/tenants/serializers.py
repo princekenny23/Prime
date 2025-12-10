@@ -16,6 +16,29 @@ class TenantSerializer(serializers.ModelSerializer):
                   'outlets', 'users')
         read_only_fields = ('id', 'created_at', 'updated_at')
     
+    def validate_name(self, value):
+        """Validate name field"""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Name is required and cannot be empty.")
+        return value.strip()
+    
+    def validate_type(self, value):
+        """Validate type field"""
+        valid_types = [choice[0] for choice in Tenant.BUSINESS_TYPES]
+        if value not in valid_types:
+            raise serializers.ValidationError(
+                f"Type must be one of: {', '.join(valid_types)}"
+            )
+        return value
+    
+    def validate_settings(self, value):
+        """Validate settings field"""
+        if value is None:
+            return {}
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Settings must be a valid JSON object.")
+        return value
+    
     def get_users(self, obj):
         """Get users for this tenant without circular import"""
         # Use a simplified serializer to avoid circular dependency

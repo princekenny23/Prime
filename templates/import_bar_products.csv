@@ -1,0 +1,6 @@
+product_name,category,variation_name,price,cost,volume_ml,alcohol_percentage,variation_sku,track_inventory,unit,low_stock_threshold,outlet,quantity,is_active,sort_order
+Vodka Premium,Spirits,Shot (30ml),8.00,4.00,30,40,VODKA-SHOT,Yes,shot,20,Bar Counter,50,Yes,1
+Vodka Premium,Spirits,Bottle (750ml),180.00,120.00,750,40,VODKA-750ML,Yes,bottle,5,Storage Room,12,Yes,2
+Beer Local,Beer,Bottle (500ml),15.00,8.00,500,5,BEER-500ML,Yes,bottle,30,Bar Counter,100,Yes,1
+Cocktail Mojito,Cocktails,,25.00,12.00,250,15,MOJITO,No,glass,0,Bar Counter,0,Yes,0
+

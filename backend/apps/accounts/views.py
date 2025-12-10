@@ -13,6 +13,37 @@ class LoginView(TokenObtainPairView):
     """Login endpoint"""
     serializer_class = CustomTokenObtainPairSerializer
     permission_classes = [AllowAny]
+    
+    def post(self, request, *args, **kwargs):
+        """Override post to log login activity"""
+        response = super().post(request, *args, **kwargs)
+        
+        # Log login if successful
+        if response.status_code == 200:
+            try:
+                from apps.activity_logs.utils import log_login
+                user = User.objects.get(email=request.data.get('email'))
+                if user.tenant:
+                    # Get IP address
+                    ip_address = self._get_client_ip(request)
+                    user_agent = request.META.get('HTTP_USER_AGENT', '')
+                    log_login(user, ip_address=ip_address, user_agent=user_agent)
+            except (User.DoesNotExist, Exception) as e:
+                # Don't break login if logging fails
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to log login activity: {str(e)}")
+        
+        return response
+    
+    def _get_client_ip(self, request):
+        """Get client IP address from request"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
 
 
 class RegisterView(generics.CreateAPIView):
@@ -51,6 +82,18 @@ def me_view(request):
 @permission_classes([IsAuthenticated])
 def logout_view(request):
     """Logout endpoint (token blacklisting can be added here)"""
+    # Log logout activity
+    try:
+        from apps.activity_logs.utils import log_logout
+        ip_address = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0] or request.META.get('REMOTE_ADDR')
+        user_agent = request.META.get('HTTP_USER_AGENT', '')
+        log_logout(request.user, ip_address=ip_address, user_agent=user_agent)
+    except Exception as e:
+        # Don't break logout if logging fails
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to log logout activity: {str(e)}")
+    
     return Response({"message": "Logged out successfully"}, status=status.HTTP_200_OK)
 
 

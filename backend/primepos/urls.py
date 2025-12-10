@@ -34,10 +34,14 @@ urlpatterns = [
     path('api/v1/', include('apps.inventory.urls')),
     path('api/v1/', include('apps.sales.urls')),
     path('api/v1/', include('apps.customers.urls')),
+    # path('api/v1/', include('apps.payments.urls')),  # Removed - new implementation pending
     path('api/v1/', include('apps.staff.urls')),
     path('api/v1/', include('apps.suppliers.urls')),
     path('api/v1/', include('apps.shifts.urls')),
+    path('api/v1/', include('apps.restaurant.urls')),
     path('api/v1/', include('apps.reports.urls')),
+    path('api/v1/', include('apps.activity_logs.urls')),
+    path('api/v1/', include('apps.notifications.urls')),
     path('api/v1/', include('apps.admin.urls')),
 ]
 

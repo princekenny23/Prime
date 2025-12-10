@@ -15,6 +15,31 @@ class IsTenantMember(permissions.BasePermission):
         return request.user and request.user.is_authenticated and request.user.tenant is not None
 
 
+class IsTenantAdmin(permissions.BasePermission):
+    """Permission check for tenant admin users"""
+    
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        # Tenant admin is a user with role='admin' and not a SaaS admin
+        return user.role == 'admin' and not user.is_saas_admin
+
+
+def is_tenant_admin(user):
+    """Helper function to check if user is a tenant admin"""
+    if not user or not user.is_authenticated:
+        return False
+    return user.role == 'admin' and not user.is_saas_admin
+
+
+def is_admin_user(user):
+    """Helper function to check if user is SaaS admin or tenant admin"""
+    if not user or not user.is_authenticated:
+        return False
+    return user.is_saas_admin or is_tenant_admin(user)
+
+
 class TenantFilterMixin:
     """Mixin to filter queryset by tenant"""
     
@@ -30,4 +55,120 @@ class TenantFilterMixin:
         if self.request.user.tenant:
             return queryset.filter(tenant=self.request.user.tenant)
         return queryset.none()
+    
+    def get_tenant_for_request(self, request):
+        """
+        Helper method to get tenant for a request with proper validation.
+        CRITICAL: Use this in perform_create to ensure tenant isolation.
+        
+        Returns:
+            Tenant instance or None
+        
+        Raises:
+            ValidationError if tenant is required but missing
+        """
+        # Refresh user to ensure tenant is loaded (important during onboarding)
+        user = request.user
+        if not hasattr(user, '_tenant_loaded'):
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+                user = User.objects.select_related('tenant').get(pk=user.pk)
+                request.user = user
+                user._tenant_loaded = True
+            except User.DoesNotExist:
+                pass
+        
+        # Get tenant from request context (set by middleware) or user
+        tenant = getattr(request, 'tenant', None) or user.tenant
+        
+        return tenant
+    
+    def require_tenant(self, request):
+        """
+        CRITICAL: Get tenant and raise error if missing.
+        Use this in perform_create to enforce tenant isolation.
+        
+        Returns:
+            Tenant instance
+        
+        Raises:
+            ValidationError if tenant is missing
+        """
+        from rest_framework.exceptions import ValidationError
+        
+        tenant = self.get_tenant_for_request(request)
+        
+        if not tenant:
+            raise ValidationError(
+                "Tenant is required. Please ensure you are authenticated and have a tenant assigned. "
+                "If you just created a tenant, please refresh your session or log out and log back in."
+            )
+        
+        return tenant
+    
+    def get_outlet_for_request(self, request):
+        """
+        Helper method to get outlet for a request.
+        Checks query params, headers, and request data.
+        
+        Returns:
+            Outlet instance or None
+        """
+        tenant = self.get_tenant_for_request(request)
+        if not tenant:
+            return None
+        
+        # Check query params first (most common)
+        outlet_id = request.query_params.get('outlet') or request.query_params.get('outlet_id')
+        
+        # Check headers (X-Outlet-ID)
+        if not outlet_id:
+            outlet_id = request.headers.get('X-Outlet-ID')
+        
+        # Check request data (for POST/PUT)
+        if not outlet_id and hasattr(request, 'data'):
+            outlet_id = request.data.get('outlet') or request.data.get('outlet_id')
+        
+        if not outlet_id:
+            return None
+        
+        try:
+            from apps.outlets.models import Outlet
+            outlet = Outlet.objects.get(id=outlet_id, tenant=tenant)
+            return outlet
+        except (Outlet.DoesNotExist, ValueError, TypeError):
+            return None
+    
+    def validate_tenant_id(self, request, tenant_id_from_data):
+        """
+        CRITICAL: Validate that tenant_id from request data matches authenticated tenant.
+        Use this to prevent cross-tenant data leakage.
+        
+        Args:
+            request: DRF request object
+            tenant_id_from_data: Tenant ID from request data (if provided)
+        
+        Raises:
+            ValidationError if tenant IDs don't match
+        """
+        if not tenant_id_from_data:
+            return  # No tenant ID in data, will be set from authenticated tenant
+        
+        from rest_framework.exceptions import ValidationError
+        
+        tenant = self.get_tenant_for_request(request)
+        
+        if not tenant:
+            raise ValidationError("Tenant is required.")
+        
+        try:
+            tenant_id_from_data = int(tenant_id_from_data)
+            if tenant.id != tenant_id_from_data:
+                raise ValidationError(
+                    f"You can only create resources for your own tenant. "
+                    f"Requested tenant {tenant_id_from_data} does not match your tenant {tenant.id}."
+                )
+        except (ValueError, TypeError):
+            raise ValidationError("Invalid tenant ID format.")
 

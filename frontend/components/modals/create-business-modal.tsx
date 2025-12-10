@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import type { BusinessType } from "@/lib/types/mock-data"
+import type { BusinessType } from "@/lib/types"
 import { useAuthStore } from "@/stores/authStore"
 import { tenantService } from "@/lib/services/tenantService"
 import { outletService } from "@/lib/services/outletService"
@@ -181,7 +181,7 @@ export function CreateBusinessModal({
                     <SelectValue placeholder="Select business type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="retail">Retail Store</SelectItem>
+                    <SelectItem value="wholesale and retail">Wholesale and Retail</SelectItem>
                     <SelectItem value="restaurant">Restaurant</SelectItem>
                     <SelectItem value="bar">Bar</SelectItem>
                   </SelectContent>

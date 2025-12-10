@@ -7,7 +7,10 @@ import {
   Truck,
   BarChart3,
   UserCheck,
-  Users
+  Users,
+  CreditCard,
+  DollarSign,
+  Clock
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -73,6 +76,16 @@ const officeOptions: OfficeOptionCard[] = [
     textColor: "text-foreground",
     description: "Manage staff members and roles"
   },
+  {
+    id: "shift-management",
+    title: "Shift Management",
+    href: "/dashboard/office/shift-management",
+    icon: Clock,
+    bgColor: "bg-blue-900",
+    iconColor: "text-white",
+    textColor: "text-white",
+    description: "Manage shifts and shift history"
+  },
 ]
 
 export default function OfficePage() {
@@ -110,7 +123,7 @@ export default function OfficePage() {
                     "absolute top-8 left-1/2 transform -translate-x-1/2",
                     isFullColor ? "opacity-100" : "opacity-90"
                   )}>
-                    <Icon className={cn("h-20 w-20", option.iconColor)} />
+                    <Icon className={cn("h-12 w-12", option.iconColor)} />
                   </div>
 
                   {/* Title Section */}

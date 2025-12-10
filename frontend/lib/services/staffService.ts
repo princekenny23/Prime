@@ -10,7 +10,15 @@ export interface Staff {
     role: string
   }
   tenant: string
-  outlets: string[]
+  outlets: Array<{
+    id: string
+    name: string
+    address?: string
+    phone?: string
+    email?: string
+    is_active?: boolean
+  }>
+  outlet_ids?: number[] // For write operations
   role?: {
     id: string
     name: string

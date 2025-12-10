@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { User, Mail, Phone, Shield, Building2, Calendar } from "lucide-react"
-import type { User as UserType } from "@/lib/types/mock-data"
+import type { User as UserType } from "@/lib/types"
 
 interface ViewUserModalProps {
   open: boolean

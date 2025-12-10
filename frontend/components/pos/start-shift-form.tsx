@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { Calendar as CalendarIcon, Store, Calendar, CreditCard, DollarSign, FileText, Loader2 } from "lucide-react"
@@ -31,12 +31,32 @@ interface FormErrors {
   general?: string
 }
 
-export function StartShiftForm() {
+interface StartShiftFormProps {
+  onSuccess?: () => void
+  redirectTo?: "pos" | "shift-management" | "dashboard"
+}
+
+export function StartShiftForm({ onSuccess, redirectTo }: StartShiftFormProps = {} as StartShiftFormProps) {
   const router = useRouter()
   const { currentOutlet, outlets } = useTenant()
   const { startShift, getTillsForOutlet, checkShiftExists } = useShift()
   const { role } = useRole()
   const { currentBusiness } = useBusinessStore()
+  
+  // Determine redirect based on current route or prop
+  const getRedirectPath = () => {
+    if (redirectTo === "shift-management") {
+      return "/dashboard/office/shift-management"
+    }
+    if (redirectTo === "dashboard") {
+      return "/dashboard"
+    }
+    // Default: redirect to POS
+    if (currentBusiness) {
+      return `/pos/${currentBusiness.type}`
+    }
+    return "/dashboard"
+  }
 
   const [selectedOutlet, setSelectedOutlet] = useState<string>(currentOutlet?.id || "")
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
@@ -188,12 +208,14 @@ export function StartShiftForm() {
         notes: notes.trim() || undefined,
       })
 
-      // Redirect to business-specific POS terminal
-      if (currentBusiness) {
-        router.push(`/pos/${currentBusiness.type}`)
-      } else {
-        router.push("/dashboard")
+      // Call onSuccess callback if provided
+      if (onSuccess) {
+        onSuccess()
+        return
       }
+
+      // Redirect based on redirectTo prop or default to POS
+      router.push(getRedirectPath())
     } catch (error) {
       console.error("Error starting shift:", error)
       setErrors({
@@ -281,7 +303,7 @@ export function StartShiftForm() {
           disabled={!selectedOutlet || loadingTills}
         >
           <SelectTrigger id="till" className={cn(errors.till && "border-destructive")}>
-            <SelectValue placeholder={loadingTills ? "Loading tills..." : "Select a till"} />
+            <SelectValue placeholder={loadingTills ? "Loading tills..." : selectedTill ? "Till Selected" : "Select a till"} />
           </SelectTrigger>
           <SelectContent>
             {tills.length === 0 && !loadingTills ? (
@@ -321,15 +343,18 @@ export function StartShiftForm() {
           <DollarSign className="h-4 w-4" />
           Opening Cash Balance <span className="text-destructive">*</span>
         </Label>
-        <Input
-          id="openingCash"
-          type="text"
-          inputMode="decimal"
-          value={openingCash}
-          onChange={handleOpeningCashChange}
-          placeholder="0.00"
-          className={cn(errors.openingCash && "border-destructive")}
-        />
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">MWK</span>
+          <Input
+            id="openingCash"
+            type="text"
+            inputMode="decimal"
+            value={openingCash}
+            onChange={handleOpeningCashChange}
+            placeholder="0.00"
+            className={cn(errors.openingCash && "border-destructive", "pl-12")}
+          />
+        </div>
         {errors.openingCash && (
           <p className="text-sm text-destructive">{errors.openingCash}</p>
         )}
@@ -344,15 +369,18 @@ export function StartShiftForm() {
           <DollarSign className="h-4 w-4" />
           Floating Cash (Optional)
         </Label>
-        <Input
-          id="floatingCash"
-          type="text"
-          inputMode="decimal"
-          value={floatingCash}
-          onChange={handleFloatingCashChange}
-          placeholder="0.00"
-          className={cn(errors.floatingCash && "border-destructive")}
-        />
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">MWK</span>
+          <Input
+            id="floatingCash"
+            type="text"
+            inputMode="decimal"
+            value={floatingCash}
+            onChange={handleFloatingCashChange}
+            placeholder="0.00"
+            className={cn(errors.floatingCash && "border-destructive", "pl-12")}
+          />
+        </div>
         {errors.floatingCash && (
           <p className="text-sm text-destructive">{errors.floatingCash}</p>
         )}

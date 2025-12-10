@@ -1,5 +1,5 @@
 import { api, apiEndpoints } from "@/lib/api"
-import type { Sale } from "@/lib/types/mock-data"
+import type { Sale } from "@/lib/types"
 
 export interface SaleFilters {
   outlet?: string
@@ -18,12 +18,19 @@ export interface CreateSaleData {
     product_id: string
     quantity: number
     price: number
+    notes?: string
+    kitchen_status?: string
   }>
   subtotal: number
   tax?: number
   discount?: number
   payment_method: "cash" | "card" | "mobile" | "tab"
   notes?: string
+  // Restaurant-specific fields
+  table_id?: string
+  guests?: number
+  priority?: "normal" | "high" | "urgent"
+  status?: string
 }
 
 // Transform backend sale to frontend format
@@ -46,7 +53,9 @@ function transformSale(backendSale: any): Sale {
     paymentMethod: backendSale.payment_method || backendSale.paymentMethod || "cash",
     status: backendSale.status || "completed",
     createdAt: backendSale.created_at || backendSale.createdAt || new Date().toISOString(),
-  }
+    // Include raw backend data for restaurant orders
+    _raw: backendSale,
+  } as any
 }
 
 export const saleService = {
@@ -83,24 +92,60 @@ export const saleService = {
 
   async create(data: CreateSaleData): Promise<Sale> {
     // Transform frontend data to backend format
-    const backendData = {
-      outlet: data.outlet,
-      shift: data.shift,
-      customer: data.customer,
+    // Ensure all IDs are integers
+    const backendData: any = {
+      outlet: parseInt(String(data.outlet)),
+      shift: data.shift ? parseInt(String(data.shift)) : undefined,
+      customer: data.customer ? parseInt(String(data.customer)) : undefined,
       items_data: data.items_data.map(item => ({
-        product_id: parseInt(item.product_id),
+        product_id: parseInt(String(item.product_id)),
         quantity: item.quantity,
-        price: item.price.toString(),
+        price: String(item.price), // Backend expects string for DecimalField
+        notes: item.notes || "",
+        kitchen_status: item.kitchen_status || "pending",
       })),
-      subtotal: data.subtotal.toString(),
-      tax: data.tax ? data.tax.toString() : "0",
-      discount: data.discount ? data.discount.toString() : "0",
+      subtotal: String(data.subtotal), // Backend expects string for DecimalField
+      tax: data.tax ? String(data.tax) : "0",
+      discount: data.discount ? String(data.discount) : "0",
       payment_method: data.payment_method,
       notes: data.notes || "",
     }
     
-    const response = await api.post<any>(apiEndpoints.sales.create, backendData)
-    return transformSale(response)
+    // Remove undefined fields
+    if (!backendData.shift) delete backendData.shift
+    if (!backendData.customer) delete backendData.customer
+    
+    // Add restaurant-specific fields if provided
+    if (data.table_id) {
+      backendData.table_id = parseInt(data.table_id)
+    }
+    if (data.guests) {
+      backendData.guests = data.guests
+    }
+    if (data.priority) {
+      backendData.priority = data.priority
+    }
+    if (data.status) {
+      backendData.status = data.status
+    }
+    
+    console.log("Sending sale request to backend:", {
+      endpoint: apiEndpoints.sales.create,
+      data: JSON.stringify(backendData, null, 2)
+    })
+    
+    try {
+      const response = await api.post<any>(apiEndpoints.sales.create, backendData)
+      console.log("Sale response received:", response)
+      return transformSale(response)
+    } catch (error: any) {
+      console.error("Sale creation error:", error)
+      console.error("Error status:", error.status)
+      console.error("Error data:", error.data)
+      console.error("Error message:", error.message)
+      // Re-throw with more context
+      throw error
+    }
   },
 
   async refund(id: string, reason?: string): Promise<Sale> {
@@ -119,7 +164,8 @@ export const saleService = {
     if (filters?.end_date) params.append("end_date", filters.end_date)
     
     const query = params.toString()
-    return api.get(`${apiEndpoints.sales.list}stats/${query ? `?${query}` : ""}`)
+    // Use the stats action endpoint: /api/v1/sales/stats/
+    return api.get(`/api/v1/sales/stats/${query ? `?${query}` : ""}`)
   },
 }
 

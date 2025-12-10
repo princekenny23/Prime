@@ -7,12 +7,10 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { usePOSStore } from "@/stores/posStore"
 import { useBusinessStore } from "@/stores/businessStore"
-import { getProducts } from "@/lib/mockApi"
 import { productService } from "@/lib/services/productService"
-import { useRealAPI } from "@/lib/utils/api-config"
 import { formatCurrency } from "@/lib/utils/currency"
+import type { Product } from "@/lib/types"
 import { Search, Wine, Receipt, Plus, Minus, X, CreditCard, Smartphone, DollarSign, Lock } from "lucide-react"
-import { PaymentModal } from "@/components/modals/payment-modal"
 import { CloseRegisterModal } from "@/components/modals/close-register-modal"
 import { ReceiptPreviewModal } from "@/components/modals/receipt-preview-modal"
 import { useShift } from "@/contexts/shift-context"
@@ -38,27 +36,31 @@ export function BarPOS() {
   const [showReceipt, setShowReceipt] = useState(false)
   const [receiptData, setReceiptData] = useState<any>(null)
   const [products, setProducts] = useState<Product[]>([])
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true)
+  const [productsError, setProductsError] = useState<string | null>(null)
 
   useEffect(() => {
     const loadData = async () => {
-      if (!currentBusiness) return
+      if (!currentBusiness) {
+        setIsLoadingProducts(false)
+        return
+      }
+      
+      setIsLoadingProducts(true)
+      setProductsError(null)
       
       try {
-        if (useRealAPI()) {
-          const productsData = await productService.list({ is_active: true })
-          setProducts(productsData.results || productsData)
-        } else {
-          const businessProducts = getProducts(currentBusiness.id)
-          if (businessProducts.length > 0) {
-            setProducts(businessProducts)
-          }
-        }
-      } catch (error) {
+        const response = await productService.list({ is_active: true })
+        const productsList = Array.isArray(response) 
+          ? response 
+          : (response.results || [])
+        setProducts(productsList)
+      } catch (error: any) {
         console.error("Failed to load products:", error)
-        const businessProducts = getProducts(currentBusiness.id)
-        if (businessProducts.length > 0) {
-          setProducts(businessProducts)
-        }
+        setProductsError("Failed to load products. Please refresh the page.")
+        setProducts([])
+      } finally {
+        setIsLoadingProducts(false)
       }
     }
     
@@ -101,12 +103,7 @@ export function BarPOS() {
     }
   }
 
-  const handleQuickPayment = (method: "cash" | "card" | "mobile") => {
-    if (cart.length === 0) return
-    // Process quick payment
-    alert(`Processing ${method} payment for ${formatCurrency(cartTotal, currentBusiness)}`)
-    clearCart()
-  }
+  // Quick payment removed - all payments go through PaymentModal for proper recording
 
   if (!currentBusiness) {
     return (
@@ -187,8 +184,41 @@ export function BarPOS() {
 
           {/* Product Grid with Quick Add */}
           <div className="flex-1 overflow-y-auto p-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredProducts.map((product) => (
+            {isLoadingProducts ? (
+              <div className="flex items-center justify-center h-64">
+                <p className="text-muted-foreground">Loading products...</p>
+              </div>
+            ) : productsError ? (
+              <div className="flex flex-col items-center justify-center h-64">
+                <p className="text-destructive mb-2">{productsError}</p>
+                <Button variant="outline" onClick={async () => {
+                  setProductsError(null)
+                  setIsLoadingProducts(true)
+                  try {
+                    const response = await productService.list({ is_active: true })
+                    const productsList = Array.isArray(response) 
+                      ? response 
+                      : (response.results || [])
+                    setProducts(productsList)
+                  } catch (error: any) {
+                    console.error("Failed to load products:", error)
+                    setProductsError("Failed to load products. Please refresh the page.")
+                    setProducts([])
+                  } finally {
+                    setIsLoadingProducts(false)
+                  }
+                }}>
+                  Retry
+                </Button>
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64">
+                <Wine className="h-12 w-12 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">No products found</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {filteredProducts.map((product) => (
                 <Card key={product.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-4">
                     <div className="space-y-3">
@@ -232,8 +262,9 @@ export function BarPOS() {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -306,33 +337,7 @@ export function BarPOS() {
                 <span>{formatCurrency(cartTotal, currentBusiness)}</span>
               </div>
 
-              {/* Quick Payment Buttons */}
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  variant="outline"
-                  className="h-12"
-                  onClick={() => handleQuickPayment("cash")}
-                >
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  Cash
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-12"
-                  onClick={() => handleQuickPayment("card")}
-                >
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Card
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-12"
-                  onClick={() => handleQuickPayment("mobile")}
-                >
-                  <Smartphone className="h-4 w-4 mr-2" />
-                  Mobile
-                </Button>
-              </div>
+              {/* Quick payment buttons removed - all payments go through PaymentModal for proper recording */}
 
               <Button
                 className="w-full"
@@ -347,34 +352,7 @@ export function BarPOS() {
         </div>
       </div>
 
-      <PaymentModal
-        open={showPayment}
-        onOpenChange={setShowPayment}
-        total={cartTotal}
-        onComplete={() => {
-          // Prepare receipt data
-          const receiptItems = cart.map(item => ({
-            id: item.id,
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity,
-            discount: 0,
-            total: item.total,
-          }))
-          
-          setReceiptData({
-            cart: receiptItems,
-            subtotal: cartTotal,
-            discount: 0,
-            tax: 0,
-            total: cartTotal,
-          })
-          
-          clearCart()
-          setShowPayment(false)
-          setShowReceipt(true)
-        }}
-      />
+      {/* PaymentModal removed - new payment system will be implemented */}
       <CloseRegisterModal
         open={showCloseRegister}
         onOpenChange={setShowCloseRegister}

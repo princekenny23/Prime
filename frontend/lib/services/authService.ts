@@ -1,5 +1,12 @@
 import { api, apiEndpoints } from "@/lib/api"
-import type { User } from "@/lib/types/mock-data"
+import type { User } from "@/lib/types"
+
+// Map backend tenant type to frontend business type
+const mapBackendTypeToFrontend = (type: string | undefined): string => {
+  if (!type) return "wholesale and retail"
+  if (type === "retail") return "wholesale and retail"
+  return type
+}
 
 export interface LoginResponse {
   access: string
@@ -49,7 +56,10 @@ export const authService = {
         outletIds: [],
         createdAt: response.user.date_joined || new Date().toISOString(),
         is_saas_admin: response.user.is_saas_admin || false,
-        tenant: response.user.tenant,
+        tenant: response.user.tenant ? {
+          ...response.user.tenant,
+          type: mapBackendTypeToFrontend(response.user.tenant.type),
+        } : undefined,
       } : null
       
       console.log("User transformed:", { id: user?.id, email: user?.email, is_saas_admin: user?.is_saas_admin })
@@ -128,7 +138,10 @@ export const authService = {
       outletIds: [],
       createdAt: response.date_joined || new Date().toISOString(),
       is_saas_admin: response.is_saas_admin || false,
-      tenant: response.tenant,
+      tenant: response.tenant ? {
+        ...response.tenant,
+        type: mapBackendTypeToFrontend(response.tenant.type),
+      } : undefined,
     } as User
   },
 }

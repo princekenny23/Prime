@@ -29,25 +29,30 @@ export default function BarPOSPage() {
     return null
   }
 
-  // Show loading while checking shift
+  // Show loading while checking shift (with timeout to prevent infinite loading)
   if (isLoading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-screen">
-          <p className="text-muted-foreground">Loading...</p>
+          <div className="text-center">
+            <p className="text-muted-foreground mb-2">Loading POS...</p>
+            <p className="text-xs text-muted-foreground">Checking for active shift</p>
+          </div>
         </div>
       </DashboardLayout>
     )
   }
 
   // If no active shift, show Register Closed screen
-  if (!activeShift) {
-    return (
-      <DashboardLayout>
-        <RegisterClosedScreen />
-      </DashboardLayout>
-    )
-  }
+  // Note: For bar POS, we allow operation without shift for now
+  // Uncomment below to require shift
+  // if (!activeShift) {
+  //   return (
+  //     <DashboardLayout>
+  //       <RegisterClosedScreen />
+  //     </DashboardLayout>
+  //   )
+  // }
 
   return (
     <DashboardLayout>

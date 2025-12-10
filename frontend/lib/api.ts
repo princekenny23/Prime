@@ -58,6 +58,22 @@ export class ApiClient {
         Authorization: `Bearer ${token}`,
       }
     }
+    
+    // Add outlet ID header if available (for outlet data isolation)
+    if (typeof window !== "undefined") {
+      try {
+        // Try to get current outlet from localStorage (set by tenant context)
+        const outletId = localStorage.getItem("currentOutletId")
+        if (outletId) {
+          config.headers = {
+            ...config.headers,
+            "X-Outlet-ID": outletId,
+          }
+        }
+      } catch (error) {
+        // Silently fail if localStorage is not available
+      }
+    }
 
     try {
       const controller = new AbortController()
@@ -91,16 +107,32 @@ export class ApiClient {
                 Authorization: `Bearer ${access}`,
               }
               return this.request<T>(endpoint, { ...options, headers: config.headers }, false)
+            } else {
+              // Refresh token is invalid, clear tokens and redirect to login
+              localStorage.removeItem("authToken")
+              localStorage.removeItem("refreshToken")
+              if (typeof window !== "undefined" && !window.location.pathname.includes("/auth/login")) {
+                window.location.href = "/auth/login"
+              }
+              throw new Error("Session expired. Please login again.")
             }
           } catch (refreshError) {
             // Refresh failed, clear tokens and redirect to login
             localStorage.removeItem("authToken")
             localStorage.removeItem("refreshToken")
-            if (typeof window !== "undefined") {
+            if (typeof window !== "undefined" && !window.location.pathname.includes("/auth/login")) {
               window.location.href = "/auth/login"
             }
             throw new Error("Session expired. Please login again.")
           }
+        } else {
+          // No refresh token available - clear tokens and redirect to login
+          localStorage.removeItem("authToken")
+          localStorage.removeItem("refreshToken")
+          if (typeof window !== "undefined" && !window.location.pathname.includes("/auth/login")) {
+            window.location.href = "/auth/login"
+          }
+          throw new Error("Authentication required. Please login again.")
         }
       }
 
@@ -116,9 +148,55 @@ export class ApiClient {
           errorData = {}
         }
         
-        const errorMessage = errorData.detail || errorData.message || errorData.error || 
-                           (typeof errorData === 'string' ? errorData : null) ||
-                           `API Error: ${response.status} ${response.statusText}`
+        // Try to extract a meaningful error message
+        let errorMessage = errorData.detail || errorData.message || errorData.error
+        
+        // If no detail, try to get field-specific errors
+        if (!errorMessage && typeof errorData === 'object') {
+          // Check for common field errors
+          const fieldErrors = ['email', 'password', 'name', 'phone', 'role', 'outlet_ids']
+          for (const field of fieldErrors) {
+            if (errorData[field]) {
+              const fieldError = errorData[field]
+              errorMessage = Array.isArray(fieldError) ? fieldError[0] : fieldError
+              break
+            }
+          }
+          
+          // If still no message, get first error from any field
+          if (!errorMessage) {
+            const firstKey = Object.keys(errorData)[0]
+            if (firstKey) {
+              const firstError = errorData[firstKey]
+              errorMessage = Array.isArray(firstError) ? firstError[0] : firstError
+            }
+          }
+        }
+        
+        // Fallback to string or default message
+        if (!errorMessage) {
+          errorMessage = (typeof errorData === 'string' ? errorData : null) ||
+                         `API Error: ${response.status} ${response.statusText}`
+        }
+        
+        // Handle authentication errors specifically
+        if (response.status === 401) {
+          const authErrorMessage = errorMessage.toLowerCase()
+          if (authErrorMessage.includes("authentication credentials were not provided") || 
+              authErrorMessage.includes("not authenticated") ||
+              authErrorMessage.includes("invalid token")) {
+            // Clear tokens and redirect to login if in browser
+            if (typeof window !== "undefined") {
+              localStorage.removeItem("authToken")
+              localStorage.removeItem("refreshToken")
+              // Only redirect if not already on login page
+              if (!window.location.pathname.includes("/auth/login")) {
+                window.location.href = "/auth/login"
+              }
+            }
+            errorMessage = "Your session has expired. Please login again."
+          }
+        }
         
         // Log full error details for debugging
         console.error("API Error:", {
@@ -152,16 +230,52 @@ export class ApiClient {
       return {} as T
     } catch (error) {
       if (error instanceof Error) {
-        // Don't expose full error details for security
-        const isLoginEndpoint = endpoint.includes('login')
-        const errorMsg = isLoginEndpoint 
-          ? "Login failed. Please check your credentials."
-          : `API Request failed: ${error.message}`
+        // Handle specific error types
+        let errorMsg = ""
+        
+        // Network errors (Failed to fetch)
+        if (error.message === "Failed to fetch" || error.name === "TypeError") {
+          errorMsg = "Unable to connect to the server. Please check if the backend server is running and accessible."
+          console.error("Network error - Backend may be down:", {
+            endpoint: url,
+            baseURL: this.baseURL,
+            message: "Check if backend server is running at " + this.baseURL,
+          })
+        }
+        // Timeout errors
+        else if (error.name === "AbortError" || error.message.includes("timeout")) {
+          errorMsg = "Request timed out. The server may be slow or unavailable."
+          console.error("Request timeout:", {
+            endpoint: url,
+            timeout: this.timeout,
+          })
+        }
+        // Other errors
+        else {
+          const isLoginEndpoint = endpoint.includes('login')
+          // Check if this is already a formatted authentication error
+          const isAuthError = error.message.includes("Session expired") || 
+                             error.message.includes("Authentication required") ||
+                             error.message.includes("Please login again")
+          
+          if (isLoginEndpoint) {
+            errorMsg = "Login failed. Please check your credentials."
+          } else if (isAuthError) {
+            // Preserve authentication error messages as-is
+            errorMsg = error.message
+          } else {
+            errorMsg = `API Request failed: ${error.message}`
+          }
+        }
+        
         console.error("Request error:", {
           endpoint: url,
+          baseURL: this.baseURL,
           message: error.message,
+          errorName: error.name,
           // Don't log full error stack or request data
         })
+        
         throw new Error(errorMsg)
       }
       throw error
@@ -227,6 +341,32 @@ export const apiEndpoints = {
     get: (id: string) => `/outlets/${id}/`,
     create: "/outlets/",
     update: (id: string) => `/outlets/${id}/`,
+    delete: (id: string) => `/outlets/${id}/`,
+  },
+  // Tills
+  tills: {
+    list: "/tills/",
+    get: (id: string) => `/tills/${id}/`,
+    create: "/tills/",
+    update: (id: string) => `/tills/${id}/`,
+    delete: (id: string) => `/tills/${id}/`,
+    available: "/tills/available/",
+  },
+  // Tables (Restaurant)
+  tables: {
+    list: "/tables/",
+    get: (id: string) => `/tables/${id}/`,
+    create: "/tables/",
+    update: (id: string) => `/tables/${id}/`,
+    delete: (id: string) => `/tables/${id}/`,
+  },
+  // Kitchen Orders (Restaurant)
+  kitchenOrders: {
+    list: "/restaurant/kitchen-orders/",
+    get: (id: string) => `/restaurant/kitchen-orders/${id}/`,
+    create: "/restaurant/kitchen-orders/",
+    update: (id: string) => `/restaurant/kitchen-orders/${id}/`,
+    delete: (id: string) => `/restaurant/kitchen-orders/${id}/`,
   },
   // Products
   products: {
@@ -235,6 +375,24 @@ export const apiEndpoints = {
     create: "/products/",
     update: (id: string) => `/products/${id}/`,
     delete: (id: string) => `/products/${id}/`,
+  },
+  // Variations
+  variations: {
+    list: "/products/variations/",
+    get: (id: string) => `/products/variations/${id}/`,
+    create: "/products/variations/",
+    update: (id: string) => `/products/variations/${id}/`,
+    delete: (id: string) => `/products/variations/${id}/`,
+    bulkUpdateStock: "/products/variations/bulk_update_stock/",
+  },
+  // Location Stock
+  locationStock: {
+    list: "/inventory/location-stock/",
+    get: (id: string) => `/inventory/location-stock/${id}/`,
+    create: "/inventory/location-stock/",
+    update: (id: string) => `/inventory/location-stock/${id}/`,
+    delete: (id: string) => `/inventory/location-stock/${id}/`,
+    bulkUpdate: "/inventory/location-stock/bulk_update/",
   },
   // Categories
   categories: {
@@ -250,6 +408,22 @@ export const apiEndpoints = {
     get: (id: string) => `/sales/${id}/`,
     create: "/sales/",
     update: (id: string) => `/sales/${id}/`,
+    refund: (id: string) => `/sales/${id}/refund/`,
+    stats: "/sales/stats/",
+  },
+  // Deliveries
+  deliveries: {
+    list: "/deliveries/",
+    get: (id: string) => `/deliveries/${id}/`,
+    create: "/deliveries/",
+    update: (id: string) => `/deliveries/${id}/`,
+    delete: (id: string) => `/deliveries/${id}/`,
+    confirm: (id: string) => `/deliveries/${id}/confirm/`,
+    dispatch: (id: string) => `/deliveries/${id}/dispatch/`,
+    complete: (id: string) => `/deliveries/${id}/complete/`,
+    cancel: (id: string) => `/deliveries/${id}/cancel/`,
+    pending: "/deliveries/pending/",
+    scheduledToday: "/deliveries/scheduled_today/",
   },
   // Customers
   customers: {
@@ -291,6 +465,52 @@ export const apiEndpoints = {
     update: (id: string) => `/suppliers/${id}/`,
     delete: (id: string) => `/suppliers/${id}/`,
   },
+  // Product Suppliers (Product-Supplier relationships)
+  productSuppliers: {
+    list: "/product-suppliers/",
+    get: (id: string) => `/product-suppliers/${id}/`,
+    create: "/product-suppliers/",
+    update: (id: string) => `/product-suppliers/${id}/`,
+    delete: (id: string) => `/product-suppliers/${id}/`,
+  },
+  // Auto Purchase Order Settings
+  autoPOSettings: {
+    list: "/auto-po-settings/",
+    get: (id: string) => `/auto-po-settings/${id}/`,
+    update: (id: string) => `/auto-po-settings/${id}/`,
+    checkLowStock: "/auto-po-settings/check_low_stock/",
+  },
+  // Purchase Orders
+  purchaseOrders: {
+    list: "/purchase-orders/",
+    get: (id: string) => `/purchase-orders/${id}/`,
+    create: "/purchase-orders/",
+    update: (id: string) => `/purchase-orders/${id}/`,
+    delete: (id: string) => `/purchase-orders/${id}/`,
+    approve: (id: string) => `/purchase-orders/${id}/approve/`,
+    receive: (id: string) => `/purchase-orders/${id}/receive/`,
+    itemsNeedingSupplier: "/purchase-orders/items_needing_supplier/",
+    assignSupplierToItem: (id: string) => `/purchase-orders/${id}/assign_supplier_to_item/`,
+  },
+  // Supplier Invoices
+  supplierInvoices: {
+    list: "/supplier-invoices/",
+    get: (id: string) => `/supplier-invoices/${id}/`,
+    create: "/supplier-invoices/",
+    update: (id: string) => `/supplier-invoices/${id}/`,
+    delete: (id: string) => `/supplier-invoices/${id}/`,
+    recordPayment: (id: string) => `/supplier-invoices/${id}/record_payment/`,
+  },
+  // Purchase Returns
+  purchaseReturns: {
+    list: "/purchase-returns/",
+    get: (id: string) => `/purchase-returns/${id}/`,
+    create: "/purchase-returns/",
+    update: (id: string) => `/purchase-returns/${id}/`,
+    delete: (id: string) => `/purchase-returns/${id}/`,
+    approve: (id: string) => `/purchase-returns/${id}/approve/`,
+    complete: (id: string) => `/purchase-returns/${id}/complete/`,
+  },
   // Inventory
   inventory: {
     movements: "/inventory/movements/",
@@ -306,41 +526,10 @@ export const apiEndpoints = {
     list: "/shifts/",
     start: "/shifts/start/",
     active: "/shifts/active/",
+    current: "/shifts/current/",
     history: "/shifts/history/",
     check: "/shifts/check/",
     close: (id: string) => `/shifts/${id}/close/`,
-  },
-  // Customers
-  customers: {
-    list: "/customers",
-    get: (id: string) => `/customers/${id}`,
-    create: "/customers",
-    update: (id: string) => `/customers/${id}`,
-    adjustPoints: (id: string) => `/customers/${id}/adjust_points/`,
-  },
-  // Staff
-  staff: {
-    list: "/staff/",
-    get: (id: string) => `/staff/${id}/`,
-    create: "/staff/",
-    update: (id: string) => `/staff/${id}/`,
-    delete: (id: string) => `/staff/${id}/`,
-  },
-  // Roles
-  roles: {
-    list: "/roles/",
-    get: (id: string) => `/roles/${id}/`,
-    create: "/roles/",
-    update: (id: string) => `/roles/${id}/`,
-    delete: (id: string) => `/roles/${id}/`,
-  },
-  // Suppliers
-  suppliers: {
-    list: "/suppliers/",
-    get: (id: string) => `/suppliers/${id}/`,
-    create: "/suppliers/",
-    update: (id: string) => `/suppliers/${id}/`,
-    delete: (id: string) => `/suppliers/${id}/`,
   },
   // Reports
   reports: {
@@ -355,6 +544,45 @@ export const apiEndpoints = {
   admin: {
     tenants: "/admin/tenants/",
     analytics: "/admin/analytics/",
+  },
+  // Activity Logs
+  activityLogs: {
+    list: "/activity-logs/",
+    get: (id: string) => `/activity-logs/${id}/`,
+    summary: "/activity-logs/summary/",
+  },
+  // Notifications
+  notifications: {
+    list: "/notifications/",
+    get: (id: string) => `/notifications/${id}/`,
+    markRead: (id: string) => `/notifications/${id}/mark_read/`,
+    markAllRead: "/notifications/mark_all_read/",
+    unreadCount: "/notifications/unread_count/",
+    summary: "/notifications/summary/",
+  },
+  // Notification Preferences
+  notificationPreferences: {
+    list: "/notification-preferences/",
+    get: (id: string) => `/notification-preferences/${id}/`,
+    create: "/notification-preferences/",
+    update: (id: string) => `/notification-preferences/${id}/`,
+    myPreferences: "/notification-preferences/my-preferences/",
+  },
+  // Price Lists (Retail/Wholesale)
+  priceLists: {
+    list: "/price-lists/",
+    get: (id: string) => `/price-lists/${id}/`,
+    create: "/price-lists/",
+    update: (id: string) => `/price-lists/${id}/`,
+    delete: (id: string) => `/price-lists/${id}/`,
+  },
+  // Customer Groups (Retail/Wholesale)
+  customerGroups: {
+    list: "/customer-groups/",
+    get: (id: string) => `/customer-groups/${id}/`,
+    create: "/customer-groups/",
+    update: (id: string) => `/customer-groups/${id}/`,
+    delete: (id: string) => `/customer-groups/${id}/`,
   },
 }
 

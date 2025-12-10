@@ -1,9 +1,13 @@
 "use client"
 
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Plus, Minus, X, Percent, Trash2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Plus, Minus, X, Percent, Trash2, User, UserPlus } from "lucide-react"
+import { CustomerSelectModal } from "@/components/modals/customer-select-modal"
+import type { Customer } from "@/lib/services/customerService"
 
 interface CartItem {
   id: string
@@ -20,43 +24,143 @@ interface CartPanelProps {
   onRemove: (id: string) => void
   onApplyDiscount: (id: string) => void
   onClearCart: () => void
+  customer?: Customer | null
+  onCustomerChange?: (customer: Customer | null) => void
 }
 
-export function CartPanel({ cart, onUpdateQuantity, onRemove, onApplyDiscount, onClearCart }: CartPanelProps) {
+export function CartPanel({ 
+  cart, 
+  onUpdateQuantity, 
+  onRemove, 
+  onApplyDiscount, 
+  onClearCart,
+  customer,
+  onCustomerChange 
+}: CartPanelProps) {
+  const [showCustomerModal, setShowCustomerModal] = useState(false)
+
+  const handleCustomerSelect = (selectedCustomer: Customer) => {
+    if (onCustomerChange) {
+      onCustomerChange(selectedCustomer)
+    }
+  }
+
+  const handleRemoveCustomer = () => {
+    if (onCustomerChange) {
+      onCustomerChange(null)
+    }
+  }
+
   if (cart.length === 0) {
     return (
-      <Card className="h-full">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Cart</span>
-            <span className="text-sm font-normal text-muted-foreground">0 items</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center h-[200px] text-muted-foreground">
-            <div className="text-center">
-              <p>Cart is empty</p>
-              <p className="text-xs mt-1">Add products to get started</p>
+      <>
+        <Card className="h-full">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Cart</span>
+              <span className="text-sm font-normal text-muted-foreground">0 items</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {onCustomerChange && (
+                <div className="flex items-center gap-2">
+                  {customer ? (
+                    <div className="flex items-center gap-2 flex-1 p-2 bg-muted rounded-lg">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium flex-1 truncate">{customer.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={handleRemoveCustomer}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => setShowCustomerModal(true)}
+                    >
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Add Customer
+                    </Button>
+                  )}
+                </div>
+              )}
+              <div className="flex items-center justify-center h-[200px] text-muted-foreground">
+                <div className="text-center">
+                  <p>Cart is empty</p>
+                  <p className="text-xs mt-1">Add products to get started</p>
+                </div>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+        {onCustomerChange && (
+          <CustomerSelectModal
+            open={showCustomerModal}
+            onOpenChange={setShowCustomerModal}
+            onSelect={handleCustomerSelect}
+            selectedCustomer={customer || undefined}
+          />
+        )}
+      </>
     )
   }
 
   return (
-    <Card className="h-full flex flex-col min-h-[600px]">
-      <CardHeader className="flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <span>Cart</span>
-            <span className="text-sm font-normal text-muted-foreground">({cart.length} items)</span>
-          </CardTitle>
-          <Button variant="ghost" size="sm" onClick={onClearCart}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardHeader>
+    <>
+      <Card className="h-full flex flex-col min-h-[600px]">
+        <CardHeader className="flex-shrink-0">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <span>Cart</span>
+                <span className="text-sm font-normal text-muted-foreground">({cart.length} items)</span>
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={onClearCart}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+            {onCustomerChange && (
+              <div className="flex items-center gap-2">
+                {customer ? (
+                  <div className="flex items-center gap-2 flex-1 p-2 bg-muted rounded-lg">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium flex-1 truncate">{customer.name}</span>
+                    {customer.loyalty_points !== undefined && customer.loyalty_points > 0 && (
+                      <Badge variant="secondary" className="text-xs">
+                        {customer.loyalty_points} pts
+                      </Badge>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={handleRemoveCustomer}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setShowCustomerModal(true)}
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add Customer
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        </CardHeader>
       <CardContent className="flex-1 min-h-0 overflow-hidden">
         <ScrollArea className="h-full">
           <div className="space-y-2 pr-4">
@@ -124,6 +228,15 @@ export function CartPanel({ cart, onUpdateQuantity, onRemove, onApplyDiscount, o
         </ScrollArea>
       </CardContent>
     </Card>
+    {onCustomerChange && (
+      <CustomerSelectModal
+        open={showCustomerModal}
+        onOpenChange={setShowCustomerModal}
+        onSelect={handleCustomerSelect}
+        selectedCustomer={customer || undefined}
+      />
+    )}
+    </>
   )
 }
 

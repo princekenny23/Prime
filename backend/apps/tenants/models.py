@@ -1,11 +1,10 @@
 from django.db import models
-from django.contrib.postgres.fields import JSONField
 
 
 class Tenant(models.Model):
     """Multi-tenant Business model"""
     BUSINESS_TYPES = [
-        ('retail', 'Retail'),
+        ('retail', 'Wholesale and Retail'),
         ('restaurant', 'Restaurant'),
         ('bar', 'Bar'),
     ]

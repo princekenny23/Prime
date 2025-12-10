@@ -118,18 +118,28 @@ export default function CreditsPage() {
       (statusFilter === "active" && customer.credit_status === "active") ||
       (statusFilter === "suspended" && customer.credit_status === "suspended") ||
       (statusFilter === "closed" && customer.credit_status === "closed") ||
-      (statusFilter === "overdue" && (customer.outstanding_balance || 0) > 0)
+      (statusFilter === "overdue" && (Number(customer.outstanding_balance) || 0) > 0)
     
     return matchesSearch && matchesStatus
   })
 
   // Calculate statistics
-  const totalCreditLimit = customers.reduce((sum, c) => sum + (c.credit_limit || 0), 0)
-  const totalOutstanding = customers.reduce((sum, c) => sum + (c.outstanding_balance || 0), 0)
-  const totalAvailable = customers.reduce((sum, c) => sum + (c.available_credit || 0), 0)
+  const totalCreditLimit = customers.reduce((sum, c) => {
+    const limit = Number(c.credit_limit) || 0
+    return sum + limit
+  }, 0)
+  const totalOutstanding = customers.reduce((sum, c) => {
+    const balance = Number(c.outstanding_balance) || 0
+    return sum + balance
+  }, 0)
+  const totalAvailable = customers.reduce((sum, c) => {
+    const available = Number(c.available_credit) || 0
+    return sum + available
+  }, 0)
   const overdueCount = customers.filter(c => {
     // This would ideally come from credit summary, but for now we check outstanding balance
-    return (c.outstanding_balance || 0) > 0
+    const balance = Number(c.outstanding_balance) || 0
+    return balance > 0
   }).length
 
   const handleViewDetails = (customer: Customer) => {
@@ -156,7 +166,7 @@ export default function CreditsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {currentBusiness?.currencySymbol || "MWK"} {totalCreditLimit.toFixed(2)}
+                {currentBusiness?.currencySymbol || "MWK"} {Number(totalCreditLimit).toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Across {customers.length} customers
@@ -171,7 +181,7 @@ export default function CreditsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-orange-600">
-                {currentBusiness?.currencySymbol || "MWK"} {totalOutstanding.toFixed(2)}
+                {currentBusiness?.currencySymbol || "MWK"} {Number(totalOutstanding).toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 {overdueCount} customers with balance
@@ -186,7 +196,7 @@ export default function CreditsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {currentBusiness?.currencySymbol || "MWK"} {totalAvailable.toFixed(2)}
+                {currentBusiness?.currencySymbol || "MWK"} {Number(totalAvailable).toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Remaining credit capacity
@@ -201,8 +211,8 @@ export default function CreditsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {totalCreditLimit > 0 
-                  ? ((totalOutstanding / totalCreditLimit) * 100).toFixed(1)
+                {Number(totalCreditLimit) > 0 
+                  ? ((Number(totalOutstanding) / Number(totalCreditLimit)) * 100).toFixed(1)
                   : "0"}%
               </div>
               <p className="text-xs text-muted-foreground mt-1">
@@ -273,8 +283,10 @@ export default function CreditsPage() {
                   </TableRow>
                 ) : (
                   filteredCustomers.map((customer) => {
-                    const utilization = customer.credit_limit && customer.credit_limit > 0
-                      ? ((customer.outstanding_balance || 0) / customer.credit_limit) * 100
+                    const creditLimit = Number(customer.credit_limit) || 0
+                    const outstandingBalance = Number(customer.outstanding_balance) || 0
+                    const utilization = creditLimit > 0
+                      ? (outstandingBalance / creditLimit) * 100
                       : 0
                     
                     return (
@@ -287,15 +299,15 @@ export default function CreditsPage() {
                         </TableCell>
                         <TableCell>
                           <span className="font-medium">
-                            {currentBusiness?.currencySymbol || "MWK"} {(customer.credit_limit || 0).toFixed(2)}
+                            {currentBusiness?.currencySymbol || "MWK"} {creditLimit.toFixed(2)}
                           </span>
                         </TableCell>
                         <TableCell>
                           <div>
                             <span className={`font-medium ${
-                              (customer.outstanding_balance || 0) > 0 ? "text-orange-600" : "text-muted-foreground"
+                              outstandingBalance > 0 ? "text-orange-600" : "text-muted-foreground"
                             }`}>
-                              {currentBusiness?.currencySymbol || "MWK"} {(customer.outstanding_balance || 0).toFixed(2)}
+                              {currentBusiness?.currencySymbol || "MWK"} {outstandingBalance.toFixed(2)}
                             </span>
                             {utilization > 0 && (
                               <div className="w-full bg-muted rounded-full h-1.5 mt-1">
@@ -312,7 +324,7 @@ export default function CreditsPage() {
                         </TableCell>
                         <TableCell>
                           <span className="font-medium text-green-600">
-                            {currentBusiness?.currencySymbol || "MWK"} {(customer.available_credit || 0).toFixed(2)}
+                            {currentBusiness?.currencySymbol || "MWK"} {Number(customer.available_credit || 0).toFixed(2)}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -377,19 +389,19 @@ export default function CreditsPage() {
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Credit Limit:</span>
                         <span className="font-medium">
-                          {currentBusiness?.currencySymbol || "MWK"} {creditSummary.credit_limit.toFixed(2)}
+                          {currentBusiness?.currencySymbol || "MWK"} {Number(creditSummary.credit_limit).toFixed(2)}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Outstanding Balance:</span>
                         <span className="font-medium text-orange-600">
-                          {currentBusiness?.currencySymbol || "MWK"} {creditSummary.outstanding_balance.toFixed(2)}
+                          {currentBusiness?.currencySymbol || "MWK"} {Number(creditSummary.outstanding_balance).toFixed(2)}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Available Credit:</span>
                         <span className="font-medium text-green-600">
-                          {currentBusiness?.currencySymbol || "MWK"} {creditSummary.available_credit.toFixed(2)}
+                          {currentBusiness?.currencySymbol || "MWK"} {Number(creditSummary.available_credit).toFixed(2)}
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -413,7 +425,7 @@ export default function CreditsPage() {
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Overdue Amount:</span>
                         <span className="font-medium text-red-600">
-                          {currentBusiness?.currencySymbol || "MWK"} {creditSummary.overdue_amount.toFixed(2)}
+                          {currentBusiness?.currencySymbol || "MWK"} {Number(creditSummary.overdue_amount).toFixed(2)}
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -455,14 +467,14 @@ export default function CreditsPage() {
                                 {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : "-"}
                               </TableCell>
                               <TableCell>
-                                {currentBusiness?.currencySymbol || "MWK"} {invoice.total.toFixed(2)}
+                                {currentBusiness?.currencySymbol || "MWK"} {Number(invoice.total).toFixed(2)}
                               </TableCell>
                               <TableCell>
-                                {currentBusiness?.currencySymbol || "MWK"} {invoice.amount_paid.toFixed(2)}
+                                {currentBusiness?.currencySymbol || "MWK"} {Number(invoice.amount_paid).toFixed(2)}
                               </TableCell>
                               <TableCell>
                                 <span className={invoice.is_overdue ? "text-red-600 font-medium" : ""}>
-                                  {currentBusiness?.currencySymbol || "MWK"} {invoice.remaining.toFixed(2)}
+                                  {currentBusiness?.currencySymbol || "MWK"} {Number(invoice.remaining).toFixed(2)}
                                 </span>
                               </TableCell>
                               <TableCell>

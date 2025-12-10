@@ -136,6 +136,16 @@ export default function StockAdjustmentsPage() {
         adjustmentsCount: adjustments.length
       })
       loadAdjustments()
+      
+      // Listen for outlet changes
+      const handleOutletChange = () => {
+        loadAdjustments()
+      }
+      window.addEventListener("outlet-changed", handleOutletChange)
+      
+      return () => {
+        window.removeEventListener("outlet-changed", handleOutletChange)
+      }
     } else {
       console.log("useEffect - no currentBusiness, skipping load")
     }

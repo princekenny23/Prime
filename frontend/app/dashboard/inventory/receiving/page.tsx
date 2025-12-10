@@ -123,6 +123,16 @@ export default function ReceivingPage() {
   useEffect(() => {
     if (currentBusiness) {
       loadReceiving()
+      
+      // Listen for outlet changes
+      const handleOutletChange = () => {
+        loadReceiving()
+      }
+      window.addEventListener("outlet-changed", handleOutletChange)
+      
+      return () => {
+        window.removeEventListener("outlet-changed", handleOutletChange)
+      }
     }
   }, [currentBusiness?.id, loadReceiving])
 
