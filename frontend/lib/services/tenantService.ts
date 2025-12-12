@@ -114,6 +114,8 @@ export const tenantService = {
     // Transform frontend data to backend format
     const backendData: any = {
       name: data.name,
+      // Include type if provided (for business type updates)
+      ...(data.type && { type: mapFrontendTypeToBackend(data.type) }),
       currency: data.currency,
       currency_symbol: data.currencySymbol || data.currency_symbol,
       phone: data.phone || "",

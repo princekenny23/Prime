@@ -34,6 +34,7 @@ import { Badge } from "@/components/ui/badge"
 import { useBusinessStore } from "@/stores/businessStore"
 import { useAuthStore } from "@/stores/authStore"
 import { useRouter } from "next/navigation"
+import { PrimePOSLogo } from "@/components/brand/primepos-logo"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -140,8 +141,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Logo */}
           <div className="p-4 border-b">
             <div className="flex items-center justify-between">
-              <Link href="/dashboard" className="flex items-center justify-center w-12 h-12 rounded-lg bg-primary text-primary-foreground text-lg font-bold">
-                P
+              <Link href="/dashboard" className="flex items-center justify-center">
+                <PrimePOSLogo variant="icon" size="md" version={1} />
               </Link>
               <Button
                 variant="ghost"

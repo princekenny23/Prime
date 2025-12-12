@@ -51,8 +51,8 @@ class Staff(models.Model):
 
     class Meta:
         db_table = 'staff_staff'
-        verbose_name = 'Staff'
-        verbose_name_plural = 'Staff'
+        verbose_name = 'Employee'
+        verbose_name_plural = 'Employees'
         indexes = [
             models.Index(fields=['tenant']),
             models.Index(fields=['role']),

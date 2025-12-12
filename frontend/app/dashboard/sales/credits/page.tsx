@@ -195,13 +195,10 @@ export default function CreditsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Credit Sales</h1>
-                <p className="text-muted-foreground mt-1">
-                  Track credit sales and outstanding payments
-                </p>
-              </div>
-            </div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Credit Sales</h1>
+            <p className="text-muted-foreground mt-1">
+              Track credit sales and outstanding payments
+            </p>
           </div>
         </div>
 

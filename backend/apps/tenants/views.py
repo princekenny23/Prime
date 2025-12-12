@@ -26,13 +26,52 @@ class TenantViewSet(viewsets.ModelViewSet, TenantFilterMixin):
     ordering = ['-created_at']
     
     def get_permissions(self):
-        """SaaS admins can manage all tenants, regular users can create their own tenant"""
-        if self.action in ['update', 'partial_update', 'destroy']:
+        """SaaS admins can manage all tenants, regular users can create and update their own tenant"""
+        if self.action == 'destroy':
             return [IsSaaSAdmin()]
-        # Allow authenticated users to create their own tenant (for onboarding)
-        if self.action == 'create':
+        # Allow authenticated users to create and update their own tenant
+        if self.action in ['create', 'update', 'partial_update']:
             return [IsAuthenticated()]
         return [IsAuthenticated()]
+    
+    def get_queryset(self):
+        """Override to filter tenants - users can only see their own tenant"""
+        queryset = super().get_queryset()
+        # SaaS admins can see all tenants
+        if self.request.user.is_saas_admin:
+            return queryset
+        # Regular users only see their own tenant
+        if self.request.user.tenant:
+            return queryset.filter(id=self.request.user.tenant.id)
+        return queryset.none()
+    
+    def update(self, request, *args, **kwargs):
+        """Override update to ensure users can only update their own tenant"""
+        instance = self.get_object()
+        
+        # Regular users can only update their own tenant
+        if not request.user.is_saas_admin:
+            if not request.user.tenant or instance.id != request.user.tenant.id:
+                return Response(
+                    {"detail": "You can only update your own tenant."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        
+        return super().update(request, *args, **kwargs)
+    
+    def partial_update(self, request, *args, **kwargs):
+        """Override partial_update to ensure users can only update their own tenant"""
+        instance = self.get_object()
+        
+        # Regular users can only update their own tenant
+        if not request.user.is_saas_admin:
+            if not request.user.tenant or instance.id != request.user.tenant.id:
+                return Response(
+                    {"detail": "You can only update your own tenant."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        
+        return super().partial_update(request, *args, **kwargs)
     
     def create(self, request, *args, **kwargs):
         """Override create to log validation errors"""

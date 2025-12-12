@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Plus, Search, Receipt, Edit, Trash2, Eye, Filter, Download } from "lucide-react"
+import { Plus, Search, Receipt, Edit, Trash2, Filter } from "lucide-react"
 import { useState, useEffect, useCallback } from "react"
 import { useBusinessStore } from "@/stores/businessStore"
 import { useToast } from "@/components/ui/use-toast"
@@ -37,10 +37,12 @@ import { Badge } from "@/components/ui/badge"
 import { formatCurrency } from "@/lib/utils/currency"
 import Link from "next/link"
 import { format } from "date-fns"
+import { expenseService } from "@/lib/services/expenseService"
 
 interface Expense {
   id: string
   expense_number: string
+  title: string
   category: string
   vendor?: string
   description: string
@@ -48,7 +50,6 @@ interface Expense {
   payment_method: string
   payment_reference?: string
   expense_date: string
-  receipt_url?: string
   outlet_id?: string
   outlet_name?: string
   status: "pending" | "approved" | "rejected"
@@ -94,12 +95,10 @@ export default function ExpensesPage() {
 
     setIsLoading(true)
     try {
-      // TODO: Replace with actual API call
-      // const response = await expenseService.list()
-      // setExpenses(response.results || [])
-      
-      // Mock data for now
-      setExpenses([])
+      const response = await expenseService.list({
+        tenant: currentBusiness.id,
+      })
+      setExpenses(response.results || [])
     } catch (error) {
       console.error("Failed to load expenses:", error)
       setExpenses([])
@@ -122,6 +121,7 @@ export default function ExpensesPage() {
   const filteredExpenses = expenses.filter(expense => {
     const matchesSearch = 
       expense.expense_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      expense.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       expense.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       expense.vendor?.toLowerCase().includes(searchTerm.toLowerCase())
     
@@ -148,8 +148,7 @@ export default function ExpensesPage() {
     if (!expenseToDelete) return
 
     try {
-      // TODO: Replace with actual API call
-      // await expenseService.delete(expenseToDelete)
+      await expenseService.delete(expenseToDelete)
       
       toast({
         title: "Expense Deleted",
@@ -313,6 +312,7 @@ export default function ExpensesPage() {
                     <TableRow>
                       <TableHead>Expense #</TableHead>
                       <TableHead>Date</TableHead>
+                      <TableHead>Title</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead>Vendor</TableHead>
@@ -327,6 +327,7 @@ export default function ExpensesPage() {
                       <TableRow key={expense.id}>
                         <TableCell className="font-medium">{expense.expense_number}</TableCell>
                         <TableCell>{format(new Date(expense.expense_date), "MMM dd, yyyy")}</TableCell>
+                        <TableCell className="font-medium">{expense.title}</TableCell>
                         <TableCell>{expense.category}</TableCell>
                         <TableCell className="max-w-[200px] truncate">{expense.description}</TableCell>
                         <TableCell>{expense.vendor || "N/A"}</TableCell>
@@ -337,11 +338,6 @@ export default function ExpensesPage() {
                         <TableCell>{getStatusBadge(expense.status)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {expense.receipt_url && (
-                              <Button variant="ghost" size="icon" title="View Receipt">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            )}
                             <Link href={`/dashboard/office/expenses/${expense.id}/edit`}>
                               <Button variant="ghost" size="icon" title="Edit">
                                 <Edit className="h-4 w-4" />

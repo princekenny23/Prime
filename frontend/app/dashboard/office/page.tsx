@@ -36,10 +36,10 @@ const officeOptions: Omit<OptionCardProps, "iconSize">[] = [
   },
   {
     id: "staff",
-    title: "Staff",
+    title: "Employee Management",
     href: "/dashboard/office/staff",
     icon: Users,
-    description: "Manage staff members and roles"
+    description: "Manage employees and their roles"
   },
   {
     id: "shift-management",

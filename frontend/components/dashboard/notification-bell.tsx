@@ -137,15 +137,17 @@ export function NotificationBell() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          {unreadCount > 0 && (
-            <Badge
-              variant="destructive"
-              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
-            >
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </Badge>
-          )}
+          <div className="relative flex items-center justify-center">
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <>
+                {/* Blinking blue ring - outer pulsing ring */}
+                <span className="absolute inset-0 rounded-full border-2 border-blue-900 animate-ping opacity-75" />
+                {/* Blinking blue ring - solid ring */}
+                <span className="absolute inset-0 rounded-full border-2 border-blue-900 animate-blink" />
+              </>
+            )}
+          </div>
           {!isConnected && (
             <span className="absolute -bottom-1 -right-1 h-2 w-2 bg-yellow-500 rounded-full border border-white" title="WebSocket disconnected" />
           )}
@@ -183,7 +185,7 @@ export function NotificationBell() {
                     className="block"
                   >
                     <Link
-                      href={notification.link || "/dashboard/notifications"}
+                      href={notification.link || "/dashboard/settings/notifications"}
                       className="block"
                     >
                       <div
@@ -226,7 +228,7 @@ export function NotificationBell() {
             </div>
           </ScrollArea>
           <div className="border-t pt-2 mt-2">
-            <Link href="/dashboard/notifications">
+            <Link href="/dashboard/settings/notifications">
               <Button variant="ghost" className="w-full text-sm">
                 View All Notifications
               </Button>

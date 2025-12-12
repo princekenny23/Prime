@@ -22,7 +22,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { AlertCircle, Info, Plus, ArrowUpDown, Upload } from "lucide-react"
 import { useState, useEffect, useCallback } from "react"
-import { StockAdjustmentModal } from "@/components/modals/stock-adjustment-modal"
+import Link from "next/link"
 import { inventoryService } from "@/lib/services/inventoryService"
 import { useBusinessStore } from "@/stores/businessStore"
 import { useRealAPI } from "@/lib/utils/api-config"
@@ -31,7 +31,6 @@ import { useToast } from "@/components/ui/use-toast"
 export default function StockAdjustmentsPage() {
   const { toast } = useToast()
   const { currentBusiness, currentOutlet } = useBusinessStore()
-  const [showAdjustment, setShowAdjustment] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [isImporting, setIsImporting] = useState(false)
@@ -222,10 +221,12 @@ export default function StockAdjustmentsPage() {
               <Upload className="mr-2 h-4 w-4" />
               Import Adjustments
             </Button>
-            <Button onClick={() => setShowAdjustment(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Adjustment
-            </Button>
+            <Link href="/dashboard/inventory/stock-adjustments/new">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                New Adjustment
+              </Button>
+            </Link>
           </div>
         </div>
 
@@ -321,13 +322,6 @@ export default function StockAdjustmentsPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Stock Adjustment Modal */}
-      <StockAdjustmentModal
-        open={showAdjustment}
-        onOpenChange={setShowAdjustment}
-        onSuccess={loadAdjustments}
-      />
 
       {/* Import Adjustments Modal */}
       <Dialog open={showImportModal} onOpenChange={setShowImportModal}>

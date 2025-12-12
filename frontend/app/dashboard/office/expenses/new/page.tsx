@@ -17,9 +17,10 @@ import { useBusinessStore } from "@/stores/businessStore"
 import { useToast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { ArrowLeft, Upload, X } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { useTenant } from "@/contexts/tenant-context"
+import { expenseService } from "@/lib/services/expenseService"
 
 const expenseCategories = [
   "Supplies",
@@ -47,6 +48,7 @@ export default function NewExpensePage() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
+    title: "",
     category: "",
     vendor: "",
     description: "",
@@ -55,39 +57,19 @@ export default function NewExpensePage() {
     payment_reference: "",
     expense_date: new Date().toISOString().split("T")[0],
     outlet_id: "",
-    notes: "",
   })
-  const [receiptFile, setReceiptFile] = useState<File | null>(null)
-  const [receiptPreview, setReceiptPreview] = useState<string | null>(null)
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setReceiptFile(file)
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setReceiptPreview(reader.result as string)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  const removeReceipt = () => {
-    setReceiptFile(null)
-    setReceiptPreview(null)
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.category || !formData.amount || !formData.payment_method) {
+    if (!formData.title || !formData.category || !formData.amount || !formData.payment_method || !formData.description) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields.",
+        description: "Please fill in all required fields (Title, Category, Amount, Payment Method, and Description).",
         variant: "destructive",
       })
       return
@@ -95,15 +77,17 @@ export default function NewExpensePage() {
 
     setIsSubmitting(true)
     try {
-      // TODO: Replace with actual API call
-      // const formDataToSend = new FormData()
-      // Object.entries(formData).forEach(([key, value]) => {
-      //   if (value) formDataToSend.append(key, value)
-      // })
-      // if (receiptFile) {
-      //   formDataToSend.append("receipt", receiptFile)
-      // }
-      // await expenseService.create(formDataToSend)
+      await expenseService.create({
+        title: formData.title.trim(),
+        category: formData.category,
+        vendor: formData.vendor.trim() || undefined,
+        description: formData.description.trim(),
+        amount: parseFloat(formData.amount),
+        payment_method: formData.payment_method,
+        payment_reference: formData.payment_reference.trim() || undefined,
+        expense_date: formData.expense_date,
+        outlet_id: formData.outlet_id ? parseInt(formData.outlet_id) : undefined,
+      })
 
       toast({
         title: "Expense Created",
@@ -147,6 +131,16 @@ export default function NewExpensePage() {
                   <CardDescription>Enter the expense information</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="title">Expense Title *</Label>
+                    <Input
+                      id="title"
+                      placeholder="e.g., Rent, Utilities, Office Supplies"
+                      value={formData.title}
+                      onChange={(e) => handleInputChange("title", e.target.value)}
+                    />
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="category">Category *</Label>
                     <Select
@@ -232,6 +226,9 @@ export default function NewExpensePage() {
                   )}
                 </CardContent>
               </Card>
+            </div>
+
+         
 
               <Card>
                 <CardHeader>
@@ -266,72 +263,8 @@ export default function NewExpensePage() {
                       onChange={(e) => handleInputChange("payment_reference", e.target.value)}
                     />
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Right Column */}
+                       {/* Right Column */}
             <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Receipt</CardTitle>
-                  <CardDescription>Upload a receipt image (optional)</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {receiptPreview ? (
-                    <div className="relative">
-                      <img
-                        src={receiptPreview}
-                        alt="Receipt preview"
-                        className="w-full h-auto rounded-lg border"
-                      />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        className="absolute top-2 right-2"
-                        onClick={removeReceipt}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                      <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                      <Label htmlFor="receipt" className="cursor-pointer">
-                        <span className="text-sm font-medium text-primary hover:underline">
-                          Click to upload receipt
-                        </span>
-                        <input
-                          id="receipt"
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleFileChange}
-                        />
-                      </Label>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        PNG, JPG up to 10MB
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Additional Notes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Textarea
-                    placeholder="Add any additional notes..."
-                    value={formData.notes}
-                    onChange={(e) => handleInputChange("notes", e.target.value)}
-                    rows={4}
-                  />
-                </CardContent>
-              </Card>
-
               <div className="flex gap-4">
                 <Link href="/dashboard/office/expenses" className="flex-1">
                   <Button type="button" variant="outline" className="w-full">
@@ -343,6 +276,10 @@ export default function NewExpensePage() {
                 </Button>
               </div>
             </div>
+                </CardContent>
+              </Card>
+
+            
           </div>
         </form>
       </div>

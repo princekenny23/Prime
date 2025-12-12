@@ -14,7 +14,7 @@ const roleRoutes: Record<string, string[]> = {
     "/dashboard/customers",
     "/dashboard/staff",
     "/dashboard/settings",
-    "/dashboard/notifications",
+    "/dashboard/settings/notifications",
     "/dashboard/activity-log",
   ],
   cashier: [
@@ -23,7 +23,7 @@ const roleRoutes: Record<string, string[]> = {
     "/dashboard/pos",
     "/dashboard/customers",
     "/dashboard/reports",
-    "/dashboard/notifications",
+    "/dashboard/settings/notifications",
   ],
   staff: [
     "/dashboard",
@@ -31,7 +31,7 @@ const roleRoutes: Record<string, string[]> = {
     "/dashboard/pos",
     "/dashboard/inventory/products",
     "/dashboard/inventory",
-    "/dashboard/notifications",
+    "/dashboard/settings/notifications",
   ],
   manager: [
     "/dashboard",
@@ -42,7 +42,7 @@ const roleRoutes: Record<string, string[]> = {
     "/dashboard/office/outlets",
     "/dashboard/reports",
     "/dashboard/customers",
-    "/dashboard/notifications",
+    "/dashboard/settings/notifications",
     "/dashboard/activity-log",
   ],
 }

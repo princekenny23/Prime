@@ -149,13 +149,10 @@ export default function ReturnsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Returns</h1>
-                <p className="text-muted-foreground mt-1">
-                  View and manage product returns and refunds
-                </p>
-              </div>
-            </div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Returns</h1>
+            <p className="text-muted-foreground mt-1">
+              View and manage product returns and refunds
+            </p>
           </div>
         </div>
 
