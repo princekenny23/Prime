@@ -71,7 +71,7 @@ export default function PurchaseOrdersPage() {
             <h1 className="text-3xl font-bold">Purchase Orders</h1>
             <p className="text-muted-foreground">Create and manage purchase orders from suppliers</p>
           </div>
-          <Link href="/dashboard/office/suppliers/purchase-orders/new">
+          <Link href="/dashboard/inventory/suppliers/purchase-orders/new">
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               New Purchase Order
@@ -145,7 +145,7 @@ export default function PurchaseOrdersPage() {
                       <TableCell>${po.total?.toFixed(2) || "0.00"}</TableCell>
                       <TableCell>{getStatusBadge(po.status)}</TableCell>
                       <TableCell>
-                        <Link href={`/dashboard/office/suppliers/purchase-orders/${po.id}`}>
+                        <Link href={`/dashboard/inventory/suppliers/purchase-orders/${po.id}`}>
                           <Button variant="ghost" size="sm">View</Button>
                         </Link>
                       </TableCell>

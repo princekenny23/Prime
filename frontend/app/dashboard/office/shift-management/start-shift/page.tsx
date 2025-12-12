@@ -5,7 +5,6 @@ import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { StartShiftForm } from "@/components/pos/start-shift-form"
 import { useToast } from "@/components/ui/use-toast"
-import Link from "next/link"
 import { CheckCircle2, Store, Calendar, CreditCard, DollarSign, Info } from "lucide-react"
 import { PageRefreshButton } from "@/components/dashboard/page-refresh-button"
 
@@ -26,18 +25,11 @@ export default function StartShiftPage() {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard/office/shift-management">
-              <button className="text-muted-foreground hover:text-foreground">
-                ← Back
-              </button>
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold">Start Shift</h1>
-              <p className="text-muted-foreground mt-1">
-                Start a new shift for any outlet and till in your business
-              </p>
-            </div>
+          <div>
+            <h1 className="text-3xl font-bold">Start Shift</h1>
+            <p className="text-muted-foreground mt-1">
+              Start a new shift for any outlet and till in your business
+            </p>
           </div>
           <PageRefreshButton />
         </div>

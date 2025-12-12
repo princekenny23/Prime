@@ -1,28 +1,60 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { usePOSStore } from "@/stores/posStore"
 import { useBusinessStore } from "@/stores/businessStore"
-import { productService, categoryService } from "@/lib/services/productService"
+import { productService, categoryService, variationService } from "@/lib/services/productService"
 import { formatCurrency } from "@/lib/utils/currency"
-import { Search, ShoppingCart, Percent, Save, Trash2, Plus, Minus, X, Lock } from "lucide-react"
 import { DiscountModal } from "@/components/modals/discount-modal"
 import { CloseRegisterModal } from "@/components/modals/close-register-modal"
 import { ReceiptPreviewModal } from "@/components/modals/receipt-preview-modal"
+import { CustomerSelectModal } from "@/components/modals/customer-select-modal"
+import { SelectUnitModal } from "@/components/modals/select-unit-modal"
+import { SelectVariationModal } from "@/components/modals/select-variation-modal"
 import { useShift } from "@/contexts/shift-context"
-import { cn } from "@/lib/utils"
+import { saleService } from "@/lib/services/saleService"
+import { useToast } from "@/components/ui/use-toast"
+import type { Customer } from "@/lib/services/customerService"
+import type { Product } from "@/lib/types"
+
+type SaleType = "retail" | "wholesale"
+
+interface ProductUnit {
+  id: string | number
+  unit_name: string
+  conversion_factor: number | string
+  retail_price: number | string
+  wholesale_price?: number | string
+  is_active?: boolean
+  stock_in_unit?: number
+}
 
 export function RetailPOS() {
   const { currentBusiness, currentOutlet } = useBusinessStore()
   const { cart, addToCart, updateCartItem, removeFromCart, clearCart, holdSale } = usePOSStore()
   const { activeShift } = useShift()
+  const { toast } = useToast()
+  const [saleType, setSaleType] = useState<SaleType>("retail")
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
+  const [showCustomerSelect, setShowCustomerSelect] = useState(false)
+  const [showSaleTypeConfirm, setShowSaleTypeConfirm] = useState(false)
+  const [pendingSaleType, setPendingSaleType] = useState<SaleType | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
-  const [showPayment, setShowPayment] = useState(false)
   const [showDiscount, setShowDiscount] = useState(false)
   const [showCloseRegister, setShowCloseRegister] = useState(false)
   const [showReceipt, setShowReceipt] = useState(false)
@@ -31,6 +63,50 @@ export function RetailPOS() {
   const [categories, setCategories] = useState<string[]>([])
   const [isLoadingProducts, setIsLoadingProducts] = useState(true)
   const [productsError, setProductsError] = useState<string | null>(null)
+  const [showUnitSelector, setShowUnitSelector] = useState(false)
+  const [selectedProductForUnit, setSelectedProductForUnit] = useState<any>(null)
+  const [showVariationModal, setShowVariationModal] = useState(false)
+  const [selectedProductForVariation, setSelectedProductForVariation] = useState<any>(null)
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false)
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
+  
+  // Focus search on mount and after actions
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  // Debounce search term for performance with bulk data
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  // Filter search results for dropdown (limit to 10 for performance)
+  useEffect(() => {
+    if (!debouncedSearchTerm || debouncedSearchTerm.length < 2) {
+      setSearchResults([])
+      setShowSearchDropdown(false)
+      return
+    }
+
+    const term = debouncedSearchTerm.toLowerCase()
+    const results = products
+      .filter((product: any) => {
+        const matchesSearch = product.name?.toLowerCase().includes(term) ||
+                             product.sku?.toLowerCase().includes(term) ||
+                             product.barcode?.toLowerCase().includes(term)
+        const matchesCategory = selectedCategory === "all" || 
+                               product.categoryId === selectedCategory ||
+                               (product.category && (product.category.id === selectedCategory || product.category.name === selectedCategory))
+        return matchesSearch && matchesCategory && product.isActive
+      })
+      .slice(0, 10) // Limit to 10 results for performance
+
+    setSearchResults(results)
+    setShowSearchDropdown(results.length > 0)
+  }, [debouncedSearchTerm, products, selectedCategory])
 
   useEffect(() => {
     const loadData = async () => {
@@ -43,7 +119,6 @@ export function RetailPOS() {
       setProductsError(null)
       
       try {
-        // Use real API
         const [productsData, categoriesData] = await Promise.all([
           productService.list({ is_active: true }),
           categoryService.list(),
@@ -63,25 +138,118 @@ export function RetailPOS() {
     loadData()
   }, [currentBusiness])
 
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.sku?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredProducts = products.filter((product: any) => {
+    const matchesSearch = product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         product.barcode?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesCategory = selectedCategory === "all" || 
-                           product.categoryId === selectedCategory
+                           product.categoryId === selectedCategory ||
+                           (product.category && (product.category.id === selectedCategory || product.category.name === selectedCategory))
     return matchesSearch && matchesCategory && product.isActive
   })
 
   const cartTotal = cart.reduce((sum, item) => sum + item.total, 0)
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0)
 
-  const handleAddToCart = (product: typeof products[0]) => {
+  // Get price based on sale type
+  const getProductPrice = (product: any): number => {
+    if (saleType === "wholesale") {
+      return product.wholesale_price || product.wholesalePrice || product.price || 0
+    }
+    return product.price || 0
+  }
+
+  const handleAddToCart = async (product: any) => {
+    // Check if product has variations
+    try {
+      const variations = await variationService.list({ product: product.id, is_active: true })
+      
+      if (variations.length > 0) {
+        setSelectedProductForVariation(product)
+        setShowVariationModal(true)
+        return
+      }
+    } catch (error) {
+      console.error("Failed to check variations:", error)
+    }
+
+    // Check if product has selling units
+    const sellingUnits = (product as any).selling_units || []
+    const activeUnits = sellingUnits.filter((u: any) => u.is_active !== false)
+    
+    if (activeUnits.length > 0) {
+      // Show unit selector popup
+      setSelectedProductForUnit(product)
+      setShowUnitSelector(true)
+      return
+    }
+
+    // No variations or units - add directly to cart
+    const price = getProductPrice(product)
     addToCart({
       id: `cart_${Date.now()}_${Math.random()}`,
       productId: product.id,
       name: product.name,
-      price: product.price,
+      price: price,
       quantity: 1,
+      saleType: saleType,
     })
+  }
+
+  const handleUnitSelected = (unit: ProductUnit | null) => {
+    if (!selectedProductForUnit) return
+
+    // If unit is null, use base unit
+    if (!unit) {
+      const price = getProductPrice(selectedProductForUnit)
+      addToCart({
+        id: `cart_${Date.now()}_${Math.random()}`,
+        productId: selectedProductForUnit.id,
+        name: selectedProductForUnit.name,
+        price: price,
+        quantity: 1,
+        saleType: saleType,
+      })
+      setSelectedProductForUnit(null)
+      setShowUnitSelector(false)
+      return
+    }
+
+    // Use selected unit
+    const price = saleType === "wholesale" && unit.wholesale_price
+      ? parseFloat(String(unit.wholesale_price))
+      : parseFloat(String(unit.retail_price))
+
+    const displayName = `${selectedProductForUnit.name} (${unit.unit_name})`
+
+    addToCart({
+      id: `cart_${Date.now()}_${Math.random()}`,
+      productId: selectedProductForUnit.id,
+      name: displayName,
+      price: price,
+      quantity: 1,
+      saleType: saleType,
+    })
+
+    setSelectedProductForUnit(null)
+    setShowUnitSelector(false)
+  }
+
+  const handleVariationSelected = (variation: any) => {
+    if (!selectedProductForVariation) return
+
+    const price = variation.price || getProductPrice(selectedProductForVariation)
+    addToCart({
+      id: `cart_${Date.now()}_${Math.random()}`,
+      productId: selectedProductForVariation.id,
+      name: `${selectedProductForVariation.name} - ${variation.name}`,
+      price: price,
+      quantity: 1,
+      saleType: saleType,
+    })
+
+    setSelectedProductForVariation(null)
+    setShowVariationModal(false)
   }
 
   const handleQuantityChange = (itemId: string, change: number) => {
@@ -94,8 +262,150 @@ export function RetailPOS() {
 
   const handleHoldSale = () => {
     const holdId = holdSale()
-    // Show success message (you can add toast notification here)
     alert(`Sale held with ID: ${holdId}`)
+  }
+
+  const handleSaleTypeChange = (newType: SaleType) => {
+    if (cart.length > 0 && saleType !== newType) {
+      setPendingSaleType(newType)
+      setShowSaleTypeConfirm(true)
+    } else {
+      setSaleType(newType)
+    }
+  }
+
+  const handleConfirmSaleTypeChange = () => {
+    if (pendingSaleType) {
+      clearCart()
+      setSelectedCustomer(null)
+      setSaleType(pendingSaleType)
+      setPendingSaleType(null)
+      setShowSaleTypeConfirm(false)
+    }
+  }
+
+  const handleCancelSaleTypeChange = () => {
+    setPendingSaleType(null)
+    setShowSaleTypeConfirm(false)
+  }
+
+  const handleCheckout = async () => {
+    // Validation
+    if (cart.length === 0) {
+      toast({
+        title: "Cart is empty",
+        description: "Please add items to cart before processing payment.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!currentOutlet) {
+      toast({
+        title: "Outlet not selected",
+        description: "Please select an outlet before processing payment.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!activeShift) {
+      toast({
+        title: "No active shift",
+        description: "Please start a shift before processing payments.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsProcessingPayment(true)
+
+    try {
+      // Calculate totals - round to 2 decimal places to avoid floating point precision issues
+      const subtotal = Math.round(cart.reduce((sum, item) => sum + item.total, 0) * 100) / 100
+      const discount = 0 // TODO: Calculate from item discounts
+      const tax = 0 // TODO: Calculate tax if needed
+      const total = Math.round((subtotal - discount + tax) * 100) / 100
+
+      // Transform cart items to backend format
+      const items_data = cart.map((item) => {
+        // Extract variation_id and unit_id from item if stored
+        // For now, we'll use product_id only (backend will handle variations if needed)
+        return {
+          product_id: item.productId,
+          variation_id: (item as any).variationId || undefined,
+          unit_id: (item as any).unitId || undefined,
+          quantity: item.quantity,
+          price: Math.round(item.price * 100) / 100, // Round price to 2 decimal places
+          notes: item.notes || "",
+        }
+      })
+
+      // Create sale data - ensure all decimal values are rounded to 2 decimal places
+      const saleData = {
+        outlet: currentOutlet.id,
+        shift: activeShift.id,
+        customer: selectedCustomer?.id || undefined,
+        items_data: items_data,
+        subtotal: Math.round(subtotal * 100) / 100,
+        tax: Math.round(tax * 100) / 100,
+        discount: Math.round(discount * 100) / 100,
+        total: Math.round(total * 100) / 100,
+        payment_method: "cash" as const,
+        notes: "",
+      }
+
+      // Call backend API
+      const sale = await saleService.create(saleData)
+
+      // Show success message
+      toast({
+        title: "Sale completed successfully",
+        description: `Receipt #${sale._raw?.receipt_number || sale.id}`,
+      })
+
+      // Dispatch event to notify other components (e.g., sales history page)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sale-completed', { 
+          detail: { saleId: sale.id, receiptNumber: sale._raw?.receipt_number || sale.id }
+        }))
+      }
+
+      // Prepare receipt data for modal
+      const receiptCartItems = cart.map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        discount: 0, // TODO: Calculate from item discounts if implemented
+        total: item.total,
+      }))
+
+      setReceiptData({
+        cart: receiptCartItems,
+        subtotal: subtotal,
+        discount: discount,
+        tax: tax,
+        total: total,
+        sale: sale,
+      })
+
+      // Clear cart
+      clearCart()
+      setSelectedCustomer(null)
+
+      // Show receipt modal
+      setShowReceipt(true)
+    } catch (error: any) {
+      console.error("Checkout error:", error)
+      toast({
+        title: "Payment failed",
+        description: error.message || "An error occurred while processing the payment. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsProcessingPayment(false)
+    }
   }
 
   if (!currentBusiness) {
@@ -107,186 +417,305 @@ export function RetailPOS() {
   }
 
   return (
-    <div className="flex flex-col bg-background min-h-[calc(100vh-8rem)]">
-      {/* Header */}
-      <div className="border-b bg-card px-6 py-4">
-        <div className="flex items-center justify-between">
+    <div className="flex flex-col bg-background h-screen">
+      {/* Compact Header */}
+      <div className="border-b bg-card px-4 py-2 flex items-center justify-between">
+        <div className="flex items-center gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Wholesale and Retail POS</h1>
-            <p className="text-sm text-muted-foreground">{currentBusiness.name}</p>
+            <div className="text-lg font-bold">POS Terminal</div>
+            <div className="text-xs text-muted-foreground">{currentBusiness.name}</div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleHoldSale}>
-              <Save className="h-4 w-4 mr-2" />
-              Hold Sale
+          <Tabs value={saleType} onValueChange={(value) => handleSaleTypeChange(value as SaleType)}>
+            <TabsList>
+              <TabsTrigger value="retail">Retail</TabsTrigger>
+              <TabsTrigger value="wholesale">Wholesale</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleHoldSale}>
+            Hold
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowDiscount(true)}>
+            Discount
+          </Button>
+          {cart.length > 0 && (
+            <Button variant="outline" size="sm" onClick={clearCart}>
+              Clear
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowDiscount(true)}>
-              <Percent className="h-4 w-4 mr-2" />
-              Discount
+          )}
+          {activeShift && (
+            <Button variant="outline" size="sm" onClick={() => setShowCloseRegister(true)}>
+              Close
             </Button>
-            {cart.length > 0 && (
-              <Button variant="outline" size="sm" onClick={clearCart}>
-                <Trash2 className="h-4 w-4 mr-2" />
-                Clear
-              </Button>
-            )}
-            {activeShift && (
-              <Button variant="outline" size="sm" onClick={() => setShowCloseRegister(true)}>
-                <Lock className="h-4 w-4 mr-2" />
-                Close Register
-              </Button>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Main Content - Products */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Search and Filters */}
-          <div className="p-4 border-b space-y-4">
+        {/* Products Panel - Clean List View */}
+        <div className="flex-1 flex flex-col overflow-hidden bg-background">
+          {/* Search Bar with Dropdown */}
+          <div className="p-3 border-b bg-card">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search products..."
-                className="pl-10"
+                ref={searchInputRef}
+                placeholder="Search by name, SKU, or barcode..."
+                className="w-full"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value)
+                  if (e.target.value.length >= 2) {
+                    setShowSearchDropdown(true)
+                  } else {
+                    setShowSearchDropdown(false)
+                  }
+                }}
+                onFocus={() => {
+                  if (searchResults.length > 0) {
+                    setShowSearchDropdown(true)
+                  }
+                }}
+                onBlur={() => {
+                  // Delay to allow click on dropdown items
+                  setTimeout(() => setShowSearchDropdown(false), 200)
+                }}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && searchResults.length > 0) {
+                    handleAddToCart(searchResults[0])
+                    setSearchTerm("")
+                    setShowSearchDropdown(false)
+                  } else if (e.key === "Escape") {
+                    setShowSearchDropdown(false)
+                  }
+                }}
               />
-            </div>
-            
-            {/* Category Filters */}
-            {categories.length > 0 && (
-              <div className="flex gap-2 flex-wrap">
-                {categories.map((category) => (
-                  <Button
-                    key={category}
-                    variant={selectedCategory === category ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedCategory(category)}
-                  >
-                    {category}
-                  </Button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Product Grid */}
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {filteredProducts.map((product) => (
-                <Card
-                  key={product.id}
-                  className="cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => handleAddToCart(product)}
-                >
-                  <CardContent className="p-4">
-                    <div className="space-y-2">
-                      <div className="aspect-square bg-muted rounded-lg flex items-center justify-center mb-2">
-                        <ShoppingCart className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                      <h3 className="font-medium text-sm">{product.name}</h3>
-                      <p className="text-xs text-muted-foreground">{product.sku}</p>
-                      <p className="font-bold text-primary">
-                        {formatCurrency(product.price, currentBusiness)}
-                      </p>
-                      {product.stock !== undefined && (
-                        <Badge variant={product.stock > 10 ? "default" : "destructive"} className="text-xs">
-                          Stock: {product.stock}
-                        </Badge>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Cart Sidebar */}
-        <div className="w-96 border-l bg-card flex flex-col">
-          <div className="p-4 border-b">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Cart ({cartItemCount})</h2>
-              {cart.length > 0 && (
-                <Button variant="ghost" size="sm" onClick={clearCart}>
-                  <X className="h-4 w-4" />
-                </Button>
+              
+              {/* Search Results Dropdown */}
+              {showSearchDropdown && searchResults.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-[400px] overflow-y-auto">
+                  {searchResults.map((product: any) => {
+                    const price = getProductPrice(product)
+                    const sellingUnits = product.selling_units || []
+                    const activeUnits = sellingUnits.filter((u: any) => u.is_active !== false)
+                    const hasUnits = activeUnits.length > 0
+                    
+                    return (
+                      <button
+                        key={product.id}
+                        className="w-full px-4 py-3 text-left hover:bg-accent border-b last:border-b-0 transition-colors"
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          handleAddToCart(product)
+                          setSearchTerm("")
+                          setShowSearchDropdown(false)
+                          setTimeout(() => {
+                            searchInputRef.current?.focus()
+                          }, 100)
+                        }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm truncate">{product.name}</div>
+                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                              {product.sku && <span>SKU: {product.sku}</span>}
+                              {product.barcode && <span>Barcode: {product.barcode}</span>}
+                              {product.stock !== undefined && (
+                                <span className={product.stock <= 10 ? "text-destructive font-medium" : ""}>
+                                  Stock: {product.stock}
+                                </span>
+                              )}
+                              {hasUnits && <span className="text-primary font-medium">Multi-unit</span>}
+                            </div>
+                          </div>
+                          <div className="ml-4 text-right">
+                            <div className="font-bold text-sm">{formatCurrency(price, currentBusiness)}</div>
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
               )}
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          {/* Category Filter - Compact */}
+          {categories.length > 1 && (
+            <div className="px-3 py-2 border-b bg-muted/30 flex gap-1 flex-wrap">
+              {categories.slice(0, 8).map((category) => (
+                <Button
+                  key={category}
+                  variant={selectedCategory === category ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setSelectedCategory(category)}
+                >
+                  {category}
+                </Button>
+              ))}
+            </div>
+          )}
+
+          {/* Products Grid - Text Only Cards */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {isLoadingProducts ? (
+              <div className="p-8 text-center text-muted-foreground">Loading products...</div>
+            ) : productsError ? (
+              <div className="p-8 text-center text-destructive">{productsError}</div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">No products found</div>
+            ) : (
+              <div className="grid grid-cols-4 gap-3">
+                {filteredProducts.map((product: any) => {
+                  const price = getProductPrice(product)
+                  const sellingUnits = product.selling_units || []
+                  const activeUnits = sellingUnits.filter((u: any) => u.is_active !== false)
+                  const hasUnits = activeUnits.length > 0
+                  
+                  return (
+                    <button
+                      key={product.id}
+                      className="bg-blue-50 hover:bg-blue-100 active:bg-blue-200 border border-blue-200 rounded-lg p-4 text-center transition-all duration-150 shadow-sm hover:shadow-md min-h-[120px] flex flex-col justify-center items-center"
+                      onClick={() => handleAddToCart(product)}
+                    >
+                      <div className="font-medium text-sm text-gray-900 mb-2 line-clamp-2">
+                        {product.name}
+                      </div>
+                      <div className="font-bold text-base text-gray-900">
+                        {formatCurrency(price, currentBusiness)}
+                      </div>
+                      {product.stock !== undefined && product.stock <= 10 && (
+                        <div className="text-xs text-red-600 mt-1 font-medium">
+                          Low Stock
+                        </div>
+                      )}
+                      {hasUnits && (
+                        <div className="text-xs text-blue-600 mt-1 font-medium">
+                          Select Unit
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Cart Panel - Compact */}
+        <div className="w-80 border-l bg-card flex flex-col">
+          {/* Cart Header */}
+          <div className="p-3 border-b">
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-semibold">Cart ({cartItemCount})</div>
+              {cart.length > 0 && (
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={clearCart}>
+                  Clear
+                </Button>
+              )}
+            </div>
+            
+            {/* Customer Selection */}
+            {selectedCustomer ? (
+              <div className="flex items-center justify-between p-2 bg-muted rounded text-xs">
+                <span className="truncate">{selectedCustomer.name}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 px-2 text-xs"
+                  onClick={() => setSelectedCustomer(null)}
+                >
+                  Remove
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-7 text-xs"
+                onClick={() => setShowCustomerSelect(true)}
+              >
+                Add Customer
+              </Button>
+            )}
+          </div>
+
+          {/* Cart Items */}
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {cart.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <ShoppingCart className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>Cart is empty</p>
+              <div className="text-center py-12 text-muted-foreground text-sm">
+                Cart is empty
               </div>
             ) : (
               cart.map((item) => (
-                <Card key={item.id}>
-                  <CardContent className="p-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatCurrency(item.price, currentBusiness)} each
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          onClick={() => handleQuantityChange(item.id, -1)}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          onClick={() => handleQuantityChange(item.id, 1)}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
+                <div key={item.id} className="p-2 border rounded bg-background">
+                  <div className="flex items-start justify-between mb-1">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{item.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatCurrency(item.price, currentBusiness)} each
                       </div>
                     </div>
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t">
+                    <div className="ml-2 text-right">
+                      <div className="text-sm font-bold">{formatCurrency(item.total, currentBusiness)}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center gap-2">
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        onClick={() => removeFromCart(item.id)}
+                        className="h-6 w-6 p-0 text-xs"
+                        onClick={() => handleQuantityChange(item.id, -1)}
                       >
-                        <Trash2 className="h-3 w-3" />
+                        -
                       </Button>
-                      <p className="font-bold">
-                        {formatCurrency(item.total, currentBusiness)}
-                      </p>
+                      <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-xs"
+                        onClick={() => handleQuantityChange(item.id, 1)}
+                      >
+                        +
+                      </Button>
                     </div>
-                  </CardContent>
-                </Card>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs text-destructive"
+                      onClick={() => removeFromCart(item.id)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </div>
               ))
             )}
           </div>
 
-          {/* Payment Section */}
+          {/* Payment Footer */}
           {cart.length > 0 && (
-            <div className="border-t p-4 space-y-3">
-              <div className="flex items-center justify-between text-lg font-bold">
-                <span>Total:</span>
-                <span>{formatCurrency(cartTotal, currentBusiness)}</span>
+            <div className="border-t p-3 bg-muted/30">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-lg font-bold">Total:</span>
+                <span className="text-lg font-bold">{formatCurrency(cartTotal, currentBusiness)}</span>
               </div>
               <Button
                 className="w-full"
                 size="lg"
-                disabled
-                title="Payment system will be implemented"
+                onClick={handleCheckout}
+                disabled={isProcessingPayment || cart.length === 0}
               >
-                <ShoppingCart className="mr-2 h-5 w-5" />
-                Process Payment (Coming Soon)
+                {isProcessingPayment ? (
+                  <>
+                    <span className="mr-2">Processing...</span>
+                  </>
+                ) : (
+                  `Process ${saleType === "wholesale" ? "Wholesale" : "Retail"} Payment`
+                )}
               </Button>
             </div>
           )}
@@ -294,7 +723,6 @@ export function RetailPOS() {
       </div>
 
       {/* Modals */}
-      {/* PaymentModal removed - new payment system will be implemented */}
       <DiscountModal
         open={showDiscount}
         onOpenChange={setShowDiscount}
@@ -305,6 +733,67 @@ export function RetailPOS() {
         open={showCloseRegister}
         onOpenChange={setShowCloseRegister}
       />
+      <CustomerSelectModal
+        open={showCustomerSelect}
+        onOpenChange={setShowCustomerSelect}
+        onSelect={setSelectedCustomer}
+        selectedCustomer={selectedCustomer || undefined}
+      />
+      
+      {/* Unit Selection Modal - Shows popup when product has multiple units */}
+      {selectedProductForUnit && (
+        <SelectUnitModal
+          open={showUnitSelector}
+          onOpenChange={(open) => {
+            setShowUnitSelector(open)
+            if (!open) {
+              setSelectedProductForUnit(null)
+            }
+          }}
+          product={selectedProductForUnit}
+          saleType={saleType}
+          onSelect={handleUnitSelected}
+        />
+      )}
+
+      {/* Variation Selection Modal */}
+      {selectedProductForVariation && (
+        <SelectVariationModal
+          open={showVariationModal}
+          onOpenChange={(open) => {
+            setShowVariationModal(open)
+            if (!open) {
+              setSelectedProductForVariation(null)
+            }
+          }}
+          productId={selectedProductForVariation.id}
+          productName={selectedProductForVariation.name}
+          onSelect={handleVariationSelected}
+          saleType={saleType}
+        />
+      )}
+      
+      {/* Sale Type Change Confirmation */}
+      <AlertDialog open={showSaleTypeConfirm} onOpenChange={setShowSaleTypeConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear Cart?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Switching to <strong>{pendingSaleType}</strong> will clear your current cart. 
+              All items in the cart will be removed. Do you want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelSaleTypeChange}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSaleTypeChange}>
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
       {receiptData && (
         <ReceiptPreviewModal
           open={showReceipt}
@@ -327,4 +816,3 @@ export function RetailPOS() {
     </div>
   )
 }
-

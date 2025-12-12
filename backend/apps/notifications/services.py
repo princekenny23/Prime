@@ -95,6 +95,7 @@ class NotificationService:
                 'receipt_number': sale.receipt_number,
                 'total': str(sale.total),
                 'outlet': sale.outlet.name if sale.outlet else None,
+                'outlet_id': sale.outlet.id if sale.outlet else None,
             }
         )
         NotificationService._send_websocket_notification(notification)
@@ -124,6 +125,7 @@ class NotificationService:
                 'current_stock': current_stock,
                 'threshold': threshold,
                 'outlet': outlet.name if outlet else None,
+                'outlet_id': outlet.id if outlet else None,
             }
         )
         NotificationService._send_websocket_notification(notification)
@@ -143,6 +145,7 @@ class NotificationService:
             metadata={
                 'shift_id': shift.id,
                 'outlet': shift.outlet.name,
+                'outlet_id': shift.outlet.id,
                 'user': shift.user.email,
                 'opening_cash': str(shift.opening_cash_balance),
             }
@@ -170,6 +173,7 @@ class NotificationService:
             metadata={
                 'shift_id': shift.id,
                 'outlet': shift.outlet.name,
+                'outlet_id': shift.outlet.id,
                 'user': shift.user.email,
                 'closing_cash': str(shift.closing_cash_balance) if hasattr(shift, 'closing_cash_balance') else None,
                 'difference': str(difference) if difference is not None else None,

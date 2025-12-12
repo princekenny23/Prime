@@ -1,6 +1,5 @@
 product_name,category,variation_name,price,cost,wholesale_price,minimum_wholesale_quantity,variation_sku,track_inventory,unit,low_stock_threshold,outlet,quantity,is_active
-Soap Bar,Personal Care,Single,5.00,2.50,4.00,12,SOAP-SINGLE,Yes,pcs,50,Warehouse,500,Yes
-Soap Bar,Personal Care,Pack of 12,48.00,30.00,40.00,1,SOAP-PACK12,Yes,pack,10,Warehouse,100,Yes
-Soap Bar,Personal Care,Case of 144,480.00,360.00,400.00,1,SOAP-CASE144,Yes,case,5,Warehouse,50,Yes
-Rice 5kg,Groceries,,45.00,30.00,38.00,10,RICE-5KG,Yes,bag,20,Warehouse,200,Yes
-
+Soap Bar,Personal Care,Single,5,2.5,4,12,SOAP-SINGLE,Yes,pcs,50,,500,Yes
+Soap Bar,Personal Care,Pack of 12,48,30,40,1,SOAP-PACK12,Yes,pack,10,,100,Yes
+Soap Bar,Personal Care,Case of 144,480,360,400,1,SOAP-CASE144,Yes,case,5,,50,Yes
+Rice 5kg,Groceries,,45,30,38,10,RICE-5KG,Yes,bag,20,,200,Yes

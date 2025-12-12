@@ -135,14 +135,28 @@ export default function DashboardPage() {
     if (currentBusiness) {
       loadDashboardData()
       
+      // Auto-refresh dashboard data every 30 seconds for real-time updates
+      const interval = setInterval(() => {
+        loadDashboardData()
+      }, 30000)
+      
       // Listen for outlet changes
       const handleOutletChange = () => {
         loadDashboardData()
       }
+      
+      // Listen for sale completion events to refresh dashboard
+      const handleSaleCompleted = () => {
+        loadDashboardData()
+      }
+      
       window.addEventListener("outlet-changed", handleOutletChange)
+      window.addEventListener("sale-completed", handleSaleCompleted)
       
       return () => {
+        clearInterval(interval)
         window.removeEventListener("outlet-changed", handleOutletChange)
+        window.removeEventListener("sale-completed", handleSaleCompleted)
       }
     }
   }, [currentBusiness, currentOutlet, tenantOutlet])
@@ -174,7 +188,17 @@ export default function DashboardPage() {
         loadRecentSales()
       }, 30000)
       
-      return () => clearInterval(interval)
+      // Listen for sale completion events to refresh recent sales immediately
+      const handleSaleCompleted = () => {
+        loadRecentSales()
+      }
+      
+      window.addEventListener("sale-completed", handleSaleCompleted)
+      
+      return () => {
+        clearInterval(interval)
+        window.removeEventListener("sale-completed", handleSaleCompleted)
+      }
     }
   }, [currentBusiness, currentOutlet, tenantOutlet])
 

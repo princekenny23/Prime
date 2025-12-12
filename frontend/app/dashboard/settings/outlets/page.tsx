@@ -1,7 +1,6 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
-import Link from "next/link"
 import { OutletList } from "@/components/outlets/outlet-list"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -26,18 +25,11 @@ export default function OutletsSettingsPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard/settings">
-              <button className="text-muted-foreground hover:text-foreground">
-                ← Back
-              </button>
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold">Outlet Settings</h1>
-              <p className="text-muted-foreground mt-1">
-                Manage your business outlets and branches
-              </p>
-            </div>
+          <div>
+            <h1 className="text-3xl font-bold">Outlet Settings</h1>
+            <p className="text-muted-foreground mt-1">
+              Manage your business outlets and branches
+            </p>
           </div>
           <Button onClick={() => setIsModalOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />

@@ -155,11 +155,19 @@ export default function RetailDashboardPage() {
       const handleOutletChange = () => {
         loadDashboardData()
       }
+      
+      // Listen for sale completion events to refresh dashboard
+      const handleSaleCompleted = () => {
+        loadDashboardData()
+      }
+      
       window.addEventListener("outlet-changed", handleOutletChange)
+      window.addEventListener("sale-completed", handleSaleCompleted)
       
       return () => {
         clearInterval(interval)
         window.removeEventListener("outlet-changed", handleOutletChange)
+        window.removeEventListener("sale-completed", handleSaleCompleted)
       }
     }
   }, [currentBusiness, currentOutlet])
@@ -189,7 +197,17 @@ export default function RetailDashboardPage() {
         loadRecentSales()
       }, 30000)
       
-      return () => clearInterval(interval)
+      // Listen for sale completion events to refresh recent sales immediately
+      const handleSaleCompleted = () => {
+        loadRecentSales()
+      }
+      
+      window.addEventListener("sale-completed", handleSaleCompleted)
+      
+      return () => {
+        clearInterval(interval)
+        window.removeEventListener("sale-completed", handleSaleCompleted)
+      }
     }
   }, [currentBusiness, currentOutlet])
 

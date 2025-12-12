@@ -197,7 +197,7 @@ export default function ProductsItemsPage() {
             <p className="text-muted-foreground">Manage your product catalog</p>
           </div>
           <div className="flex gap-2">
-            <Link href="/dashboard/products/categories">
+            <Link href="/dashboard/inventory/products/categories">
               <Button variant="outline">
                 <Folder className="mr-2 h-4 w-4" />
                 Categories
@@ -301,7 +301,7 @@ export default function ProductsItemsPage() {
                       <TableRow key={product.id}>
                         <TableCell>
                           <Link 
-                            href={`/dashboard/products/${product.id}`}
+                            href={`/dashboard/inventory/products/${product.id}`}
                             className="font-medium hover:text-primary"
                           >
                             {product.name}

@@ -17,7 +17,10 @@ from apps.tenants.permissions import TenantFilterMixin
 
 class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
     """Sale ViewSet with atomic transactions"""
-    queryset = Sale.objects.select_related('tenant', 'outlet', 'user', 'shift', 'customer').prefetch_related('items')
+    queryset = Sale.objects.select_related('tenant', 'outlet', 'user', 'shift', 'customer').prefetch_related(
+        'items',
+        'items__product'  # Prefetch product data for sale items to avoid N+1 queries
+    )
     serializer_class = SaleSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -45,8 +48,11 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         user_tenant = getattr(user, 'tenant', None)
         tenant = request_tenant or user_tenant
         
-        # Get base queryset
-        queryset = Sale.objects.select_related('tenant', 'outlet', 'user', 'shift', 'customer').prefetch_related('items').all()
+        # Get base queryset with optimized prefetching to avoid N+1 queries
+        queryset = Sale.objects.select_related('tenant', 'outlet', 'user', 'shift', 'customer').prefetch_related(
+            'items',
+            'items__product'  # Prefetch product data for sale items
+        ).all()
         
         # Apply tenant filter - CRITICAL for security
         if not is_saas_admin:
@@ -200,7 +206,7 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                 raise serializers.ValidationError(f"Item {idx + 1}: product_id is required")
             
             try:
-                price = Decimal(price_str)
+                price = Decimal(price_str).quantize(Decimal('0.01'))
             except (InvalidOperation, ValueError):
                 raise serializers.ValidationError(f"Item {idx + 1}: Invalid price format")
             
@@ -276,8 +282,8 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                 product.stock -= quantity_in_base_units
                 product.save()
             
-            # Calculate item total
-            item_total = price * Decimal(quantity)
+            # Calculate item total - round to 2 decimal places
+            item_total = (price * Decimal(quantity)).quantize(Decimal('0.01'))
             total_subtotal += item_total
             
             # Extract item notes and kitchen_status if provided
@@ -313,14 +319,25 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                 reference_id=str(sale.id)
             )
         
-        # Calculate totals
-        tax = sale.tax or 0
-        discount = sale.discount or 0
-        sale.subtotal = total_subtotal
-        sale.total = total_subtotal + tax - discount
+        # Calculate totals - round to 2 decimal places to match DecimalField precision
+        tax = sale.tax or Decimal('0')
+        discount = sale.discount or Decimal('0')
+        # Round subtotal to 2 decimal places
+        sale.subtotal = total_subtotal.quantize(Decimal('0.01'))
+        # Round total to 2 decimal places
+        sale.total = (total_subtotal + tax - discount).quantize(Decimal('0.01'))
         
-        # Handle credit sales
-        if sale.payment_method == 'credit':
+        # Set status based on payment method and sale type
+        # For cash/card/mobile payments, mark as completed immediately
+        if sale.payment_method in ['cash', 'card', 'mobile']:
+            sale.status = 'completed'
+            sale.payment_status = 'paid'
+        # For tab/restaurant orders, keep as pending until payment
+        elif sale.payment_method == 'tab' and not sale.status:
+            sale.status = 'pending'
+            sale.payment_status = 'unpaid'
+        # For credit sales, handle separately
+        elif sale.payment_method == 'credit':
             if not sale.customer:
                 return Response(
                     {"detail": "Customer is required for credit sales"},
@@ -340,8 +357,14 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
             sale.amount_paid = Decimal('0')
             sale.payment_status = 'unpaid'
             sale.status = 'completed'  # Credit sales are completed but unpaid
+        # If status was explicitly set in request data (e.g., restaurant orders), keep it
+        elif not sale.status:
+            # Default to completed for any other payment method
+            sale.status = 'completed'
+            sale.payment_status = 'paid'
         
         sale.save()
+        logger.info(f"Sale saved: ID={sale.id}, Receipt={sale.receipt_number}, Status={sale.status}, Total={sale.total}, Payment={sale.payment_method}")
         
         # Create Kitchen Order Ticket (KOT) if this is a restaurant order with a table
         if table and sale.status == 'pending':
@@ -725,7 +748,9 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
     
     @action(detail=False, methods=['get'])
     def stats(self, request):
-        """Get sales statistics"""
+        """Get sales statistics - optimized with database aggregation"""
+        from django.db.models import Sum, Count
+        
         queryset = self.filter_queryset(self.get_queryset())
         
         # Date range filters
@@ -737,17 +762,124 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         if end_date:
             queryset = queryset.filter(created_at__lte=end_date)
         
-        total_sales = queryset.count()
-        total_revenue = sum(sale.total for sale in queryset)
-        today_sales = queryset.filter(created_at__date=timezone.now().date()).count()
-        today_revenue = sum(sale.total for sale in queryset.filter(created_at__date=timezone.now().date()))
+        # Use database aggregation instead of Python iteration (much faster)
+        stats = queryset.aggregate(
+            total_sales=Count('id'),
+            total_revenue=Sum('total'),
+        )
+        
+        today = timezone.now().date()
+        today_stats = queryset.filter(created_at__date=today).aggregate(
+            today_sales=Count('id'),
+            today_revenue=Sum('total'),
+        )
         
         return Response({
-            'total_sales': total_sales,
-            'total_revenue': float(total_revenue),
-            'today_sales': today_sales,
-            'today_revenue': float(today_revenue),
+            'total_sales': stats['total_sales'] or 0,
+            'total_revenue': float(stats['total_revenue'] or 0),
+            'today_sales': today_stats['today_sales'] or 0,
+            'today_revenue': float(today_stats['today_revenue'] or 0),
         })
+    
+    @action(detail=False, methods=['get'])
+    def chart_data(self, request):
+        """Get chart data for last 7 days - optimized single query"""
+        from django.db.models import Sum, Count
+        from django.db.models.functions import TruncDate
+        from datetime import timedelta
+        
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        # Get outlet filter if provided
+        outlet = self.get_outlet_for_request(request)
+        if outlet:
+            queryset = queryset.filter(outlet=outlet)
+        
+        # Get date range (last 7 days)
+        end_date = timezone.now().date()
+        start_date = end_date - timedelta(days=6)
+        
+        # Filter by date range
+        queryset = queryset.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+        
+        # Aggregate by date using database
+        daily_stats = queryset.annotate(
+            date=TruncDate('created_at')
+        ).values('date').annotate(
+            sales=Sum('total'),
+            count=Count('id')
+        ).order_by('date')
+        
+        # Create a map of date -> stats
+        stats_map = {str(item['date']): item for item in daily_stats}
+        
+        # Build response for all 7 days
+        chart_data = []
+        for i in range(6, -1, -1):
+            date = end_date - timedelta(days=i)
+            date_str = str(date)
+            day_stats = stats_map.get(date_str, {'sales': 0, 'count': 0})
+            
+            chart_data.append({
+                'date': date.strftime('%a'),  # Weekday abbreviation
+                'sales': float(day_stats['sales'] or 0),
+                'profit': float(day_stats['sales'] or 0) * 0.7,  # TODO: Calculate properly with expenses
+            })
+        
+        return Response(chart_data)
+    
+    @action(detail=False, methods=['get'])
+    def top_selling_items(self, request):
+        """Get top selling items - optimized database query"""
+        from django.db.models import Sum, F
+        
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        # Get outlet filter if provided
+        outlet = self.get_outlet_for_request(request)
+        if outlet:
+            queryset = queryset.filter(outlet=outlet)
+        
+        # Filter completed sales only
+        queryset = queryset.filter(status='completed')
+        
+        # Get date range (optional)
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        if start_date:
+            queryset = queryset.filter(created_at__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(created_at__lte=end_date)
+        
+        # Aggregate sale items by product
+        top_items = SaleItem.objects.filter(
+            sale__in=queryset
+        ).values(
+            'product_id'
+        ).annotate(
+            quantity=Sum('quantity'),
+            revenue=Sum(F('price') * F('quantity')),
+            product_name=F('product_name')
+        ).order_by('-revenue')[:5]
+        
+        # Get product details
+        product_ids = [item['product_id'] for item in top_items if item['product_id']]
+        products = {p.id: p for p in Product.objects.filter(id__in=product_ids).only('id', 'name', 'sku')}
+        
+        # Format response
+        result = []
+        for item in top_items:
+            product = products.get(item['product_id'])
+            result.append({
+                'id': str(item['product_id']),
+                'name': item['product_name'] or (product.name if product else 'Unknown Product'),
+                'sku': product.sku if product else 'N/A',
+                'quantity': item['quantity'] or 0,
+                'revenue': float(item['revenue'] or 0),
+                'change': 0,  # TODO: Calculate change from previous period
+            })
+        
+        return Response(result)
 
 
 class DeliveryViewSet(viewsets.ModelViewSet, TenantFilterMixin):

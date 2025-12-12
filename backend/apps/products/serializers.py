@@ -13,7 +13,11 @@ class CategorySerializer(serializers.ModelSerializer):
     
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-        representation['product_count'] = instance.products.count()
+        # Use prefetched count if available to avoid N+1 query
+        if hasattr(instance, '_products_count'):
+            representation['product_count'] = instance._products_count
+        else:
+            representation['product_count'] = instance.products.count()
         return representation
 
 
@@ -116,7 +120,8 @@ class ProductSerializer(serializers.ModelSerializer):
         allow_null=True
     )
     is_low_stock = serializers.SerializerMethodField()
-    stock = serializers.SerializerMethodField()  # Calculate from LocationStock
+    # stock is writable for create/update, but calculated from LocationStock when reading
+    stock = serializers.IntegerField(required=False, allow_null=True, min_value=0, default=0)
     variations = ItemVariationSerializer(many=True, read_only=True)
     default_variation = ItemVariationSerializer(read_only=True)
     selling_units = ProductUnitSerializer(many=True, read_only=True)
@@ -158,10 +163,13 @@ class ProductSerializer(serializers.ModelSerializer):
         """Backward compat: return default variation cost or cost"""
         return obj.get_cost()
     
-    def get_stock(self, obj):
-        """Calculate stock from all variations' LocationStock"""
+    def to_representation(self, instance):
+        """Override to show calculated stock from LocationStock in response"""
+        representation = super().to_representation(instance)
+        # Replace stock with calculated value from LocationStock when reading
         outlet = self.context.get('outlet')
-        return obj.get_total_stock(outlet=outlet)
+        representation['stock'] = instance.get_total_stock(outlet=outlet)
+        return representation
     
     def get_is_low_stock(self, obj):
         """Check if product is low stock by checking variations"""

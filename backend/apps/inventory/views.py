@@ -445,30 +445,66 @@ def adjust(request):
             logger.error(f"Product {product_id} not found for tenant {tenant.id}")
             return Response({"detail": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
         
-        # Adjust stock
-        old_stock = product.stock
-        product.stock += quantity
-        if product.stock < 0:
-            logger.error(f"Stock would be negative: {product.stock}")
-            return Response(
-                {"detail": "Stock cannot be negative"},
-                status=status.HTTP_400_BAD_REQUEST
+        # Get outlet
+        from apps.outlets.models import Outlet
+        try:
+            outlet = Outlet.objects.get(id=outlet_id, tenant=tenant)
+        except Outlet.DoesNotExist:
+            logger.error(f"Outlet {outlet_id} not found for tenant {tenant.id}")
+            return Response({"detail": "Outlet not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get or create default variation if product has no variations
+        variation = product.variations.filter(is_active=True).first()
+        if not variation:
+            from apps.products.models import ItemVariation
+            variation = ItemVariation.objects.create(
+                product=product,
+                name='Default',
+                price=product.retail_price,
+                cost=product.cost,
+                sku=product.sku if product.sku else '',
+                barcode=product.barcode if product.barcode else '',
+                track_inventory=True,
+                unit=product.unit,
+                low_stock_threshold=product.low_stock_threshold,
+                is_active=product.is_active,
+                sort_order=0
             )
+            logger.info(f"Created default variation for product {product.id}: {variation.id}")
+        
+        # Update LocationStock (preferred method for variation-based inventory)
+        if variation and variation.track_inventory:
+            location_stock, created = LocationStock.objects.get_or_create(
+                tenant=tenant,
+                variation=variation,
+                outlet=outlet,
+                defaults={'quantity': 0}
+            )
+            
+            old_quantity = location_stock.quantity
+            location_stock.quantity = max(0, location_stock.quantity + quantity)
+            location_stock.save()
+            logger.info(f"LocationStock updated: {old_quantity} -> {location_stock.quantity} for variation {variation.id} at outlet {outlet.id}")
+        
+        # Also update legacy Product.stock field for backward compatibility
+        old_stock = product.stock
+        product.stock = max(0, product.stock + quantity)
         product.save()
         logger.info(f"Product stock updated: {old_stock} -> {product.stock}")
         
-        # Record movement
+        # Record movement with variation
         try:
             movement = StockMovement.objects.create(
                 tenant=tenant,
                 product=product,
-                outlet_id=outlet_id,
+                variation=variation,
+                outlet=outlet,
                 user=request.user,
                 movement_type=movement_type,
                 quantity=abs(quantity),
                 reason=reason
             )
-            logger.info(f"StockMovement created: id={movement.id}, type={movement_type}, quantity={movement.quantity}")
+            logger.info(f"StockMovement created: id={movement.id}, type={movement_type}, quantity={movement.quantity}, variation={variation.id if variation else None}")
         except Exception as e:
             logger.error(f"Failed to create StockMovement: {e}", exc_info=True)
             raise
@@ -612,7 +648,51 @@ def receive(request):
                 })
                 continue
             
-            # Update stock (increase)
+            # Get outlet
+            from apps.outlets.models import Outlet
+            try:
+                outlet = Outlet.objects.get(id=outlet_id, tenant=tenant)
+            except Outlet.DoesNotExist:
+                errors.append({
+                    "product_id": product_id,
+                    "error": f"Outlet {outlet_id} not found"
+                })
+                continue
+            
+            # Get or create default variation if product has no variations
+            variation = product.variations.filter(is_active=True).first()
+            if not variation:
+                from apps.products.models import ItemVariation
+                variation = ItemVariation.objects.create(
+                    product=product,
+                    name='Default',
+                    price=product.retail_price,
+                    cost=product.cost,
+                    sku=product.sku if product.sku else '',
+                    barcode=product.barcode if product.barcode else '',
+                    track_inventory=True,
+                    unit=product.unit,
+                    low_stock_threshold=product.low_stock_threshold,
+                    is_active=product.is_active,
+                    sort_order=0
+                )
+                logger.info(f"Created default variation for product {product.id}: {variation.id}")
+            
+            # Update LocationStock (preferred method for variation-based inventory)
+            if variation and variation.track_inventory:
+                location_stock, created = LocationStock.objects.get_or_create(
+                    tenant=tenant,
+                    variation=variation,
+                    outlet=outlet,
+                    defaults={'quantity': 0}
+                )
+                
+                old_quantity = location_stock.quantity
+                location_stock.quantity += quantity
+                location_stock.save()
+                logger.info(f"LocationStock updated: {old_quantity} -> {location_stock.quantity} for variation {variation.id} at outlet {outlet.id}")
+            
+            # Also update legacy Product.stock field for backward compatibility
             old_stock = product.stock
             product.stock += quantity
             product.save()
@@ -629,13 +709,14 @@ def receive(request):
                 except (ValueError, TypeError):
                     logger.warning(f"Invalid cost value: {cost}, skipping cost update")
             
-            # Record movement
+            # Record movement with variation
             try:
                 movement_reason = reason or (f"Purchase from {supplier}" if supplier else "Purchase")
                 movement = StockMovement.objects.create(
                     tenant=tenant,
                     product=product,
-                    outlet_id=outlet_id,
+                    variation=variation,
+                    outlet=outlet,
                     user=request.user,
                     movement_type='purchase',
                     quantity=quantity,
@@ -750,6 +831,48 @@ class LocationStockViewSet(viewsets.ModelViewSet, TenantFilterMixin):
             raise PermissionDenied("Outlet does not belong to your tenant")
         
         serializer.save(tenant=tenant)
+    
+    def perform_update(self, serializer):
+        """Ensure tenant is set and validate on update"""
+        tenant = getattr(self.request, 'tenant', None) or self.request.user.tenant
+        if not tenant:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("Tenant is required")
+        
+        instance = serializer.instance
+        variation = serializer.validated_data.get('variation', instance.variation)
+        outlet = serializer.validated_data.get('outlet', instance.outlet)
+        new_quantity = serializer.validated_data.get('quantity', instance.quantity)
+        
+        # Verify tenant matches
+        if variation.product.tenant != tenant:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Variation does not belong to your tenant")
+        
+        if outlet.tenant != tenant:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Outlet does not belong to your tenant")
+        
+        # Track old quantity before saving
+        old_quantity = instance.quantity
+        quantity_difference = new_quantity - old_quantity
+        
+        # Save the update
+        serializer.save()
+        
+        # Update Product.stock for backward compatibility
+        # Only update if quantity actually changed
+        if quantity_difference != 0:
+            product = variation.product
+            # Update product stock based on the difference
+            # For default variation, directly update product stock
+            if variation.name == 'Default' or not product.variations.exclude(id=variation.id).filter(is_active=True).exists():
+                # If this is the default variation or the only active variation, update product stock
+                product.stock = max(0, product.stock + quantity_difference)
+                product.save(update_fields=['stock'])
+                logger.info(f"Updated Product.stock for product {product.id}: {product.stock} (difference: {quantity_difference})")
+        
+        logger.info(f"LocationStock updated: id={instance.id}, variation={variation.id}, outlet={outlet.id}, quantity: {old_quantity} -> {new_quantity}")
     
     @action(detail=False, methods=['post'])
     def bulk_update(self, request):

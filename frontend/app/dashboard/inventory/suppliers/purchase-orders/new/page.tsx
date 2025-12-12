@@ -239,7 +239,7 @@ export default function NewPurchaseOrderPage() {
       })
 
       // Redirect to view the created purchase order
-      router.push(`/dashboard/office/suppliers/purchase-orders/${createdPO.id}`)
+      router.push(`/dashboard/inventory/suppliers/purchase-orders/${createdPO.id}`)
     } catch (error: any) {
       console.error("Failed to create purchase order:", error)
       toast({
@@ -256,7 +256,7 @@ export default function NewPurchaseOrderPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Link href="/dashboard/office/suppliers/purchase-orders">
+          <Link href="/dashboard/inventory/suppliers/purchase-orders">
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-4 w-4" />
             </Button>
@@ -476,7 +476,7 @@ export default function NewPurchaseOrderPage() {
                   >
                     {isSubmitting ? "Creating..." : "Create Purchase Order"}
                   </Button>
-                  <Link href="/dashboard/office/suppliers/purchase-orders">
+                  <Link href="/dashboard/inventory/suppliers/purchase-orders">
                     <Button variant="outline" className="w-full">
                       Cancel
                     </Button>

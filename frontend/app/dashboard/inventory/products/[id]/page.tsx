@@ -108,7 +108,7 @@ export default function ProductDetailPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/dashboard/products">
+            <Link href="/dashboard/inventory/products">
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="h-4 w-4" />
               </Button>
@@ -410,7 +410,7 @@ export default function ProductDetailPage() {
                   <p className="font-medium">123 Supplier St, City, State 12345</p>
                 </div>
                 <div className="pt-4">
-                  <Link href="/dashboard/office/suppliers">
+                  <Link href="/dashboard/inventory/suppliers">
                     <Button variant="outline">View All Suppliers</Button>
                   </Link>
                 </div>

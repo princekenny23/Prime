@@ -226,12 +226,23 @@ export const productService = {
     return products.map(transformProduct)
   },
 
+  async count(filters?: ProductFilters): Promise<number> {
+    const params = new URLSearchParams()
+    if (filters?.category) params.append("category", filters.category)
+    if (filters?.is_active !== undefined) params.append("is_active", String(filters.is_active))
+    if (filters?.search) params.append("search", filters.search)
+    
+    const query = params.toString()
+    const response = await api.get<{ count: number }>(`${apiEndpoints.products.list}count/${query ? `?${query}` : ""}`)
+    return response.count
+  },
+
       async generateSkuPreview(): Promise<string> {
         const response = await api.get<{ sku: string }>(`${apiEndpoints.products.list}generate-sku/`)
         return response.sku
       },
 
-      async bulkImport(file: File): Promise<{
+      async bulkImport(file: File, outletId?: string): Promise<{
         success: boolean
         total_rows: number
         imported: number
@@ -240,6 +251,9 @@ export const productService = {
         categories_existing: number
         errors: Array<{ row: number; product_name: string; error: string }>
         warnings: Array<{ row: number; product_name: string; warning: string }>
+        requires_outlet?: boolean
+        message?: string
+        outlets?: Array<{ id: number | string; name: string }>
       }> {
         const formData = new FormData()
         formData.append('file', file)
@@ -253,20 +267,36 @@ export const productService = {
           headers['Authorization'] = `Bearer ${token}`
         }
         
+        // Add outlet ID to header if provided
+        if (outletId) {
+          headers['X-Outlet-ID'] = outletId
+        }
+        
+        // Build URL with outlet query param if provided
+        let url = `${apiEndpoints.products.list}bulk-import/`
+        if (outletId) {
+          url += `?outlet=${outletId}`
+        }
+        
         // Don't set Content-Type - browser will set it with boundary for multipart/form-data
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"
-        const response = await fetch(`${API_BASE_URL}${apiEndpoints.products.list}bulk-import/`, {
+        const response = await fetch(`${API_BASE_URL}${url}`, {
           method: 'POST',
           headers: headers,
           body: formData,
         })
         
+        const responseData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-          throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
+          // Check if this is a requires_outlet response
+          if (responseData.requires_outlet) {
+            return responseData
+          }
+          throw new Error(responseData.error || responseData.message || `HTTP ${response.status}: ${response.statusText}`)
         }
         
-        return response.json()
+        return responseData
       },
     }
 

@@ -30,6 +30,8 @@ class CategoryViewSet(viewsets.ModelViewSet, TenantFilterMixin):
     
     def get_queryset(self):
         """Ensure tenant filtering is applied correctly"""
+        from django.db.models import Count
+        
         # Ensure user.tenant is loaded
         user = self.request.user
         if not hasattr(user, '_tenant_loaded'):
@@ -47,8 +49,8 @@ class CategoryViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         user_tenant = getattr(user, 'tenant', None)
         tenant = request_tenant or user_tenant
         
-        # Get base queryset
-        queryset = Category.objects.all()
+        # Get base queryset with prefetched product count to avoid N+1 queries
+        queryset = Category.objects.annotate(_products_count=Count('products'))
         
         # Apply tenant filter - CRITICAL for security
         if not is_saas_admin:
@@ -132,8 +134,12 @@ class ProductViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         
         logger.info(f"ProductViewSet.get_queryset - User: {user.email}, is_saas_admin: {is_saas_admin}, user_tenant_id: {user_tenant.id if user_tenant else None}, request_tenant_id: {request_tenant.id if request_tenant else None}")
         
-        # Get base queryset
-        queryset = Product.objects.select_related('category', 'tenant', 'outlet').all()
+        # Get base queryset with optimized prefetching to avoid N+1 queries
+        # Note: 'unit' is a CharField, not a ForeignKey, so we can't prefetch it
+        queryset = Product.objects.select_related('category', 'tenant', 'outlet').prefetch_related(
+            'variations',
+            'selling_units'
+        ).all()
         
         # Apply tenant filter - CRITICAL for security
         if not is_saas_admin:
@@ -198,6 +204,33 @@ class ProductViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         
         return response
     
+    def perform_update(self, serializer):
+        """Handle stock updates when updating a product"""
+        # Get the stock value from validated data before saving
+        new_stock = serializer.validated_data.get('stock', None)
+        
+        # Save the product (this will update Product.stock)
+        product = serializer.save()
+        
+        # Update LocationStock for the default variation if stock was provided
+        if new_stock is not None:
+            from apps.inventory.models import LocationStock
+            variation = product.variations.filter(is_active=True, track_inventory=True).first()
+            if variation:
+                outlet = self.get_outlet_for_request(self.request)
+                if outlet:
+                    location_stock, created = LocationStock.objects.get_or_create(
+                        tenant=product.tenant,
+                        variation=variation,
+                        outlet=outlet,
+                        defaults={'quantity': new_stock}
+                    )
+                    if not created:
+                        # Update existing LocationStock
+                        location_stock.quantity = new_stock
+                        location_stock.save()
+                    logger.info(f"Updated LocationStock for product {product.id}, variation {variation.id}, outlet {outlet.id}: quantity={location_stock.quantity}")
+    
     def destroy(self, request, *args, **kwargs):
         """Override destroy to ensure tenant and outlet match"""
         instance = self.get_object()
@@ -245,6 +278,13 @@ class ProductViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                     pass
         
         return context
+    
+    @action(detail=False, methods=['get'])
+    def count(self, request):
+        """Get product count - optimized endpoint to avoid loading all products"""
+        queryset = self.filter_queryset(self.get_queryset())
+        count = queryset.count()
+        return Response({'count': count})
     
     def create(self, request, *args, **kwargs):
         """Override create to log validation errors"""
@@ -295,7 +335,44 @@ class ProductViewSet(viewsets.ModelViewSet, TenantFilterMixin):
             raise ValidationError("Outlet does not belong to your tenant.")
         
         # Save with both tenant and outlet
-        serializer.save(tenant=tenant, outlet=outlet)
+        product = serializer.save(tenant=tenant, outlet=outlet)
+        
+        # Create default variation if product doesn't have any variations
+        if not product.variations.exists():
+            from apps.products.models import ItemVariation
+            default_variation = ItemVariation.objects.create(
+                product=product,
+                name='Default',
+                price=product.retail_price,
+                cost=product.cost,
+                sku=product.sku if product.sku else '',
+                barcode=product.barcode if product.barcode else '',
+                track_inventory=True,
+                unit=product.unit,
+                low_stock_threshold=product.low_stock_threshold,
+                is_active=product.is_active,
+                sort_order=0
+            )
+            logger.info(f"Created default variation for product {product.id}: {default_variation.id}")
+        
+        # Always create LocationStock entry for default variation (even if stock is 0)
+        # This ensures the stock tracking system is properly initialized
+        from apps.inventory.models import LocationStock
+        variation = product.variations.first()
+        if variation and variation.track_inventory:
+            # Use the stock value from the product (which was set from the request)
+            initial_stock = product.stock if product.stock is not None else 0
+            location_stock, created = LocationStock.objects.get_or_create(
+                tenant=tenant,
+                variation=variation,
+                outlet=outlet,
+                defaults={'quantity': initial_stock}
+            )
+            if not created:
+                # Update existing LocationStock with the new stock value
+                location_stock.quantity = initial_stock
+                location_stock.save()
+            logger.info(f"Created/updated LocationStock for product {product.id}, variation {variation.id}, outlet {outlet.id}: quantity={location_stock.quantity}, product.stock={product.stock}")
     
     @action(detail=False, methods=['get'])
     def low_stock(self, request):
@@ -558,6 +635,45 @@ class ProductViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         if not (file_name.endswith('.xlsx') or file_name.endswith('.xls') or file_name.endswith('.csv')):
             return Response(
                 {'error': 'Invalid file type. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check for outlet early - before processing file
+        # Try header first, then query param, then request data
+        outlet_id = request.headers.get('X-Outlet-ID') or request.query_params.get('outlet') or request.data.get('outlet')
+        
+        if not outlet_id:
+            # Return structured response with tenant outlets
+            from apps.outlets.models import Outlet
+            tenant_outlets = Outlet.objects.filter(tenant=tenant, is_active=True).order_by('name')
+            outlets_list = [{'id': outlet.id, 'name': outlet.name} for outlet in tenant_outlets]
+            
+            logger.info(f"Bulk import requires outlet selection. Tenant has {len(outlets_list)} outlets.")
+            return Response(
+                {
+                    'requires_outlet': True,
+                    'message': 'Please select an outlet for this import',
+                    'outlets': outlets_list
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate outlet belongs to tenant
+        from apps.outlets.models import Outlet
+        try:
+            outlet = Outlet.objects.get(id=outlet_id, tenant=tenant)
+        except (Outlet.DoesNotExist, ValueError, TypeError):
+            # Return structured response with tenant outlets
+            tenant_outlets = Outlet.objects.filter(tenant=tenant, is_active=True).order_by('name')
+            outlets_list = [{'id': outlet.id, 'name': outlet.name} for outlet in tenant_outlets]
+            
+            logger.warning(f"Invalid outlet ID {outlet_id} for tenant {tenant.id}")
+            return Response(
+                {
+                    'requires_outlet': True,
+                    'message': f'Outlet with ID {outlet_id} not found or does not belong to your business. Please select a valid outlet.',
+                    'outlets': outlets_list
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -872,28 +988,8 @@ class ProductViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                             except (ValueError, TypeError):
                                 pass  # Invalid wholesale price, skip it
                     
-                    # Get outlet from request for bulk import
-                    # Try header first, then query param, then request data
-                    outlet_id = request.headers.get('X-Outlet-ID') or request.query_params.get('outlet') or request.data.get('outlet')
-                    if not outlet_id:
-                        results['errors'].append({
-                            'row': row_num,
-                            'product_name': name,
-                            'error': 'Outlet is required for bulk import. Please specify X-Outlet-ID header or ?outlet=id query parameter.'
-                        })
-                        results['failed'] += 1
-                        continue
-                    
-                    try:
-                        outlet = Outlet.objects.get(id=outlet_id, tenant=tenant)
-                    except (Outlet.DoesNotExist, ValueError, TypeError):
-                        results['errors'].append({
-                            'row': row_num,
-                            'product_name': name,
-                            'error': f'Outlet with ID {outlet_id} not found or does not belong to tenant.'
-                        })
-                        results['failed'] += 1
-                        continue
+                    # Outlet is already validated earlier, use it directly
+                    # outlet_id and outlet are already set above
                     
                     # Create or update product (outlet-specific)
                     product, product_created = Product.objects.get_or_create(

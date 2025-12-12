@@ -11,9 +11,27 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
-import { ClipboardCheck, Plus, Clock, CheckCircle2, Users } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Plus, MoreVertical, AlertCircle, CheckCircle2, Eye, Users, Upload } from "lucide-react"
 import { useState } from "react"
+import { useToast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
 import { StartStockTakeModal } from "@/components/modals/start-stock-take-modal"
 import { format } from "date-fns"
@@ -22,6 +40,7 @@ import { inventoryService } from "@/lib/services/inventoryService"
 import { useBusinessStore } from "@/stores/businessStore"
 import { useRealAPI } from "@/lib/utils/api-config"
 import { useEffect } from "react"
+import Link from "next/link"
 
 interface StockTake {
   id: string
@@ -29,6 +48,7 @@ interface StockTake {
   outletName: string
   date: string
   time: string
+  createdAt: string
   description?: string
   status: "RUNNING" | "FINISHED"
   progress: number
@@ -37,14 +57,18 @@ interface StockTake {
   startedBy: string
   participants?: number
   completedAt?: string
+  operatingDate?: string
 }
 
 export default function StockTakingHistoryPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const { currentBusiness, currentOutlet, outlets } = useBusinessStore()
   const [showStartModal, setShowStartModal] = useState(false)
-  const [runningStockTakes, setRunningStockTakes] = useState<StockTake[]>([])
-  const [finishedStockTakes, setFinishedStockTakes] = useState<StockTake[]>([])
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const [allStockTakes, setAllStockTakes] = useState<StockTake[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const useReal = useRealAPI()
 
@@ -58,51 +82,47 @@ export default function StockTakingHistoryPage() {
           const response = await inventoryService.getStockTakes()
           const stockTakes = response.results || []
           
-          // Transform and separate running and finished
-          const running = stockTakes
-            .filter((st: any) => st.status === 'running')
-            .map((st: any) => ({
+          // Transform all stock takes into unified format
+          const transformed = stockTakes.map((st: any) => {
+            const isRunning = st.status === 'running'
+            const items = st.items || []
+            const countedItems = items.filter((i: any) => i.counted_quantity > 0).length
+            const totalItems = items.length
+            const progress = totalItems > 0 
+              ? Math.round((countedItems / totalItems) * 100) 
+              : 0
+
+            return {
               id: String(st.id),
               outletId: String(st.outlet?.id || st.outlet || ""),
-              outletName: st.outlet?.name || outlets.find(o => o.id === String(st.outlet))?.name || "Unknown",
-              date: st.operating_date || st.created_at,
+              outletName: st.outlet?.name || outlets.find(o => o.id === String(st.outlet))?.name || "--",
+              date: st.created_at,
               time: new Date(st.created_at).toLocaleTimeString(),
+              createdAt: st.created_at,
               description: st.description || "",
-              status: "RUNNING" as const,
-              progress: st.items ? Math.round((st.items.filter((i: any) => i.counted_quantity > 0).length / st.items.length) * 100) : 0,
-              totalItems: st.items?.length || 0,
-              countedItems: st.items?.filter((i: any) => i.counted_quantity > 0).length || 0,
+              status: isRunning ? "RUNNING" as const : "FINISHED" as const,
+              progress: isRunning ? progress : 100,
+              totalItems,
+              countedItems: isRunning ? countedItems : totalItems,
               startedBy: st.user?.name || st.user?.email || "System",
               participants: 1,
-            }))
-          
-          const finished = stockTakes
-            .filter((st: any) => st.status === 'completed')
-            .map((st: any) => ({
-              id: String(st.id),
-              outletId: String(st.outlet?.id || st.outlet || ""),
-              outletName: st.outlet?.name || outlets.find(o => o.id === String(st.outlet))?.name || "Unknown",
-              date: st.operating_date || st.created_at,
-              time: new Date(st.created_at).toLocaleTimeString(),
-              description: st.description || "",
-              status: "FINISHED" as const,
-              progress: 100,
-              totalItems: st.items?.length || 0,
-              countedItems: st.items?.length || 0,
-              startedBy: st.user?.name || st.user?.email || "System",
               completedAt: st.completed_at,
-            }))
+              operatingDate: st.operating_date || st.created_at?.split('T')[0] || "--",
+            }
+          })
           
-          setRunningStockTakes(running)
-          setFinishedStockTakes(finished)
+          // Sort by created date (newest first)
+          transformed.sort((a, b) => 
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
+          
+          setAllStockTakes(transformed)
         } else {
-          setRunningStockTakes([])
-          setFinishedStockTakes([])
+          setAllStockTakes([])
         }
       } catch (error) {
         console.error("Failed to load stock takes:", error)
-        setRunningStockTakes([])
-        setFinishedStockTakes([])
+        setAllStockTakes([])
       } finally {
         setIsLoading(false)
       }
@@ -119,6 +139,73 @@ export default function StockTakingHistoryPage() {
     router.push(`/dashboard/inventory/stock-taking/${id}`)
   }
 
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString)
+      return format(date, "yyyy/MM/dd HH:mm")
+    } catch {
+      return dateString
+    }
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const selectedFile = e.target.files[0]
+      const fileName = selectedFile.name.toLowerCase()
+      
+      // Validate file type
+      if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls') && !fileName.endsWith('.csv')) {
+        toast({
+          title: "Invalid File Type",
+          description: "Please select an Excel (.xlsx, .xls) or CSV (.csv) file.",
+          variant: "destructive",
+        })
+        return
+      }
+      
+      setImportFile(selectedFile)
+    }
+  }
+
+  const handleImport = async () => {
+    if (!importFile) {
+      toast({
+        title: "No File Selected",
+        description: "Please select a file to import.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsImporting(true)
+    try {
+      // TODO: Implement stock take import API call
+      // For now, show a placeholder message
+      toast({
+        title: "Import Feature",
+        description: "Stock take import functionality will be implemented soon.",
+      })
+      
+      // Simulate import delay
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      setShowImportModal(false)
+      setImportFile(null)
+      
+      // Reload stock takes after import
+      // loadStockTakes() - will be called via useEffect
+    } catch (error: any) {
+      console.error("Failed to import stock takes:", error)
+      toast({
+        title: "Import Failed",
+        description: error.message || "Failed to import stock takes. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -130,21 +217,24 @@ export default function StockTakingHistoryPage() {
               Manage and track inventory stock taking sessions
             </p>
           </div>
-          <Button onClick={() => setShowStartModal(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Start New Stock Take
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setShowImportModal(true)}>
+              <Upload className="mr-2 h-4 w-4" />
+              Import Stock Take
+            </Button>
+            <Button onClick={() => setShowStartModal(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Start New Stock Take
+            </Button>
+          </div>
         </div>
 
-        {/* Running Stock Takes */}
+        {/* Unified Stock Takes Table */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-blue-600" />
-              Running Stock Takes
-            </CardTitle>
+            <CardTitle>Stock Taking Sessions</CardTitle>
             <CardDescription>
-              Active stock taking sessions that are currently in progress
+              View all stock taking sessions, both running and completed
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -152,146 +242,127 @@ export default function StockTakingHistoryPage() {
               <div className="text-center py-8 text-muted-foreground">
                 <p>Loading stock takes...</p>
               </div>
-            ) : runningStockTakes.length === 0 ? (
+            ) : allStockTakes.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                <ClipboardCheck className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>No running stock takes</p>
+                <p>No stock taking sessions found</p>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Outlet</TableHead>
-                    <TableHead>Date & Time</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Progress</TableHead>
-                    <TableHead>Started By</TableHead>
-                    <TableHead>Participants</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {runningStockTakes.map((stockTake) => (
-                    <TableRow key={stockTake.id}>
-                      <TableCell className="font-medium">{stockTake.outletName}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span>{format(new Date(stockTake.date), "MMM dd, yyyy")}</span>
-                          <span className="text-xs text-muted-foreground">{stockTake.time}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {stockTake.description || "No description"}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-muted rounded-full h-2 max-w-[100px]">
-                            <div
-                              className="bg-blue-600 h-2 rounded-full transition-all"
-                              style={{ width: `${stockTake.progress}%` }}
-                            />
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12"></TableHead>
+                      <TableHead>STARTS</TableHead>
+                      <TableHead>CLOSED</TableHead>
+                      <TableHead>OPERATING DATE</TableHead>
+                      <TableHead>OUTLET</TableHead>
+                      <TableHead>USER(S)</TableHead>
+                      <TableHead>ITEMS</TableHead>
+                      <TableHead>PERCENTAGE</TableHead>
+                      <TableHead className="text-right">ACTION</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allStockTakes.map((stockTake) => (
+                      <TableRow key={stockTake.id}>
+                        {/* Status Icon */}
+                        <TableCell>
+                          <div className={cn(
+                            "flex h-8 w-8 items-center justify-center rounded",
+                            stockTake.status === "RUNNING" 
+                              ? "bg-yellow-100 dark:bg-yellow-900/20" 
+                              : "bg-green-100 dark:bg-green-900/20"
+                          )}>
+                            {stockTake.status === "RUNNING" ? (
+                              <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
+                            ) : (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-500" />
+                            )}
                           </div>
-                          <span className="text-sm font-medium">{stockTake.progress}%</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {stockTake.countedItems} / {stockTake.totalItems} items
-                        </div>
-                      </TableCell>
-                      <TableCell>{stockTake.startedBy}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          <span>{stockTake.participants || 1}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleJoinStockTake(stockTake.id)}
-                        >
-                          Join Stock Take
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                        </TableCell>
 
-        {/* Finished Stock Takes */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-              Finished Stock Takes
-            </CardTitle>
-            <CardDescription>
-              Completed stock taking sessions
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <p>Loading stock takes...</p>
+                        {/* STARTS */}
+                        <TableCell className="font-medium">
+                          {formatDate(stockTake.createdAt)}
+                        </TableCell>
+
+                        {/* CLOSED */}
+                        <TableCell>
+                          {stockTake.status === "RUNNING" ? (
+                            <span className="text-blue-900 dark:text-blue-900">Running...</span>
+                          ) : stockTake.completedAt ? (
+                            formatDate(stockTake.completedAt)
+                          ) : (
+                            formatDate(stockTake.createdAt)
+                          )}
+                        </TableCell>
+
+                        {/* OPERATING DATE */}
+                        <TableCell>
+                          {stockTake.operatingDate && stockTake.operatingDate !== "--" 
+                            ? stockTake.operatingDate 
+                            : "--"}
+                        </TableCell>
+
+                        {/* OUTLET */}
+                        <TableCell>
+                          {stockTake.outletName !== "--" ? stockTake.outletName : "--"}
+                        </TableCell>
+
+                        {/* USER(S) */}
+                        <TableCell>
+                          {stockTake.participants && stockTake.participants > 0 ? (
+                            <Link 
+                              href={`/dashboard/inventory/stock-taking/${stockTake.id}`}
+                              className="text-blue-900 dark:text-blue-900 hover:underline"
+                            >
+                              {stockTake.participants}
+                            </Link>
+                          ) : (
+                            <span className="text-muted-foreground">0</span>
+                          )}
+                        </TableCell>
+
+                        {/* ITEMS */}
+                        <TableCell>
+                          {stockTake.countedItems}/{stockTake.totalItems}
+                        </TableCell>
+
+                        {/* PERCENTAGE */}
+                        <TableCell>
+                          {stockTake.progress.toFixed(2)}%
+                        </TableCell>
+
+                        {/* ACTION */}
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              {stockTake.status === "RUNNING" ? (
+                                <DropdownMenuItem onClick={() => handleJoinStockTake(stockTake.id)}>
+                                  <Users className="mr-2 h-4 w-4" />
+                                  Join Stock Take
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem onClick={() => handleViewStockTake(stockTake.id)}>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  View Details
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
-            ) : finishedStockTakes.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <CheckCircle2 className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>No finished stock takes</p>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Outlet</TableHead>
-                    <TableHead>Date & Time</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Items Counted</TableHead>
-                    <TableHead>Started By</TableHead>
-                    <TableHead>Completed At</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {finishedStockTakes.map((stockTake) => (
-                    <TableRow key={stockTake.id}>
-                      <TableCell className="font-medium">{stockTake.outletName}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span>{format(new Date(stockTake.date), "MMM dd, yyyy")}</span>
-                          <span className="text-xs text-muted-foreground">{stockTake.time}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {stockTake.description || "No description"}
-                      </TableCell>
-                      <TableCell>{stockTake.totalItems}</TableCell>
-                      <TableCell>{stockTake.startedBy}</TableCell>
-                      <TableCell>
-                        {stockTake.completedAt
-                          ? format(new Date(stockTake.completedAt), "MMM dd, yyyy HH:mm")
-                          : "N/A"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className="bg-green-600">Completed</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewStockTake(stockTake.id)}
-                        >
-                          View Details
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
             )}
           </CardContent>
         </Card>
@@ -302,6 +373,77 @@ export default function StockTakingHistoryPage() {
         open={showStartModal}
         onOpenChange={setShowStartModal}
       />
+
+      {/* Import Stock Take Modal */}
+      <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Import Stock Take</DialogTitle>
+            <DialogDescription>
+              Upload an Excel or CSV file to import stock take data. The file should contain product information and counted quantities.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>File (Excel or CSV)</Label>
+              <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground mb-2">
+                  {importFile ? importFile.name : "No file selected"}
+                </p>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleFileChange}
+                  className="hidden"
+                  id="stock-take-file-upload"
+                />
+                <Label htmlFor="stock-take-file-upload">
+                  <Button variant="outline" asChild>
+                    <span>Choose File</span>
+                  </Button>
+                </Label>
+              </div>
+            </div>
+
+            <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 p-3 text-sm text-blue-900 dark:text-blue-200">
+              <p className="font-medium mb-1">File Format Requirements:</p>
+              <ul className="list-disc list-inside space-y-1 text-xs">
+                <li>Product SKU or Barcode</li>
+                <li>Counted Quantity</li>
+                <li>Optional: Notes</li>
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowImportModal(false)
+                setImportFile(null)
+              }}
+              disabled={isImporting}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleImport} disabled={!importFile || isImporting}>
+              {isImporting ? (
+                <>
+                  <Upload className="mr-2 h-4 w-4 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   )
 }

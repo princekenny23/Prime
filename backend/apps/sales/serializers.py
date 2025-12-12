@@ -5,8 +5,9 @@ from apps.products.serializers import ProductSerializer
 
 
 class SaleItemSerializer(serializers.ModelSerializer):
-    """Sale item serializer"""
-    product = ProductSerializer(read_only=True)
+    """Sale item serializer - optimized with minimal product data"""
+    # Use minimal product representation instead of full ProductSerializer for performance
+    product = serializers.SerializerMethodField()
     product_id = serializers.IntegerField(write_only=True, required=False)
     variation_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     unit_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
@@ -22,6 +23,16 @@ class SaleItemSerializer(serializers.ModelSerializer):
             'kitchen_status', 'notes', 'prepared_at', 'created_at'
         )
         read_only_fields = ('id', 'product', 'product_name', 'variation_name', 'unit_name', 'quantity_in_base_units', 'prepared_at', 'created_at')
+    
+    def get_product(self, obj):
+        """Return minimal product data for performance"""
+        if not obj.product:
+            return None
+        return {
+            'id': obj.product.id,
+            'name': obj.product.name,
+            'sku': obj.product.sku or '',
+        }
 
 
 class SaleSerializer(serializers.ModelSerializer):
@@ -164,11 +175,11 @@ class SaleSerializer(serializers.ModelSerializer):
         if 'outlet' not in attrs or not attrs.get('outlet'):
             raise serializers.ValidationError({"outlet": "Outlet is required"})
         
-        # Validate subtotal, tax, discount are valid decimals
-        for field in ['subtotal', 'tax', 'discount']:
+        # Validate subtotal, tax, discount, total are valid decimals and round to 2 decimal places
+        for field in ['subtotal', 'tax', 'discount', 'total']:
             if field in attrs:
                 try:
-                    value = Decimal(str(attrs[field]))
+                    value = Decimal(str(attrs[field])).quantize(Decimal('0.01'))
                     if value < 0:
                         raise serializers.ValidationError({field: f"{field} cannot be negative"})
                     attrs[field] = value

@@ -68,7 +68,7 @@ export default function SupplierInvoicesPage() {
             <h1 className="text-3xl font-bold">Supplier Invoices</h1>
             <p className="text-muted-foreground">Record and track supplier invoices</p>
           </div>
-          <Link href="/dashboard/office/suppliers/invoices/new">
+          <Link href="/dashboard/inventory/suppliers/invoices/new">
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               New Invoice
@@ -127,7 +127,7 @@ export default function SupplierInvoicesPage() {
                       <TableCell>${invoice.balance?.toFixed(2) || "0.00"}</TableCell>
                       <TableCell>{getStatusBadge(invoice.status)}</TableCell>
                       <TableCell>
-                        <Link href={`/dashboard/office/suppliers/invoices/${invoice.id}`}>
+                        <Link href={`/dashboard/inventory/suppliers/invoices/${invoice.id}`}>
                           <Button variant="ghost" size="sm">View</Button>
                         </Link>
                       </TableCell>

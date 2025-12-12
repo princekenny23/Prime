@@ -146,14 +146,28 @@ export default function RestaurantDashboardPage() {
     if (currentBusiness) {
       loadDashboardData()
       
+      // Auto-refresh dashboard data every 30 seconds for real-time updates
+      const interval = setInterval(() => {
+        loadDashboardData()
+      }, 30000)
+      
       // Listen for outlet changes
       const handleOutletChange = () => {
         loadDashboardData()
       }
+      
+      // Listen for sale completion events to refresh dashboard
+      const handleSaleCompleted = () => {
+        loadDashboardData()
+      }
+      
       window.addEventListener("outlet-changed", handleOutletChange)
+      window.addEventListener("sale-completed", handleSaleCompleted)
       
       return () => {
+        clearInterval(interval)
         window.removeEventListener("outlet-changed", handleOutletChange)
+        window.removeEventListener("sale-completed", handleSaleCompleted)
       }
     }
   }, [currentBusiness, currentOutlet])
@@ -177,6 +191,23 @@ export default function RestaurantDashboardPage() {
     
     if (currentBusiness) {
       loadRecentSales()
+      
+      // Auto-refresh recent sales every 30 seconds for real-time updates
+      const interval = setInterval(() => {
+        loadRecentSales()
+      }, 30000)
+      
+      // Listen for sale completion events to refresh recent sales immediately
+      const handleSaleCompleted = () => {
+        loadRecentSales()
+      }
+      
+      window.addEventListener("sale-completed", handleSaleCompleted)
+      
+      return () => {
+        clearInterval(interval)
+        window.removeEventListener("sale-completed", handleSaleCompleted)
+      }
     }
   }, [currentBusiness, currentOutlet])
 

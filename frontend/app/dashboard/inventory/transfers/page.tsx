@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Plus, ArrowRightLeft } from "lucide-react"
+import { Plus, ArrowRightLeft, Info } from "lucide-react"
 import { useState, useEffect, useCallback } from "react"
 import { TransferStockModal } from "@/components/modals/transfer-stock-modal"
 import { inventoryService } from "@/lib/services/inventoryService"
@@ -35,24 +35,19 @@ export default function TransfersPage() {
     setIsLoading(true)
     try {
       if (useReal) {
-        // Load transfer movements (transfer_in and transfer_out)
         const transferOutMovements = await inventoryService.getMovements({
           movement_type: "transfer_out",
         })
         
-        // Group transfers by reference_id (which contains to_outlet_id)
         const transferMap = new Map()
         
-        // Process transfer_out movements (these are the main transfer records)
         const transferOutResults = transferOutMovements.results || []
         transferOutResults.forEach((movement: any) => {
-          // Use reference_id as unique identifier (it contains to_outlet_id)
-          // Combine with product_id and created_at for uniqueness
           const transferId = `${movement.id}_${movement.product?.id || movement.product}_${movement.created_at}`
           
           if (!transferMap.has(transferId)) {
             const fromOutletId = movement.outlet || (typeof movement.outlet === 'object' ? movement.outlet.id : movement.outlet)
-            const toOutletId = movement.reference_id || "N/A" // reference_id contains to_outlet_id
+            const toOutletId = movement.reference_id || "N/A"
             
             transferMap.set(transferId, {
               id: movement.id,
@@ -61,7 +56,7 @@ export default function TransfersPage() {
               from_outlet_id: fromOutletId,
               from_outlet_name: movement.outlet_name || (typeof movement.outlet === 'object' ? movement.outlet.name : "N/A"),
               to_outlet_id: toOutletId,
-              to_outlet_name: "N/A", // Will be filled from transfer_in
+              to_outlet_name: "N/A",
               quantity: movement.quantity,
               reason: movement.reason || "",
               date: movement.created_at,
@@ -70,18 +65,15 @@ export default function TransfersPage() {
           }
         })
         
-        // Get transfer_in movements to get to_outlet names
         const transferInMovements = await inventoryService.getMovements({
           movement_type: "transfer_in",
         })
         
         const transferInResults = transferInMovements.results || []
         transferInResults.forEach((movement: any) => {
-          // Match by product, quantity, and reference_id (which should match transfer_out id)
           const matchingTransfer = Array.from(transferMap.values()).find((t: any) => 
             String(t.product_id) === String(movement.product?.id || movement.product) &&
             t.quantity === movement.quantity &&
-            // Match by date proximity (within same day) or by reference_id
             (movement.reference_id === String(t.id) || 
              new Date(t.date).toDateString() === new Date(movement.created_at).toDateString())
           )
@@ -113,6 +105,7 @@ export default function TransfersPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Stock Transfers</h1>
@@ -124,11 +117,42 @@ export default function TransfersPage() {
           </Button>
         </div>
 
+        {/* Explanation Card */}
+        <Card className="border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <ArrowRightLeft className="h-5 w-5 text-purple-600 dark:text-purple-400 mt-0.5 flex-shrink-0" />
+              <div className="space-y-2">
+                <h3 className="font-semibold text-purple-900 dark:text-purple-100">What is Stock Transfer?</h3>
+                <p className="text-sm text-purple-800 dark:text-purple-200">
+                  Stock transfer is when you move products from one store location (outlet) to another. 
+                  For example, if Store A has too much of a product and Store B needs it, you can transfer items between them.
+                </p>
+                <div className="mt-3 space-y-1 text-sm text-purple-800 dark:text-purple-200">
+                  <p className="font-medium">When to use Stock Transfer:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>Moving products from one store to another</li>
+                    <li>Balancing inventory between locations</li>
+                    <li>Sending products to a branch that needs them</li>
+                    <li>Moving items from warehouse to retail store</li>
+                  </ul>
+                </div>
+                <div className="mt-3 p-2 bg-purple-100 dark:bg-purple-900/30 rounded text-xs text-purple-900 dark:text-purple-200">
+                  <p className="font-medium">💡 Example:</p>
+                  <p>Main Store has 100 units of Product X, but Branch Store needs 20 units. 
+                  Transfer 20 units from Main Store to Branch Store.</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Transfer History Table */}
         <Card>
           <CardHeader>
             <CardTitle>Transfer History</CardTitle>
             <CardDescription>
-              Track all stock transfers between outlets
+              Track all stock transfers between your outlets
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -155,6 +179,9 @@ export default function TransfersPage() {
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">
                       <p className="text-muted-foreground">No transfers found</p>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Create your first transfer to move products between outlets
+                      </p>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -210,4 +237,3 @@ export default function TransfersPage() {
     </DashboardLayout>
   )
 }
-

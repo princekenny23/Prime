@@ -1,7 +1,6 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
-import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -46,18 +45,11 @@ export default function ActiveShiftsPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard/office/shift-management">
-              <button className="text-muted-foreground hover:text-foreground">
-                ← Back
-              </button>
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold">Active Shifts</h1>
-              <p className="text-muted-foreground mt-1">
-                View currently active shifts
-              </p>
-            </div>
+          <div>
+            <h1 className="text-3xl font-bold">Active Shifts</h1>
+            <p className="text-muted-foreground mt-1">
+              View currently active shifts
+            </p>
           </div>
           <PageRefreshButton />
         </div>

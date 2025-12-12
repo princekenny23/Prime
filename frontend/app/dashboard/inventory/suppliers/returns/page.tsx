@@ -67,7 +67,7 @@ export default function PurchaseReturnsPage() {
             <h1 className="text-3xl font-bold">Purchase Returns</h1>
             <p className="text-muted-foreground">Handle returns of purchased items to suppliers</p>
           </div>
-          <Link href="/dashboard/office/suppliers/returns/new">
+          <Link href="/dashboard/inventory/suppliers/returns/new">
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               New Return
@@ -124,7 +124,7 @@ export default function PurchaseReturnsPage() {
                       <TableCell>${returnItem.total?.toFixed(2) || "0.00"}</TableCell>
                       <TableCell>{getStatusBadge(returnItem.status)}</TableCell>
                       <TableCell>
-                        <Link href={`/dashboard/office/suppliers/returns/${returnItem.id}`}>
+                        <Link href={`/dashboard/inventory/suppliers/returns/${returnItem.id}`}>
                           <Button variant="ghost" size="sm">View</Button>
                         </Link>
                       </TableCell>

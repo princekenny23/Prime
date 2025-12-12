@@ -16,7 +16,6 @@ import { Badge } from "@/components/ui/badge"
 import {
   Search,
   RotateCcw,
-  ArrowLeft,
   Eye,
 } from "lucide-react"
 import { useState, useEffect, useCallback, useMemo } from "react"
@@ -150,15 +149,8 @@ export default function ReturnsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-3">
-              <Link href="/dashboard/sales">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Returns</h1>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Returns</h1>
                 <p className="text-muted-foreground mt-1">
                   View and manage product returns and refunds
                 </p>

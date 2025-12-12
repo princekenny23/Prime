@@ -24,6 +24,7 @@ export interface CreateSaleData {
   subtotal: number
   tax?: number
   discount?: number
+  total: number
   payment_method: "cash" | "card" | "mobile" | "tab"
   notes?: string
   // Restaurant-specific fields
@@ -107,6 +108,7 @@ export const saleService = {
       subtotal: String(data.subtotal), // Backend expects string for DecimalField
       tax: data.tax ? String(data.tax) : "0",
       discount: data.discount ? String(data.discount) : "0",
+      total: String(data.total), // Backend expects string for DecimalField
       payment_method: data.payment_method,
       notes: data.notes || "",
     }
@@ -166,6 +168,32 @@ export const saleService = {
     const query = params.toString()
     // Use the stats action endpoint: /api/v1/sales/stats/
     return api.get(`/api/v1/sales/stats/${query ? `?${query}` : ""}`)
+  },
+
+  async getChartData(outletId?: string): Promise<Array<{
+    date: string
+    sales: number
+    profit: number
+  }>> {
+    const params = outletId ? `?outlet=${outletId}` : ""
+    return api.get(`/api/v1/sales/chart_data/${params}`)
+  },
+
+  async getTopSellingItems(filters?: { outlet?: string; start_date?: string; end_date?: string }): Promise<Array<{
+    id: string
+    name: string
+    sku: string
+    quantity: number
+    revenue: number
+    change: number
+  }>> {
+    const params = new URLSearchParams()
+    if (filters?.outlet) params.append("outlet", filters.outlet)
+    if (filters?.start_date) params.append("start_date", filters.start_date)
+    if (filters?.end_date) params.append("end_date", filters.end_date)
+    
+    const query = params.toString()
+    return api.get(`/api/v1/sales/top_selling_items/${query ? `?${query}` : ""}`)
   },
 }
 

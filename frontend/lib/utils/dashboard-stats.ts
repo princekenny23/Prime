@@ -41,10 +41,11 @@ export async function generateKPIData(
     yesterday.setDate(yesterday.getDate() - 1)
     const yesterdayStr = yesterday.toISOString().split("T")[0]
     
-    const [todayStats, yesterdayStats, productsData] = await Promise.all([
+    // Use optimized endpoints - count instead of loading all products
+    const [todayStats, yesterdayStats, productCount] = await Promise.all([
       saleService.getStats({ start_date: today, end_date: today }).catch(() => ({ total_revenue: 0, today_revenue: 0, total_sales: 0, today_sales: 0 })),
       saleService.getStats({ start_date: yesterdayStr, end_date: yesterdayStr }).catch(() => ({ total_revenue: 0, today_revenue: 0, total_sales: 0, today_sales: 0 })),
-      productService.list({ is_active: true }).catch(() => ({ results: [], count: 0 })),
+      productService.count({ is_active: true }).catch(() => 0),
     ])
     
     const todayRevenue = todayStats.today_revenue || todayStats.total_revenue || 0
@@ -57,7 +58,7 @@ export async function generateKPIData(
     return {
       sales: { value: todayRevenue, change: salesChange },
       customers: { value: 0, change: 0 }, // TODO: Get from customerService
-      products: { value: Array.isArray(productsData) ? productsData.length : (productsData.count || productsData.results?.length || 0), change: 0 },
+      products: { value: productCount, change: 0 },
       expenses: { value: 0, change: 0 }, // TODO: Get from expenses API
       profit: { value: todayRevenue, change: salesChange }, // TODO: Calculate properly with expenses
     }
@@ -75,33 +76,20 @@ export async function generateKPIData(
 }
 
 /**
- * Generate chart data for last 7 days
+ * Generate chart data for last 7 days - optimized single API call
  */
 export async function generateChartData(
   businessId: string,
   outletId?: string
 ): Promise<ChartDataPoint[]> {
   try {
-    const days: ChartDataPoint[] = []
-    const today = new Date()
-    
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today)
-      date.setDate(date.getDate() - i)
-      const dateStr = date.toISOString().split("T")[0]
-      
-      const stats = await saleService.getStats({ start_date: dateStr, end_date: dateStr }).catch(() => ({ total_revenue: 0, today_revenue: 0 }))
-      const dayTotal = stats.today_revenue || stats.total_revenue || 0
-      const dayProfit = dayTotal * 0.7 // TODO: Calculate profit properly with expenses
-      
-      days.push({
-        date: date.toLocaleDateString("en-US", { weekday: "short" }),
-        sales: dayTotal,
-        profit: dayProfit,
-      })
-    }
-    
-    return days
+    // Use optimized endpoint that returns all 7 days in one call
+    const chartData = await saleService.getChartData(outletId)
+    return chartData.map(item => ({
+      date: item.date,
+      sales: item.sales,
+      profit: item.profit,
+    }))
   } catch (error) {
     console.error("Failed to load chart data from API:", error)
     // Return empty array
@@ -164,61 +152,15 @@ export async function generateActivityData(
 }
 
 /**
- * Generate top selling items
+ * Generate top selling items - optimized backend query
  */
 export async function generateTopSellingItems(
   businessId: string,
   outletId?: string
 ) {
   try {
-    // Get recent sales to calculate top items
-    const salesResponse = await saleService.list({
-      outlet: outletId,
-      status: "completed",
-      page: 1,
-    })
-    
-    const sales = Array.isArray(salesResponse) ? salesResponse : (salesResponse.results || [])
-    
-    // Get all products
-    const productsResponse = await productService.list({ is_active: true })
-    const products = Array.isArray(productsResponse) ? productsResponse : (productsResponse.results || [])
-    
-    // Aggregate sales by product
-    const productSales: Record<string, { quantity: number; revenue: number }> = {}
-    
-    sales.forEach((sale: any) => {
-      if (sale.items && Array.isArray(sale.items)) {
-        sale.items.forEach((item: any) => {
-          const productId = item.product_id || item.productId || item.product?.id
-          if (productId) {
-            if (!productSales[productId]) {
-              productSales[productId] = { quantity: 0, revenue: 0 }
-            }
-            productSales[productId].quantity += item.quantity || 0
-            productSales[productId].revenue += (item.price || 0) * (item.quantity || 0)
-          }
-        })
-      }
-    })
-    
-    // Convert to array and sort by revenue
-    const topItems = Object.entries(productSales)
-      .map(([productId, data]) => {
-        const product = products.find((p: any) => String(p.id) === String(productId))
-        return {
-          id: productId,
-          name: product?.name || "Unknown Product",
-          sku: product?.sku || "N/A",
-          quantity: data.quantity,
-          revenue: data.revenue,
-          change: 0, // TODO: Calculate change from previous period
-        }
-      })
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 5)
-    
-    return topItems
+    // Use optimized endpoint that does aggregation on backend
+    return await saleService.getTopSellingItems({ outlet: outletId })
   } catch (error) {
     console.error("Failed to load top selling items from API:", error)
     return []

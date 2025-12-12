@@ -1,37 +1,20 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
-import Link from "next/link"
 import { 
-  LayoutDashboard,
   ShoppingCart,
   Users,
   FileText,
   Truck,
 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { OptionCard, type OptionCardProps } from "@/components/shared/option-card"
 
-interface RetailOptionCard {
-  id: string
-  title: string
-  href: string
-  icon: React.ComponentType<{ className?: string }>
-  bgColor: string
-  iconColor: string
-  textColor: string
-  description?: string
-}
-
-const retailOptions: RetailOptionCard[] = [
- 
+const retailOptions: Omit<OptionCardProps, "iconSize">[] = [
   {
     id: "wholesale",
     title: "Wholesale",
     href: "/dashboard/retail/wholesale",
     icon: ShoppingCart,
-    bgColor: "bg-gray-100",
-    iconColor: "text-gray-700",
-    textColor: "text-foreground",
     description: "Manage wholesale pricing and quantities"
   },
   {
@@ -39,9 +22,6 @@ const retailOptions: RetailOptionCard[] = [
     title: "Customer Groups",
     href: "/dashboard/retail/customer-groups",
     icon: Users,
-    bgColor: "bg-blue-900",
-    iconColor: "text-white",
-    textColor: "text-white",
     description: "Organize customers into groups for pricing"
   },
   {
@@ -49,9 +29,6 @@ const retailOptions: RetailOptionCard[] = [
     title: "Price Lists",
     href: "/dashboard/retail/price-lists",
     icon: FileText,
-    bgColor: "bg-gray-100",
-    iconColor: "text-gray-700",
-    textColor: "text-foreground",
     description: "Create and manage custom price lists"
   },
   {
@@ -59,9 +36,6 @@ const retailOptions: RetailOptionCard[] = [
     title: "Deliveries",
     href: "/dashboard/retail/deliveries",
     icon: Truck,
-    bgColor: "bg-blue-900",
-    iconColor: "text-white",
-    textColor: "text-white",
     description: "Track and manage delivery orders"
   },
 ]
@@ -80,51 +54,13 @@ export default function RetailPage() {
 
         {/* Option Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {retailOptions.map((option) => {
-            const Icon = option.icon
-            const isFullColor = option.bgColor.includes("900")
-            
-            return (
-              <Link
-                key={option.id}
-                href={option.href}
-                className="group block"
-              >
-                <div
-                  className={cn(
-                    "relative h-52 rounded-xl shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] cursor-pointer overflow-hidden",
-                    option.bgColor
-                  )}
-                >
-                  {/* Icon Section - Centered */}
-                  <div className={cn(
-                    "absolute top-8 left-1/2 transform -translate-x-1/2",
-                    isFullColor ? "opacity-100" : "opacity-90"
-                  )}>
-                    <Icon className={cn("h-12 w-12", option.iconColor)} />
-                  </div>
-
-                  {/* Title Section */}
-                  <div className={cn(
-                    "absolute bottom-0 left-0 right-0 p-5 rounded-b-xl",
-                    isFullColor 
-                      ? option.bgColor 
-                      : "bg-white"
-                  )}>
-                    <h3 className={cn(
-                      "font-semibold text-lg text-center",
-                      isFullColor ? option.textColor : "text-foreground"
-                    )}>
-                      {option.title}
-                    </h3>
-                  </div>
-
-                  {/* Hover Overlay */}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-200" />
-                </div>
-              </Link>
-            )
-          })}
+          {retailOptions.map((option) => (
+            <OptionCard
+              key={option.id}
+              {...option}
+              iconSize="sm"
+            />
+          ))}
         </div>
       </div>
     </DashboardLayout>

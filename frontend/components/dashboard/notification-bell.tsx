@@ -14,10 +14,12 @@ import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { notificationService, type Notification } from "@/lib/services/notificationService"
 import { useBusinessStore } from "@/stores/businessStore"
+import { useTenant } from "@/contexts/tenant-context"
 import { useWebSocketNotifications } from "@/hooks/useWebSocketNotifications"
 
 export function NotificationBell() {
   const { currentBusiness } = useBusinessStore()
+  const { currentOutlet } = useTenant()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [isLoading, setIsLoading] = useState(true)
   
@@ -35,7 +37,7 @@ export function NotificationBell() {
     }, 30000)
 
     return () => clearInterval(interval)
-  }, [currentBusiness])
+  }, [currentBusiness, currentOutlet])
 
   // Update notifications list when new notification arrives via WebSocket
   useEffect(() => {
@@ -64,7 +66,12 @@ export function NotificationBell() {
 
     try {
       setIsLoading(true)
-      const response = await notificationService.list({ page_size: 10 })
+      const filters: any = { page_size: 10 }
+      // Filter by current outlet if available
+      if (currentOutlet?.id) {
+        filters.outlet_id = currentOutlet.id
+      }
+      const response = await notificationService.list(filters)
       setNotifications(response.results || [])
     } catch (error) {
       console.error("Failed to load notifications:", error)

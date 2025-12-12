@@ -16,7 +16,6 @@ import { Badge } from "@/components/ui/badge"
 import {
   Search,
   CreditCard,
-  ArrowLeft,
   Eye,
   AlertCircle,
 } from "lucide-react"
@@ -196,15 +195,8 @@ export default function CreditsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-3">
-              <Link href="/dashboard/sales">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Credit Sales</h1>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Credit Sales</h1>
                 <p className="text-muted-foreground mt-1">
                   Track credit sales and outstanding payments
                 </p>
@@ -225,7 +217,7 @@ export default function CreditsPage() {
                   </p>
                 </div>
                 <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                  <CreditCard className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  <CreditCard className="h-6 w-6 text-blue-900 dark:text-blue-900" />
                 </div>
               </div>
             </CardContent>

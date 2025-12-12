@@ -14,20 +14,12 @@ import {
   FileText,
   Calendar
 } from "lucide-react"
-import Link from "next/link"
 import { useState } from "react"
 import { ExportReportModal } from "@/components/modals/export-report-modal"
-import { cn } from "@/lib/utils"
+import { OptionCard, type OptionCardProps } from "@/components/shared/option-card"
 
-interface ReportCard {
-  id: string
-  title: string
+interface ReportCard extends Omit<OptionCardProps, "iconSize"> {
   description: string
-  icon: React.ComponentType<{ className?: string }>
-  href: string
-  bgColor: string
-  iconColor: string
-  textColor: string
   stats?: {
     label: string
     value: string
@@ -41,9 +33,6 @@ const reportCards: ReportCard[] = [
     description: "Analyze sales performance, trends, and top-selling products",
     icon: TrendingUp,
     href: "/dashboard/reports/sales",
-    bgColor: "bg-blue-900",
-    iconColor: "text-white",
-    textColor: "text-white",
     stats: {
       label: "This Month",
       value: "MWK 45,231"
@@ -55,9 +44,6 @@ const reportCards: ReportCard[] = [
     description: "Customer behavior, loyalty, and lifetime value insights",
     icon: Users,
     href: "/dashboard/reports/customers",
-    bgColor: "bg-gray-100",
-    iconColor: "text-gray-700",
-    textColor: "text-foreground",
     stats: {
       label: "Active Customers",
       value: "573"
@@ -69,9 +55,6 @@ const reportCards: ReportCard[] = [
     description: "Stock levels, movement, and product performance",
     icon: Package,
     href: "/dashboard/reports/inventory",
-    bgColor: "bg-blue-900",
-    iconColor: "text-white",
-    textColor: "text-white",
     stats: {
       label: "Total Products",
       value: "1,234"
@@ -83,9 +66,6 @@ const reportCards: ReportCard[] = [
     description: "Tax calculations, compliance, and tax summaries",
     icon: Receipt,
     href: "/dashboard/reports/tax",
-    bgColor: "bg-gray-100",
-    iconColor: "text-gray-700",
-    textColor: "text-foreground",
     stats: {
       label: "This Month",
       value: "MWK 2,345"
@@ -97,9 +77,6 @@ const reportCards: ReportCard[] = [
     description: "Profit & loss, expenses, and comprehensive financial analysis",
     icon: DollarSign,
     href: "/dashboard/reports/financial",
-    bgColor: "bg-blue-900",
-    iconColor: "text-white",
-    textColor: "text-white",
     stats: {
       label: "Net Profit",
       value: "MWK 12,456"
@@ -111,9 +88,6 @@ const reportCards: ReportCard[] = [
     description: "Compare performance across all outlets and locations",
     icon: Store,
     href: "/dashboard/reports/multi-outlet",
-    bgColor: "bg-gray-100",
-    iconColor: "text-gray-700",
-    textColor: "text-foreground",
     stats: {
       label: "Active Outlets",
       value: "5"
@@ -210,51 +184,16 @@ export default function ReportsPage() {
         <div>
           <h2 className="text-xl font-semibold mb-4">Available Reports</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {reportCards.map((report) => {
-              const Icon = report.icon
-              const isFullColor = report.bgColor.includes("900")
-              
-              return (
-                <Link
-                  key={report.id}
-                  href={report.href}
-                  className="group block"
-                >
-                  <div
-                    className={cn(
-                      "relative h-52 rounded-xl shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] cursor-pointer overflow-hidden",
-                      report.bgColor
-                    )}
-                  >
-                    {/* Icon Section - Centered */}
-                    <div className={cn(
-                      "absolute top-8 left-1/2 transform -translate-x-1/2",
-                      isFullColor ? "opacity-100" : "opacity-90"
-                    )}>
-                      <Icon className={cn("h-12 w-12", report.iconColor)} />
-                    </div>
-
-                    {/* Title Section */}
-                    <div className={cn(
-                      "absolute bottom-0 left-0 right-0 p-5 rounded-b-xl",
-                      isFullColor 
-                        ? report.bgColor 
-                        : "bg-white dark:bg-gray-900"
-                    )}>
-                      <h3 className={cn(
-                        "font-semibold text-lg text-center",
-                        isFullColor ? report.textColor : "text-foreground"
-                      )}>
-                        {report.title}
-                      </h3>
-                    </div>
-
-                    {/* Hover Overlay */}
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-200" />
-                  </div>
-                </Link>
-              )
-            })}
+            {reportCards.map((report) => (
+              <OptionCard
+                key={report.id}
+                id={report.id}
+                title={report.title}
+                href={report.href}
+                icon={report.icon}
+                iconSize="sm"
+              />
+            ))}
           </div>
         </div>
       </div>

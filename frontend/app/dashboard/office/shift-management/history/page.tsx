@@ -35,7 +35,6 @@ import {
 } from "lucide-react"
 import { format } from "date-fns"
 import { useState, useEffect } from "react"
-import Link from "next/link"
 import { useShift, Shift } from "@/contexts/shift-context"
 import { useBusinessStore } from "@/stores/businessStore"
 import { shiftService } from "@/lib/services/shiftService"
@@ -152,18 +151,11 @@ export default function ShiftHistoryPage() {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard/office/shift-management">
-              <button className="text-muted-foreground hover:text-foreground">
-                ← Back
-              </button>
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Shift History</h1>
-              <p className="text-muted-foreground mt-1">
-                View and manage all day shift records
-              </p>
-            </div>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Shift History</h1>
+            <p className="text-muted-foreground mt-1">
+              View and manage all day shift records
+            </p>
           </div>
           <Button>
             <Download className="mr-2 h-4 w-4" />

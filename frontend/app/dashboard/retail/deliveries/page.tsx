@@ -23,7 +23,6 @@ import { Badge } from "@/components/ui/badge"
 import {
   Search,
   Truck,
-  ArrowLeft,
   Eye,
   CheckCircle,
   XCircle,
@@ -113,7 +112,7 @@ export default function DeliveriesPage() {
   const getStatusBadge = (status: string) => {
     const config: Record<string, { bg: string; text: string; icon: any }> = {
       pending: { bg: "bg-yellow-100", text: "text-yellow-800", icon: Clock },
-      confirmed: { bg: "bg-blue-100", text: "text-blue-800", icon: CheckCircle },
+      confirmed: { bg: "bg-blue-100", text: "text-blue-900", icon: CheckCircle },
       preparing: { bg: "bg-purple-100", text: "text-purple-800", icon: Package },
       ready: { bg: "bg-green-100", text: "text-green-800", icon: CheckCircle },
       in_transit: { bg: "bg-indigo-100", text: "text-indigo-800", icon: Truck },
@@ -183,15 +182,8 @@ export default function DeliveriesPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-3">
-              <Link href="/dashboard/retail">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Deliveries</h1>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Deliveries</h1>
                 <p className="text-muted-foreground mt-1">
                   Manage wholesale deliveries and fulfillment
                 </p>
@@ -209,7 +201,7 @@ export default function DeliveriesPage() {
                   <p className="text-sm font-medium text-muted-foreground">Total Deliveries</p>
                   <p className="text-2xl font-bold mt-1">{summaryStats.total}</p>
                 </div>
-                <Truck className="h-8 w-8 text-blue-600" />
+                <Truck className="h-8 w-8 text-blue-900" />
               </div>
             </CardContent>
           </Card>

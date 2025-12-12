@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Plus, Search, Package, Upload, Filter, Folder, Trash2, RefreshCw, AlertTriangle } from "lucide-react"
+import { Plus, Search, Upload, Filter, Folder, Trash2, RefreshCw, AlertTriangle } from "lucide-react"
 import Link from "next/link"
 import { useState, useEffect, useCallback } from "react"
 import { AddEditProductModal } from "@/components/modals/add-edit-product-modal"
@@ -291,10 +291,7 @@ export default function ProductsPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Package className="h-8 w-8 text-primary" />
-              <h1 className="text-3xl font-bold">Products</h1>
-            </div>
+            <h1 className="text-3xl font-bold mb-2">Products</h1>
             <p className="text-muted-foreground">
               Manage your product catalog
               {isAutoRefreshing && (
@@ -313,7 +310,7 @@ export default function ProductsPage() {
               <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing || isAutoRefreshing ? "animate-spin" : ""}`} />
               Refresh
             </Button>
-            <Link href="/dashboard/products/categories">
+            <Link href="/dashboard/inventory/products/categories">
               <Button variant="outline">
                 <Folder className="mr-2 h-4 w-4" />
                 Categories
@@ -400,7 +397,7 @@ export default function ProductsPage() {
                     <TableRow key={product.id}>
                       <TableCell>
                         <Link 
-                          href={`/dashboard/products/${product.id}`}
+                          href={`/dashboard/inventory/products/${product.id}`}
                           className="font-medium hover:text-primary"
                         >
                           {product.name}
