@@ -742,11 +742,44 @@ For support and questions, contact the development team.
 
 ### 🎯 **Current Focus: Wholesale & Retail MVP (Primary Client)**
 
-**Status**: **85% Complete** - Production ready for cash-only operations  
+**Status**: **87% Complete** - Production ready for cash-only operations  
 **Target**: Square POS feature parity for wholesale & retail businesses  
 **Timeline**: 4-6 weeks to full MVP
 
 See **[WHOLESALE_RETAIL_SQUARE_POS_ROADMAP.md](./WHOLESALE_RETAIL_SQUARE_POS_ROADMAP.md)** for detailed implementation plan.
+
+---
+
+### 🆕 **Recent Updates (Latest Release)**
+
+#### **Frontend Improvements**
+- ✅ **Products Page Redesign** - Modern tabbed interface (All Products, Low Stocks, Expiries) for fast navigation
+- ✅ **Stock Adjustments** - New dedicated page with modern POS form design (Loyverse/Vend/KPOS style)
+  - Two-column layout with guide text
+  - Helper tooltips and explanatory text
+  - Clean items table with Current Qty, Change, New Quantity columns
+- ✅ **Notifications** - Moved to settings folder, unified with preferences in tabs
+- ✅ **Outlets Consolidation** - Settings/outlets is canonical, office/outlets redirects
+- ✅ **Employee Management** - Renamed from Staff throughout system (frontend & backend)
+- ✅ **System-wide Design** - Blue-900 color standardization across all components
+- ✅ **Reusable Components** - OptionCard component for consistent landing page design
+- ✅ **PrimePOS Logo** - Full logo and icon versions integrated system-wide
+- ✅ **Login Page** - Redesigned with centered floating card
+- ✅ **POS Landing Page** - Shift selection with cash register icon
+- ✅ **Notification Bell** - Blinking blue ring animation (no number badge)
+
+#### **Backend Improvements**
+- ✅ **Expenses Model** - Complete CRUD API with filtering and stats
+- ✅ **Notification Filtering** - Tenant and outlet-specific notifications
+- ✅ **Business Setup** - All fields now updatable (type, taxId, currencySymbol)
+- ✅ **Staff Model** - Renamed to Employee (verbose_name updated)
+- ✅ **Product Import** - Pre-import outlet selection with tenant isolation
+
+#### **New Features**
+- ✅ **Inventory Expiry Tracking** - Manufacturing and expiry date fields
+- ✅ **Stock Returns** - Customer and supplier return tracking
+- ✅ **Stock Received** - Renamed from Receiving, added outlet field
+- ✅ **Quotations** - Frontend UI for quotation management (backend pending)
 
 ---
 
