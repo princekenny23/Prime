@@ -1,5 +1,6 @@
 import React from "react"
 import Link from "next/link"
+import { PrimePOSLogo } from "@/components/brand/primepos-logo"
 
 interface AuthLayoutProps {
   children: React.ReactNode
@@ -11,8 +12,8 @@ export function AuthLayout({ children }: AuthLayoutProps) {
       {/* Header */}
       <header className="border-b bg-background">
         <div className="container mx-auto px-4 py-4">
-          <Link href="/" className="text-2xl font-bold text-primary">
-            PrimePOS
+          <Link href="/">
+            <PrimePOSLogo variant="full" size="md" version={1} />
           </Link>
         </div>
       </header>

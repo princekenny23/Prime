@@ -38,7 +38,6 @@ import { Separator } from "@/components/ui/separator"
 import {
   Search,
   Receipt,
-  ArrowLeft,
   Filter,
   CalendarIcon,
   User,
@@ -313,20 +312,10 @@ export default function TransactionsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-3">
-              <Link href="/dashboard/sales">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">All Transactions</h1>
-                <p className="text-muted-foreground mt-1">
-                  Comprehensive view of all sales transactions
-                </p>
-              </div>
-            </div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">All Transactions</h1>
+            <p className="text-muted-foreground mt-1">
+              Comprehensive view of all sales transactions
+            </p>
           </div>
         </div>
 

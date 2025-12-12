@@ -561,6 +561,45 @@ class ProductViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Check for outlet early - before processing file
+        # Try header first, then query param, then request data
+        outlet_id = request.headers.get('X-Outlet-ID') or request.query_params.get('outlet') or request.data.get('outlet')
+        
+        if not outlet_id:
+            # Return structured response with tenant outlets
+            from apps.outlets.models import Outlet
+            tenant_outlets = Outlet.objects.filter(tenant=tenant, is_active=True).order_by('name')
+            outlets_list = [{'id': outlet.id, 'name': outlet.name} for outlet in tenant_outlets]
+            
+            logger.info(f"Bulk import requires outlet selection. Tenant has {len(outlets_list)} outlets.")
+            return Response(
+                {
+                    'requires_outlet': True,
+                    'message': 'Please select an outlet for this import',
+                    'outlets': outlets_list
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate outlet belongs to tenant
+        from apps.outlets.models import Outlet
+        try:
+            outlet = Outlet.objects.get(id=outlet_id, tenant=tenant)
+        except (Outlet.DoesNotExist, ValueError, TypeError):
+            # Return structured response with tenant outlets
+            tenant_outlets = Outlet.objects.filter(tenant=tenant, is_active=True).order_by('name')
+            outlets_list = [{'id': outlet.id, 'name': outlet.name} for outlet in tenant_outlets]
+            
+            logger.warning(f"Invalid outlet ID {outlet_id} for tenant {tenant.id}")
+            return Response(
+                {
+                    'requires_outlet': True,
+                    'message': f'Outlet with ID {outlet_id} not found or does not belong to your business. Please select a valid outlet.',
+                    'outlets': outlets_list
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         results = {
             'success': False,
             'total_rows': 0,
@@ -872,28 +911,8 @@ class ProductViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                             except (ValueError, TypeError):
                                 pass  # Invalid wholesale price, skip it
                     
-                    # Get outlet from request for bulk import
-                    # Try header first, then query param, then request data
-                    outlet_id = request.headers.get('X-Outlet-ID') or request.query_params.get('outlet') or request.data.get('outlet')
-                    if not outlet_id:
-                        results['errors'].append({
-                            'row': row_num,
-                            'product_name': name,
-                            'error': 'Outlet is required for bulk import. Please specify X-Outlet-ID header or ?outlet=id query parameter.'
-                        })
-                        results['failed'] += 1
-                        continue
-                    
-                    try:
-                        outlet = Outlet.objects.get(id=outlet_id, tenant=tenant)
-                    except (Outlet.DoesNotExist, ValueError, TypeError):
-                        results['errors'].append({
-                            'row': row_num,
-                            'product_name': name,
-                            'error': f'Outlet with ID {outlet_id} not found or does not belong to tenant.'
-                        })
-                        results['failed'] += 1
-                        continue
+                    # Outlet is already validated earlier, use it directly
+                    # outlet_id and outlet are already set above
                     
                     # Create or update product (outlet-specific)
                     product, product_created = Product.objects.get_or_create(

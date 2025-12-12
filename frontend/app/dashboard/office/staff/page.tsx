@@ -128,7 +128,7 @@ export default function StaffPage() {
 
     return matchesSearch && matchesRole && matchesStatus
   })
-
+ 
   const activeCount = staff.filter(s => s.is_active).length
   const roleNames = roles.map(r => r.name)
 
@@ -143,14 +143,14 @@ export default function StaffPage() {
     try {
       await staffService.update(staffToDeactivate, { is_active: false })
       toast({
-        title: "Staff Deactivated",
-        description: "Staff member has been deactivated successfully.",
+        title: "Employee Deactivated",
+        description: "Employee has been deactivated successfully.",
       })
       loadStaff()
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to deactivate staff member.",
+        description: error.message || "Failed to deactivate employee.",
         variant: "destructive",
       })
     } finally {
@@ -164,8 +164,8 @@ export default function StaffPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Staff Management</h1>
-            <p className="text-muted-foreground">Manage your staff members and their roles</p>
+            <h1 className="text-3xl font-bold">Employee Management</h1>
+            <p className="text-muted-foreground">Manage your employees and their roles</p>
           </div>
           <div className="flex items-center gap-2">
             <Button 
@@ -183,7 +183,7 @@ export default function StaffPage() {
               setShowAddStaff(true)
             }}>
               <Plus className="mr-2 h-4 w-4" />
-              Add Staff
+              Add Employee
             </Button>
           </div>
         </div>
@@ -192,7 +192,7 @@ export default function StaffPage() {
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Staff</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
               <User className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -202,7 +202,7 @@ export default function StaffPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Staff</CardTitle>
+              <CardTitle className="text-sm font-medium">Active Employees</CardTitle>
               <User className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -272,9 +272,9 @@ export default function StaffPage() {
         {/* Staff Table */}
         <Card>
           <CardHeader>
-            <CardTitle>All Staff Members</CardTitle>
+            <CardTitle>All Employees</CardTitle>
             <CardDescription>
-              {filteredStaff.length} staff member{filteredStaff.length !== 1 ? "s" : ""} found
+              {filteredStaff.length} employee{filteredStaff.length !== 1 ? "s" : ""} found
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -293,13 +293,13 @@ export default function StaffPage() {
                 {isLoading ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8">
-                      <p className="text-muted-foreground">Loading staff...</p>
+                      <p className="text-muted-foreground">Loading employees...</p>
                     </TableCell>
                   </TableRow>
                 ) : filteredStaff.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8">
-                      <p className="text-muted-foreground">No staff members found</p>
+                      <p className="text-muted-foreground">No employees found</p>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -434,9 +434,9 @@ export default function StaffPage() {
       <AlertDialog open={showDeactivate} onOpenChange={setShowDeactivate}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Deactivate Staff Member?</AlertDialogTitle>
+            <AlertDialogTitle>Deactivate Employee?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to deactivate this staff member? They will no longer be able to access the system. This action can be reversed later.
+              Are you sure you want to deactivate this employee? They will no longer be able to access the system. This action can be reversed later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -445,7 +445,7 @@ export default function StaffPage() {
               onClick={confirmDeactivate}
               className="bg-destructive text-destructive-foreground"
             >
-              Deactivate Staff
+              Deactivate Employee
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

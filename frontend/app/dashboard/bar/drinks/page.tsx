@@ -319,7 +319,7 @@ export default function DrinksPage() {
                       <TableRow key={drink.id}>
                         <TableCell className="font-medium">
                           <Link 
-                            href={`/dashboard/products/${drink.id}`}
+                            href={`/dashboard/inventory/products/${drink.id}`}
                             className="hover:text-primary"
                           >
                             {drink.name}
@@ -375,7 +375,7 @@ export default function DrinksPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Link href={`/dashboard/products/${drink.id}`}>
+                            <Link href={`/dashboard/inventory/products/${drink.id}`}>
                               <Button variant="ghost" size="sm" title="View Details">
                                 <Eye className="h-4 w-4" />
                               </Button>
@@ -398,7 +398,7 @@ export default function DrinksPage() {
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem asChild>
-                                  <Link href={`/dashboard/products/${drink.id}`} className="flex items-center">
+                                  <Link href={`/dashboard/inventory/products/${drink.id}`} className="flex items-center">
                                     <Eye className="mr-2 h-4 w-4" />
                                     View Details
                                   </Link>

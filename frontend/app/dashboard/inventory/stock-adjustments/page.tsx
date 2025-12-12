@@ -11,16 +11,29 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Plus, ArrowUpDown } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { AlertCircle, Info, Plus, ArrowUpDown, Upload } from "lucide-react"
 import { useState, useEffect, useCallback } from "react"
-import { StockAdjustmentModal } from "@/components/modals/stock-adjustment-modal"
+import Link from "next/link"
 import { inventoryService } from "@/lib/services/inventoryService"
 import { useBusinessStore } from "@/stores/businessStore"
 import { useRealAPI } from "@/lib/utils/api-config"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function StockAdjustmentsPage() {
+  const { toast } = useToast()
   const { currentBusiness, currentOutlet } = useBusinessStore()
-  const [showAdjustment, setShowAdjustment] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
   const [adjustments, setAdjustments] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const useReal = useRealAPI()
@@ -42,18 +55,9 @@ export default function StockAdjustmentsPage() {
     setIsLoading(true)
     try {
       if (useReal) {
-        // Load all adjustments for the tenant (don't filter by outlet)
-        // Backend automatically filters by tenant via TenantFilterMixin
-        // We show all adjustments regardless of outlet so users can see full history
         const filterParams: any = {
           movement_type: "adjustment",
         }
-        
-        // Don't filter by outlet - show all adjustments for the tenant
-        // If you want to filter by outlet, uncomment below:
-        // if (currentOutlet?.id) {
-        //   filterParams.outlet = currentOutlet.id
-        // }
         
         console.log("Calling getMovements with filters:", filterParams)
         const movements = await inventoryService.getMovements(filterParams)
@@ -73,25 +77,21 @@ export default function StockAdjustmentsPage() {
         }
         
         const mappedAdjustments = (movements.results || []).map((m: any) => {
-          // Handle both direct product object and nested product
           const productName = m.product_name || 
                              (typeof m.product === 'string' ? m.product : m.product?.name) || 
                              "N/A"
           
-          // Handle both direct user object and nested user
           const userName = m.user_name || 
                           (typeof m.user === 'string' ? m.user : m.user?.name) || 
                           (m.user?.email || "System")
           
-          // Handle outlet - can be object, ID, or use outlet_name from backend
           const outletName = m.outlet_name || 
                             (typeof m.outlet === 'object' 
                               ? (m.outlet?.name || "N/A")
                               : (typeof m.outlet === 'string' || typeof m.outlet === 'number')
-                              ? String(m.outlet) // If it's just an ID, fallback to ID
+                              ? String(m.outlet)
                               : "N/A")
           
-          // Ensure date is a valid string
           const dateValue = m.created_at || m.date || new Date().toISOString()
           
           const mapped = {
@@ -121,15 +121,12 @@ export default function StockAdjustmentsPage() {
       }
     } catch (error) {
       console.error("Failed to load adjustments:", error)
-      // Don't clear adjustments on error, keep existing data
-      // setAdjustments([])
     } finally {
       setIsLoading(false)
     }
   }, [currentBusiness?.id, currentOutlet?.id, useReal])
 
   useEffect(() => {
-    // Only load if we have a business
     if (currentBusiness) {
       console.log("useEffect triggered - loading adjustments", {
         currentBusinessId: currentBusiness.id,
@@ -137,7 +134,6 @@ export default function StockAdjustmentsPage() {
       })
       loadAdjustments()
       
-      // Listen for outlet changes
       const handleOutletChange = () => {
         loadAdjustments()
       }
@@ -151,7 +147,6 @@ export default function StockAdjustmentsPage() {
     }
   }, [currentBusiness?.id, loadAdjustments])
   
-  // Debug: Log adjustments state changes
   useEffect(() => {
     console.log("Adjustments state changed:", {
       count: adjustments.length,
@@ -160,25 +155,113 @@ export default function StockAdjustmentsPage() {
     })
   }, [adjustments, isLoading])
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const selectedFile = e.target.files[0]
+      const fileName = selectedFile.name.toLowerCase()
+      
+      if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls') && !fileName.endsWith('.csv')) {
+        toast({
+          title: "Invalid File Type",
+          description: "Please select an Excel (.xlsx, .xls) or CSV (.csv) file.",
+          variant: "destructive",
+        })
+        return
+      }
+      
+      setImportFile(selectedFile)
+    }
+  }
+
+  const handleImport = async () => {
+    if (!importFile) {
+      toast({
+        title: "No File Selected",
+        description: "Please select a file to import.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsImporting(true)
+    try {
+      // TODO: Implement stock adjustment import API call
+      toast({
+        title: "Import Feature",
+        description: "Stock adjustment import functionality will be implemented soon.",
+      })
+      
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      setShowImportModal(false)
+      setImportFile(null)
+    } catch (error: any) {
+      console.error("Failed to import adjustments:", error)
+      toast({
+        title: "Import Failed",
+        description: error.message || "Failed to import adjustments. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Stock Adjustments</h1>
             <p className="text-muted-foreground">Adjust inventory levels manually</p>
           </div>
-          <Button onClick={() => setShowAdjustment(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Adjustment
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setShowImportModal(true)}>
+              <Upload className="mr-2 h-4 w-4" />
+              Import Adjustments
+            </Button>
+            <Link href="/dashboard/inventory/stock-adjustments/new">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                New Adjustment
+              </Button>
+            </Link>
+          </div>
         </div>
 
+        {/* Explanation Card */}
+        <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 text-blue-900 dark:text-blue-900 mt-0.5 flex-shrink-0" />
+              <div className="space-y-2">
+                <h3 className="font-semibold text-blue-900 dark:text-blue-100">What is Stock Adjustment?</h3>
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  Stock adjustment lets you fix inventory counts when they don't match reality. 
+                  For example, if you count 50 items but the system shows 45, you can add 5 items. 
+                  Or if you find damaged items, you can remove them from stock.
+                </p>
+                <div className="mt-3 space-y-1 text-sm text-blue-800 dark:text-blue-200">
+                  <p className="font-medium">Common reasons for adjustments:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>Found items that were not recorded</li>
+                    <li>Items damaged, lost, or stolen</li>
+                    <li>Counting errors that need correction</li>
+                    <li>Items returned by customers</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Adjustment History Table */}
         <Card>
           <CardHeader>
             <CardTitle>Adjustment History</CardTitle>
             <CardDescription>
-              Track all manual stock adjustments
+              Track all manual stock adjustments made to your inventory
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -206,7 +289,7 @@ export default function StockAdjustmentsPage() {
                     <TableCell colSpan={7} className="text-center py-8">
                       <p className="text-muted-foreground">No adjustments found</p>
                       <p className="text-xs text-muted-foreground mt-2">
-                        (Check console for API response)
+                        Create your first adjustment to get started
                       </p>
                     </TableCell>
                   </TableRow>
@@ -223,7 +306,7 @@ export default function StockAdjustmentsPage() {
                         <TableCell className="font-medium">{adjustment.product || "N/A"}</TableCell>
                         <TableCell>{adjustment.outlet || "N/A"}</TableCell>
                         <TableCell>{adjustment.reason || "Adjustment"}</TableCell>
-                        <TableCell className={adjustment.quantity > 0 ? "text-green-600" : "text-red-600"}>
+                        <TableCell className={adjustment.quantity > 0 ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
                           {adjustment.quantity > 0 ? "+" : ""}{adjustment.quantity}
                         </TableCell>
                         <TableCell>{adjustment.user || "System"}</TableCell>
@@ -240,12 +323,77 @@ export default function StockAdjustmentsPage() {
         </Card>
       </div>
 
-      <StockAdjustmentModal
-        open={showAdjustment}
-        onOpenChange={setShowAdjustment}
-        onSuccess={loadAdjustments}
-      />
+      {/* Import Adjustments Modal */}
+      <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Import Stock Adjustments</DialogTitle>
+            <DialogDescription>
+              Upload an Excel or CSV file to import multiple stock adjustments at once.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>File (Excel or CSV)</Label>
+              <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground mb-2">
+                  {importFile ? importFile.name : "No file selected"}
+                </p>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleFileChange}
+                  className="hidden"
+                  id="adjustment-file-upload"
+                />
+                <Label htmlFor="adjustment-file-upload">
+                  <Button variant="outline" asChild>
+                    <span>Choose File</span>
+                  </Button>
+                </Label>
+              </div>
+            </div>
+
+            <div className="rounded-md bg-blue-50 dark:bg-blue-950/20 p-3 text-sm text-blue-900 dark:text-blue-200">
+              <p className="font-medium mb-1">File Format Requirements:</p>
+              <ul className="list-disc list-inside space-y-1 text-xs">
+                <li>Product SKU or Barcode</li>
+                <li>Adjustment Quantity (positive to add, negative to remove)</li>
+                <li>Reason for adjustment</li>
+                <li>Outlet (optional)</li>
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowImportModal(false)
+                setImportFile(null)
+              }}
+              disabled={isImporting}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleImport} disabled={!importFile || isImporting}>
+              {isImporting ? (
+                <>
+                  <Upload className="mr-2 h-4 w-4 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   )
 }
-

@@ -9,6 +9,10 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "PrimePOS - Multi-Business Point of Sale Platform",
   description: "A comprehensive SaaS POS platform for retail, restaurant, pharmacy, wholesale, and more.",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-icon.svg",
+  },
 }
 
 export default function RootLayout({

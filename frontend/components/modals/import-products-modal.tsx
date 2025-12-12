@@ -15,6 +15,7 @@ import { useState } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { productService } from "@/lib/services/productService"
 import { useBusinessStore } from "@/stores/businessStore"
+import { OutletSelectionModal } from "./outlet-selection-modal"
 import {
   getFieldsForBusinessType,
   getRequiredFields,
@@ -37,6 +38,11 @@ export function ImportProductsModal({ open, onOpenChange, onSuccess }: ImportPro
   const [isLoading, setIsLoading] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [importResult, setImportResult] = useState<any>(null)
+  const [showOutletSelection, setShowOutletSelection] = useState(false)
+  const [outletSelectionData, setOutletSelectionData] = useState<{
+    outlets: Array<{ id: number | string; name: string }>
+    message: string
+  } | null>(null)
   
   const businessType = currentBusiness?.type as BusinessType
   const allFields = getFieldsForBusinessType(businessType)
@@ -106,7 +112,7 @@ export function ImportProductsModal({ open, onOpenChange, onSuccess }: ImportPro
     })
   }
 
-  const handleImport = async () => {
+  const handleImport = async (outletId?: string) => {
     if (!file) {
       toast({
         title: "No File Selected",
@@ -120,7 +126,19 @@ export function ImportProductsModal({ open, onOpenChange, onSuccess }: ImportPro
     setImportResult(null)
 
     try {
-      const result = await productService.bulkImport(file)
+      const result = await productService.bulkImport(file, outletId)
+      
+      // Check if outlet selection is required
+      if (result.requires_outlet) {
+        setOutletSelectionData({
+          outlets: result.outlets || [],
+          message: result.message || "Please select an outlet for this import"
+        })
+        setShowOutletSelection(true)
+        setIsLoading(false)
+        return
+      }
+      
       setImportResult(result)
       
       if (result.success) {
@@ -154,6 +172,12 @@ export function ImportProductsModal({ open, onOpenChange, onSuccess }: ImportPro
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleOutletSelected = async (outletId: string) => {
+    setShowOutletSelection(false)
+    // Retry import with selected outlet
+    await handleImport(outletId)
   }
 
   return (
@@ -378,11 +402,23 @@ export function ImportProductsModal({ open, onOpenChange, onSuccess }: ImportPro
           }}>
             {importResult ? "Close" : "Cancel"}
           </Button>
-          <Button onClick={handleImport} disabled={!file || isLoading}>
+          <Button onClick={() => handleImport()} disabled={!file || isLoading}>
             {isLoading ? "Importing..." : "Import Products"}
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Outlet Selection Modal */}
+      {outletSelectionData && (
+        <OutletSelectionModal
+          open={showOutletSelection}
+          onOpenChange={setShowOutletSelection}
+          outlets={outletSelectionData.outlets}
+          message={outletSelectionData.message}
+          onConfirm={handleOutletSelected}
+          isLoading={isLoading}
+        />
+      )}
     </Dialog>
   )
 }

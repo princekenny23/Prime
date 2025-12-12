@@ -80,8 +80,8 @@ export default function VerifyEmailPage() {
             <Button onClick={handleVerify} className="w-full" variant="outline">
               Try Again
             </Button>
-            <Link href="/auth/register" className="text-sm text-primary hover:underline">
-              Create a new account
+            <Link href="/auth/login" className="text-sm text-primary hover:underline">
+              Back to login
             </Link>
           </CardFooter>
         </Card>

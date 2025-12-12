@@ -34,6 +34,7 @@ import { Badge } from "@/components/ui/badge"
 import { useBusinessStore } from "@/stores/businessStore"
 import { useAuthStore } from "@/stores/authStore"
 import { useRouter } from "next/navigation"
+import { PrimePOSLogo } from "@/components/brand/primepos-logo"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -140,8 +141,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Logo */}
           <div className="p-4 border-b">
             <div className="flex items-center justify-between">
-              <Link href="/dashboard" className="flex items-center justify-center w-12 h-12 rounded-lg bg-primary text-primary-foreground text-lg font-bold">
-                P
+              <Link href="/dashboard" className="flex items-center justify-center">
+                <PrimePOSLogo variant="icon" size="md" version={1} />
               </Link>
               <Button
                 variant="ghost"
@@ -177,18 +178,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               )
             })}
           </nav>
-
-          {/* User Section */}
-          <div className="p-2 border-t">
-            <div className="flex flex-col items-center justify-center gap-1.5 px-2 py-3 rounded-lg hover:bg-accent transition-colors">
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <User className="h-4 w-4 text-primary" />
-              </div>
-              <span className="text-[10px] text-muted-foreground text-center leading-tight max-w-full truncate" title={user?.name || user?.email || "User"}>
-                {user?.name || user?.email?.split("@")[0] || "User"}
-              </span>
-            </div>
-          </div>
         </div>
       </aside>
 
@@ -300,6 +289,29 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   return null
                 }
               })()}
+              
+              {/* User Info - Clickable */}
+              {!isAdminRoute && user && (
+                <Link href="/dashboard/office/accounts">
+                  <Button 
+                    variant="ghost" 
+                    className="flex items-center gap-2 h-9 px-3 hover:bg-accent"
+                  >
+                    <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex flex-col items-start">
+                      <span className="text-sm font-medium leading-none">
+                        {user?.name || user?.email?.split("@")[0] || "User"}
+                      </span>
+                      <span className="text-xs text-muted-foreground leading-none mt-0.5 capitalize">
+                        {role || "staff"}
+                      </span>
+                    </div>
+                  </Button>
+                </Link>
+              )}
+              
               <NotificationBell />
               <Button 
                 variant="ghost" 

@@ -37,6 +37,17 @@ class NotificationViewSet(TenantFilterMixin, viewsets.ModelViewSet):
         # Filter by tenant
         queryset = queryset.filter(tenant=tenant)
         
+        # Filter by outlet if provided (check metadata for outlet_id)
+        outlet_id = self.request.query_params.get('outlet_id')
+        if outlet_id:
+            try:
+                outlet_id_int = int(outlet_id)
+                # Filter by metadata containing outlet_id
+                queryset = queryset.filter(metadata__outlet_id=outlet_id_int)
+            except (ValueError, TypeError):
+                # If outlet_id is not a valid integer, ignore the filter
+                pass
+        
         # Filter by user: show user-specific notifications OR tenant-wide (user=null)
         user = self.request.user
         queryset = queryset.filter(Q(user=user) | Q(user__isnull=True))

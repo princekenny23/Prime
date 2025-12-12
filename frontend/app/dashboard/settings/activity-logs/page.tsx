@@ -31,7 +31,7 @@ import { PageRefreshButton } from "@/components/dashboard/page-refresh-button"
 const ACTION_COLORS: Record<string, string> = {
   'Login': 'bg-green-100 text-green-800',
   'Logout': 'bg-gray-100 text-gray-800',
-  'Create': 'bg-blue-100 text-blue-800',
+  'Create': 'bg-blue-100 text-blue-900',
   'Update': 'bg-yellow-100 text-yellow-800',
   'Delete': 'bg-red-100 text-red-800',
   'Refund': 'bg-orange-100 text-orange-800',
@@ -45,7 +45,7 @@ const ACTION_COLORS: Record<string, string> = {
 }
 
 const MODULE_COLORS: Record<string, string> = {
-  'Sales': 'bg-blue-50 text-blue-700',
+  'Sales': 'bg-blue-50 text-blue-900',
   'Inventory': 'bg-green-50 text-green-700',
   'Products': 'bg-purple-50 text-purple-700',
   'Customers': 'bg-yellow-50 text-yellow-700',
@@ -150,18 +150,11 @@ export default function ActivityLogsPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard/settings">
-              <button className="text-muted-foreground hover:text-foreground">
-                ← Back
-              </button>
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold">Activity Logs</h1>
-              <p className="text-muted-foreground mt-1">
-                View system activity and audit logs
-              </p>
-            </div>
+          <div>
+            <h1 className="text-3xl font-bold">Activity Logs</h1>
+            <p className="text-muted-foreground mt-1">
+              View system activity and audit logs
+            </p>
           </div>
           <PageRefreshButton />
         </div>

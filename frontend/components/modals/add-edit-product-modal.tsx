@@ -100,6 +100,10 @@ export function AddEditProductModal({ open, onOpenChange, product, onProductSave
     lowStockThreshold: product?.lowStockThreshold || product?.low_stock_threshold || 0,
     description: product?.description || "",
     isActive: product?.isActive !== undefined ? product.isActive : true,
+    // Expiry fields
+    manufacturing_date: product?.manufacturing_date || "",
+    expiry_date: product?.expiry_date || "",
+    track_expiration: product?.track_expiration || false,
     // Bar-specific fields
     volume_ml: "",
     alcohol_percentage: "",
@@ -152,6 +156,10 @@ export function AddEditProductModal({ open, onOpenChange, product, onProductSave
         lowStockThreshold: product.lowStockThreshold || product.low_stock_threshold || 0,
         description: cleanDesc,
         isActive: product.isActive !== undefined ? product.isActive : true,
+        // Expiry fields
+        manufacturing_date: product.manufacturing_date ? new Date(product.manufacturing_date).toISOString().split('T')[0] : "",
+        expiry_date: product.expiry_date ? new Date(product.expiry_date).toISOString().split('T')[0] : "",
+        track_expiration: product.track_expiration || false,
         // Bar-specific fields
         volume_ml: businessFields.volume_ml ? String(businessFields.volume_ml) : "",
         alcohol_percentage: businessFields.alcohol_percentage ? String(businessFields.alcohol_percentage) : "",
@@ -177,6 +185,10 @@ export function AddEditProductModal({ open, onOpenChange, product, onProductSave
         lowStockThreshold: 0,
         description: "",
         isActive: true,
+        // Expiry fields
+        manufacturing_date: "",
+        expiry_date: "",
+        track_expiration: false,
         // Bar-specific fields
         volume_ml: "",
         alcohol_percentage: "",
@@ -349,6 +361,10 @@ export function AddEditProductModal({ open, onOpenChange, product, onProductSave
         lowStockThreshold: parseInt(formData.lowStockThreshold.toString()) || 0,
         description: description,
         isActive: formData.isActive,
+        // Expiry fields
+        track_expiration: formData.track_expiration,
+        manufacturing_date: formData.track_expiration && formData.manufacturing_date ? formData.manufacturing_date : undefined,
+        expiry_date: formData.track_expiration && formData.expiry_date ? formData.expiry_date : undefined,
       }
       
       // Add wholesale fields if wholesale is enabled
@@ -681,6 +697,54 @@ export function AddEditProductModal({ open, onOpenChange, product, onProductSave
               <p className="text-xs text-muted-foreground">
                 Starting inventory quantity
               </p>
+            </div>
+
+            {/* Expiry Management Section */}
+            <div className="space-y-2 md:col-span-2 border-t pt-4">
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="checkbox"
+                  id="track_expiration"
+                  checked={formData.track_expiration}
+                  onChange={(e) => setFormData({ ...formData, track_expiration: e.target.checked })}
+                  className="h-4 w-4"
+                />
+                <Label htmlFor="track_expiration" className="cursor-pointer font-semibold">Track Product Expiration</Label>
+              </div>
+              <p className="text-xs text-muted-foreground mb-4">
+                Enable expiration tracking for this product (e.g., food items, medicines)
+              </p>
+
+              {formData.track_expiration && (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="manufacturing_date">Manufacturing Date</Label>
+                    <Input 
+                      id="manufacturing_date" 
+                      type="date"
+                      value={formData.manufacturing_date}
+                      onChange={(e) => setFormData({ ...formData, manufacturing_date: e.target.value })}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Date when product was manufactured
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="expiry_date">Expiry Date</Label>
+                    <Input 
+                      id="expiry_date" 
+                      type="date"
+                      value={formData.expiry_date}
+                      onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })}
+                      min={formData.manufacturing_date || undefined}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Date when product expires
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">

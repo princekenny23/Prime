@@ -31,6 +31,7 @@ export interface NotificationFilters {
   search?: string
   page?: number
   page_size?: number
+  outlet_id?: string | number
 }
 
 export interface NotificationSummary {
@@ -89,6 +90,7 @@ class NotificationService {
       if (filters.search) params.append('search', filters.search)
       if (filters.page) params.append('page', String(filters.page))
       if (filters.page_size) params.append('page_size', String(filters.page_size))
+      if (filters.outlet_id) params.append('outlet_id', String(filters.outlet_id))
 
       const query = params.toString()
       const response = await api.get<any>(`${apiEndpoints.notifications.list}${query ? `?${query}` : ""}`)

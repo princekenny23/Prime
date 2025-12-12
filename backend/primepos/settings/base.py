@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'apps.reports',
     'apps.activity_logs',
     'apps.notifications',
+    'apps.expenses',
     'apps.admin.apps.AdminConfig',  # Use explicit config to avoid label conflict
 ]
 

@@ -16,6 +16,7 @@ import { useState, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { useTenant } from "@/contexts/tenant-context"
 import { tenantService } from "@/lib/services/tenantService"
+import type { BusinessType } from "@/lib/types"
 
 export function BusinessInfoTab() {
   const { toast } = useToast()
@@ -24,10 +25,13 @@ export function BusinessInfoTab() {
   const [isLoading, setIsLoading] = useState(true)
   const [formData, setFormData] = useState({
     name: "",
+    type: "" as "wholesale and retail" | "restaurant" | "bar" | "",
     email: "",
     phone: "",
     address: "",
     currency: "MWK",
+    currencySymbol: "MK",
+    taxId: "",
     timezone: "Africa/Blantyre",
   })
 
@@ -40,10 +44,13 @@ export function BusinessInfoTab() {
         const tenant = await tenantService.get(currentTenant.id)
         setFormData({
           name: tenant.name || "",
+          type: tenant.type || "",
           email: tenant.email || "",
           phone: tenant.phone || "",
           address: tenant.address || "",
           currency: tenant.currency || "MWK",
+          currencySymbol: tenant.currencySymbol || "MK",
+          taxId: (tenant.settings as any)?.taxId || "",
           timezone: (tenant.settings as any)?.timezone || "Africa/Blantyre",
         })
       } catch (error) {
@@ -61,11 +68,18 @@ export function BusinessInfoTab() {
     
     setIsSaving(true)
     try {
-      // Store timezone in settings JSONField
+      // Store timezone and taxId in settings JSONField
       await tenantService.update(currentTenant.id, {
-        ...formData,
+        name: formData.name,
+        type: formData.type,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        currency: formData.currency,
+        currencySymbol: formData.currencySymbol,
         settings: {
           timezone: formData.timezone,
+          ...(formData.taxId && { taxId: formData.taxId }),
         },
       })
       toast({
@@ -105,6 +119,24 @@ export function BusinessInfoTab() {
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="business-type">Business Type *</Label>
+              <Select 
+                value={formData.type}
+                onValueChange={(value) => setFormData({ ...formData, type: value as BusinessType })}
+                required
+              >
+                <SelectTrigger id="business-type">
+                  <SelectValue placeholder="Select business type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="wholesale and retail">Wholesale and Retail</SelectItem>
+                  <SelectItem value="restaurant">Restaurant</SelectItem>
+                  <SelectItem value="bar">Bar/Nightclub</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
         <div className="space-y-2">
           <Label>Business Logo</Label>
           <div className="flex items-center gap-4">
@@ -126,7 +158,26 @@ export function BusinessInfoTab() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="currency">Currency *</Label>
-                <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
+                <Select 
+                  value={formData.currency} 
+                  onValueChange={(value) => {
+                    const symbols: Record<string, string> = {
+                      MWK: "MK",
+                      USD: "$",
+                      EUR: "€",
+                      GBP: "£",
+                      ZAR: "R",
+                      KES: "KSh",
+                      UGX: "USh",
+                      TZS: "TSh",
+                    }
+                    setFormData({ 
+                      ...formData, 
+                      currency: value,
+                      currencySymbol: symbols[value] || "MK"
+                    })
+                  }}
+                >
                   <SelectTrigger id="currency">
                     <SelectValue />
                   </SelectTrigger>
@@ -144,6 +195,18 @@ export function BusinessInfoTab() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="currency-symbol">Currency Symbol</Label>
+                <Input 
+                  id="currency-symbol" 
+                  value={formData.currencySymbol}
+                  onChange={(e) => setFormData({ ...formData, currencySymbol: e.target.value })}
+                  placeholder="MK"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
                 <Label htmlFor="timezone">Timezone *</Label>
                 <Select value={formData.timezone} onValueChange={(value) => setFormData({ ...formData, timezone: value })}>
                   <SelectTrigger id="timezone">
@@ -160,6 +223,17 @@ export function BusinessInfoTab() {
                     <SelectItem value="Asia/Tokyo">Tokyo (JST)</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="tax-id">Tax ID / Registration Number</Label>
+                <Input 
+                  id="tax-id" 
+                  type="text" 
+                  placeholder="Optional"
+                  value={formData.taxId}
+                  onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
+                />
               </div>
             </div>
 

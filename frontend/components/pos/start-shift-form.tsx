@@ -53,6 +53,10 @@ export function StartShiftForm({ onSuccess, redirectTo }: StartShiftFormProps = 
     }
     // Default: redirect to POS
     if (currentBusiness) {
+      // For wholesale and retail businesses, redirect to retail POS
+      if (currentBusiness.type === "wholesale and retail") {
+        return "/pos/retail"
+      }
       return `/pos/${currentBusiness.type}`
     }
     return "/dashboard"
