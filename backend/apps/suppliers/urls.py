@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     SupplierViewSet, PurchaseOrderViewSet,
     SupplierInvoiceViewSet, PurchaseReturnViewSet,
-    ProductSupplierViewSet, AutoPurchaseOrderSettingsViewSet
+    ProductSupplierViewSet
 )
 
 router = DefaultRouter()
@@ -12,7 +12,6 @@ router.register(r'purchase-orders', PurchaseOrderViewSet, basename='purchase-ord
 router.register(r'supplier-invoices', SupplierInvoiceViewSet, basename='supplier-invoice')
 router.register(r'purchase-returns', PurchaseReturnViewSet, basename='purchase-return')
 router.register(r'product-suppliers', ProductSupplierViewSet, basename='product-supplier')
-router.register(r'auto-po-settings', AutoPurchaseOrderSettingsViewSet, basename='auto-po-settings')
 
 urlpatterns = [
     path('', include(router.urls)),

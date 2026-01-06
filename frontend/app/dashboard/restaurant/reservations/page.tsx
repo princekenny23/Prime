@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "lucide-react"
@@ -8,13 +9,10 @@ import { Calendar } from "lucide-react"
 export default function ReservationsPage() {
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Reservations</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage table reservations and bookings
-          </p>
-        </div>
+      <PageLayout
+        title="Reservations"
+        description="Manage table reservations and bookings"
+      >
 
         <Card>
           <CardHeader>
@@ -33,7 +31,7 @@ export default function ReservationsPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

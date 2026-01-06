@@ -10,24 +10,13 @@ import {
   User,
   LogOut,
   Clock,
-  ChevronDown,
-  Check,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useTenant } from "@/contexts/tenant-context"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { useToast } from "@/components/ui/use-toast"
 import { useRole } from "@/contexts/role-context"
 import { NotificationBell } from "@/components/dashboard/notification-bell"
-import { PageBreadcrumb } from "@/components/dashboard/page-breadcrumb"
+import { SubNavbar } from "@/components/ui/subnavbar"
 import { useShift } from "@/contexts/shift-context"
 import { format } from "date-fns"
 import { Badge } from "@/components/ui/badge"
@@ -35,6 +24,22 @@ import { useBusinessStore } from "@/stores/businessStore"
 import { useAuthStore } from "@/stores/authStore"
 import { useRouter } from "next/navigation"
 import { PrimePOSLogo } from "@/components/brand/primepos-logo"
+import { LanguageSwitcherCompact } from "@/components/language-switcher"
+import { useI18n } from "@/contexts/i18n-context"
+
+// Navigation translation keys mapping
+const navTranslationKeys: Record<string, string> = {
+  "Dashboard": "common.navigation.dashboard",
+  "Sales": "common.navigation.sales",
+  "Sales / POS": "common.navigation.pos",
+  "Inventory": "common.navigation.inventory",
+  "Office": "common.navigation.office",
+  "Admin": "common.navigation.admin",
+  "Settings": "common.navigation.settings",
+  "Wholesale": "common.navigation.wholesale",
+  "Restaurant": "common.navigation.restaurant",
+  "Bar": "common.navigation.bar",
+}
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -45,15 +50,20 @@ import { getIndustrySidebarConfig, fullNavigation, type NavigationItem } from "@
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [isSwitchingOutlet, setIsSwitchingOutlet] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
-  const { currentTenant, currentOutlet, outlets, switchOutlet, isLoading } = useTenant()
+  const { currentTenant, currentOutlet, isLoading } = useTenant()
   const { hasPermission, role } = useRole()
   const { activeShift } = useShift()
   const { user } = useAuthStore()
   const { currentBusiness } = useBusinessStore()
-  const { toast } = useToast()
+  const { t } = useI18n()
+  
+  // Helper to translate navigation item names
+  const translateNavItem = (name: string) => {
+    const key = navTranslationKeys[name]
+    return key ? t(key) : name
+  }
 
   // Check if user is SaaS admin (no businessId)
   const isSaaSAdmin = user && !user.businessId
@@ -104,7 +114,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         const tenantId = typeof user.tenant === 'object' 
           ? String(user.tenant.id || user.tenant) 
           : String(user.tenant)
-        console.log("Restoring business from user tenant on refresh:", tenantId)
         // Restore the business from the user's tenant
         const { setCurrentBusiness } = useBusinessStore.getState()
         setCurrentBusiness(tenantId).catch((error: any) => {
@@ -170,10 +179,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   )}
-                  title={item.name}
+                  title={translateNavItem(item.name)}
                 >
                   <item.icon className="h-5 w-5 flex-shrink-0" />
-                  <span className="text-[10px] leading-tight text-center">{item.name}</span>
+                  <span className="text-[10px] leading-tight text-center">{translateNavItem(item.name)}</span>
                 </Link>
               )
             })}
@@ -184,7 +193,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 lg:ml-20">
         {/* Topbar */}
-        <header className="sticky top-0 z-30 bg-background border-b">
+        <header data-navbar="main" className="sticky top-0 z-30 bg-background border-b">
           <div className="flex items-center justify-between px-4 py-3 lg:px-6">
             <Button
               variant="ghost"
@@ -195,68 +204,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <Menu className="h-5 w-5" />
             </Button>
 
-            {/* Tenant and Outlet Info with Switcher */}
+            {/* Tenant and Outlet Info - Display only, no switching */}
             {!isAdminRoute && !isLoading && currentTenant && (
               <div className="flex items-center gap-4 mr-4">
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-muted-foreground">Tenant:</span>
+                <div className="text-sm">
                   <span className="font-medium">{currentTenant.name}</span>
                 </div>
-                {outlets.length > 1 && currentOutlet ? (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-8 gap-2"
-                        disabled={isSwitchingOutlet}
-                      >
-                        <Store className="h-4 w-4" />
-                        <span className="font-medium">{currentOutlet.name}</span>
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuLabel>Switch Outlet</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {outlets
-                        .filter(o => o.isActive)
-                        .map((outlet) => (
-                          <DropdownMenuItem
-                            key={outlet.id}
-                            onClick={async () => {
-                              setIsSwitchingOutlet(true)
-                              try {
-                                await switchOutlet(outlet.id)
-                                toast({
-                                  title: "Outlet Switched",
-                                  description: `Switched to ${outlet.name}`,
-                                })
-                                // Trigger page refresh to update all data
-                                router.refresh()
-                              } catch (error: any) {
-                                toast({
-                                  title: "Error",
-                                  description: error.message || "Failed to switch outlet",
-                                  variant: "destructive",
-                                })
-                              } finally {
-                                setIsSwitchingOutlet(false)
-                              }
-                            }}
-                            disabled={isSwitchingOutlet || currentOutlet.id === outlet.id}
-                            className={currentOutlet.id === outlet.id ? "bg-accent" : ""}
-                          >
-                            <Store className="h-4 w-4 mr-2" />
-                            <span className="flex-1">{outlet.name}</span>
-                            {currentOutlet.id === outlet.id && (
-                              <Check className="h-4 w-4 text-primary" />
-                            )}
-                          </DropdownMenuItem>
-                        ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                ) : currentOutlet ? (
+                {currentOutlet ? (
                   <div className="flex items-center gap-2 text-sm">
                     <Store className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">{currentOutlet.name}</span>
@@ -264,15 +218,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 ) : (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Store className="h-4 w-4" />
-                    <span>No outlet selected</span>
+                    <span>{t("settings.outlets.no_outlet")}</span>
                   </div>
                 )}
               </div>
             )}
 
             <div className="flex items-center gap-2 ml-auto">
-              {/* Shift Status Indicator */}
-              {activeShift && (() => {
+              {/* Shift Status Indicator - Only show for current outlet */}
+              {activeShift && currentOutlet && activeShift.outletId === currentOutlet.id && (() => {
                 if (!activeShift.startTime) return null
                 try {
                   const date = new Date(activeShift.startTime)
@@ -281,7 +235,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     <Badge variant="outline" className="flex items-center gap-1.5 px-3 py-1.5">
                       <Clock className="h-3.5 w-3.5" />
                       <span className="text-xs">
-                        Shift: {format(date, "HH:mm")}
+                        {t("shifts.shift")}: {format(date, "HH:mm")}
                       </span>
                     </Badge>
                   )
@@ -292,7 +246,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               
               {/* User Info - Clickable */}
               {!isAdminRoute && user && (
-                <Link href="/dashboard/office/accounts">
+                <Link href="/dashboard/office/users">
                   <Button 
                     variant="ghost" 
                     className="flex items-center gap-2 h-9 px-3 hover:bg-accent"
@@ -312,6 +266,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 </Link>
               )}
               
+              <LanguageSwitcherCompact />
               <NotificationBell />
               <Button 
                 variant="ghost" 
@@ -327,12 +282,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </Button>
             </div>
           </div>
+          <SubNavbar />
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-          <PageBreadcrumb />
-          <div className="space-y-6">
+        <main className="flex-1 overflow-y-auto">
+          <div className="p-4 lg:p-6 space-y-6">
             {children}
           </div>
         </main>

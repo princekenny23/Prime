@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -18,14 +19,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { inventoryService } from "@/lib/services/inventoryService"
 import { productService } from "@/lib/services/productService"
 import { useBusinessStore } from "@/stores/businessStore"
 import { useTenant } from "@/contexts/tenant-context"
 import type { Product } from "@/lib/types"
-import { Plus, Trash2, X } from "lucide-react"
+import { Plus, Trash2, Search, Package } from "lucide-react"
+import { useI18n } from "@/contexts/i18n-context"
 
 interface StockAdjustmentModalProps {
   open: boolean
@@ -37,6 +39,7 @@ interface AdjustmentItem {
   id: string
   product_id: string
   product_name?: string
+  current_qty: number
   adjustmentType: "increase" | "decrease"
   quantity: string
 }
@@ -44,30 +47,51 @@ interface AdjustmentItem {
 export function StockAdjustmentModal({ open, onOpenChange, onSuccess }: StockAdjustmentModalProps) {
   const { toast } = useToast()
   const { currentOutlet } = useBusinessStore()
-  const { currentOutlet: tenantOutlet } = useTenant()
+  const { currentOutlet: tenantOutlet, outlets } = useTenant()
+  const { t } = useI18n()
   const [isLoading, setIsLoading] = useState(false)
   const [products, setProducts] = useState<Product[]>([])
   const [loadingProducts, setLoadingProducts] = useState(false)
   const [adjustmentItems, setAdjustmentItems] = useState<AdjustmentItem[]>([])
   const [commonReason, setCommonReason] = useState("")
   const [commonNotes, setCommonNotes] = useState("")
+  const [selectedOutlet, setSelectedOutlet] = useState<string>("")
+  const [trackingNumber, setTrackingNumber] = useState<string>("")
+  const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [showProductSearch, setShowProductSearch] = useState(false)
 
   const outlet = tenantOutlet || currentOutlet
 
   useEffect(() => {
     if (open) {
       loadProducts()
+      // Generate tracking number
+      const tracking = `ADJ-${Date.now().toString().slice(-8)}`
+      setTrackingNumber(tracking)
+      
+      // Set default outlet
+      if (outlet) {
+        setSelectedOutlet(String(outlet.id))
+      } else if (outlets.length > 0) {
+        setSelectedOutlet(String(outlets[0].id))
+      }
+      
       // Initialize with one empty item
       setAdjustmentItems([{
         id: Date.now().toString(),
         product_id: "",
+        current_qty: 0,
         adjustmentType: "increase",
         quantity: "",
       }])
       setCommonReason("")
       setCommonNotes("")
+      setDate(new Date().toISOString().split('T')[0])
+      setSearchTerm("")
+      setShowProductSearch(false)
     }
-  }, [open])
+  }, [open, outlet, outlets])
 
   const loadProducts = async () => {
     setLoadingProducts(true)
@@ -90,23 +114,52 @@ export function StockAdjustmentModal({ open, onOpenChange, onSuccess }: StockAdj
     setAdjustmentItems([...adjustmentItems, {
       id: Date.now().toString(),
       product_id: "",
+      current_qty: 0,
       adjustmentType: "increase",
       quantity: "",
     }])
+    setShowProductSearch(true)
   }
+
+  const handleSelectProduct = (product: Product) => {
+    // Add product to the last empty item or create new one
+    const emptyItemIndex = adjustmentItems.findIndex(item => !item.product_id)
+    if (emptyItemIndex >= 0) {
+      updateAdjustmentItem(adjustmentItems[emptyItemIndex].id, "product_id", product.id)
+    } else {
+      addAdjustmentItem()
+      setTimeout(() => {
+        const newItem = adjustmentItems[adjustmentItems.length - 1]
+        if (newItem) {
+          updateAdjustmentItem(newItem.id, "product_id", product.id)
+        }
+      }, 100)
+    }
+    setShowProductSearch(false)
+    setSearchTerm("")
+  }
+
+  const filteredProducts = useMemo(() => {
+    return products.filter(product =>
+      product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (product.sku && product.sku.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (product.barcode && product.barcode.toLowerCase().includes(searchTerm.toLowerCase()))
+    )
+  }, [products, searchTerm])
 
   const removeAdjustmentItem = (id: string) => {
     setAdjustmentItems(adjustmentItems.filter(item => item.id !== id))
   }
 
-  const updateAdjustmentItem = (id: string, field: keyof AdjustmentItem, value: string | "increase" | "decrease") => {
+  const updateAdjustmentItem = (id: string, field: keyof AdjustmentItem, value: string | "increase" | "decrease" | number) => {
     setAdjustmentItems(adjustmentItems.map(item => {
       if (item.id === id) {
         const updated = { ...item, [field]: value }
-        // Update product_name when product_id changes
+        // Update product_name and current_qty when product_id changes
         if (field === "product_id") {
           const product = products.find(p => p.id === value)
           updated.product_name = product?.name
+          updated.current_qty = product?.stock || 0
         }
         return updated
       }
@@ -127,10 +180,10 @@ export function StockAdjustmentModal({ open, onOpenChange, onSuccess }: StockAdj
       return
     }
 
-    if (!outlet) {
+    if (!selectedOutlet) {
       toast({
         title: "Error",
-        description: "Please select an outlet first.",
+        description: "Please select an outlet.",
         variant: "destructive",
       })
       return
@@ -159,7 +212,7 @@ export function StockAdjustmentModal({ open, onOpenChange, onSuccess }: StockAdj
         const adjustmentQuantity = item.adjustmentType === "increase" ? quantity : -quantity
         return {
           product_id: item.product_id,
-          outlet_id: outlet.id,
+          outlet_id: selectedOutlet,
           quantity: adjustmentQuantity,
           reason: commonReason + (commonNotes ? ` - ${commonNotes}` : ""),
           type: "adjustment" as const,
@@ -237,6 +290,49 @@ export function StockAdjustmentModal({ open, onOpenChange, onSuccess }: StockAdj
             <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
               <h3 className="font-semibold text-sm">Common Information</h3>
               
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="tracking">Tracking Number</Label>
+                  <Input
+                    id="tracking"
+                    value={trackingNumber}
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="date">Date *</Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="outlet">Outlet *</Label>
+                <Select 
+                  value={selectedOutlet}
+                  onValueChange={setSelectedOutlet}
+                  required
+                >
+                  <SelectTrigger id="outlet">
+                    <SelectValue placeholder={t("common.select_outlet")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {outlets.map(outlet => (
+                      <SelectItem key={outlet.id} value={String(outlet.id)}>
+                        {outlet.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="reason">Reason *</Label>
                 <Select 
@@ -245,26 +341,27 @@ export function StockAdjustmentModal({ open, onOpenChange, onSuccess }: StockAdj
                   required
                 >
                   <SelectTrigger id="reason">
-                    <SelectValue placeholder="Select reason" />
+                    <SelectValue placeholder={t("inventory.stock_adjustment.select_reason")} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Damaged">Damaged</SelectItem>
                     <SelectItem value="Theft">Theft</SelectItem>
                     <SelectItem value="Found">Found</SelectItem>
                     <SelectItem value="Return">Return</SelectItem>
+                    <SelectItem value="Stock Take">Stock Take</SelectItem>
                     <SelectItem value="Other">Other</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="notes">Notes</Label>
-                <textarea
+                <Label htmlFor="notes">Additional Notes</Label>
+                <Textarea
                   id="notes"
-                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  placeholder="Additional notes (optional)"
+                  placeholder={t("common.notes_placeholder")}
                   value={commonNotes}
                   onChange={(e) => setCommonNotes(e.target.value)}
+                  rows={3}
                 />
               </div>
             </div>
@@ -285,78 +382,148 @@ export function StockAdjustmentModal({ open, onOpenChange, onSuccess }: StockAdj
                 </Button>
               </div>
 
-              <div className="space-y-3">
-                {adjustmentItems.map((item, index) => (
-                  <div key={item.id} className="p-4 border rounded-lg space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">
-                        Product {index + 1}
-                      </span>
-                      {adjustmentItems.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeAdjustmentItem(item.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div className="space-y-2">
-                        <Label>Product *</Label>
-                        <Select 
-                          value={item.product_id}
-                          onValueChange={(value) => updateAdjustmentItem(item.id, "product_id", value)}
-                          required
-                          disabled={loadingProducts}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select product" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {products.map(product => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.name} (Stock: {product.stock})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Type *</Label>
-                        <Select 
-                          value={item.adjustmentType}
-                          onValueChange={(value: "increase" | "decrease") => updateAdjustmentItem(item.id, "adjustmentType", value)}
-                          required
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="increase">Increase</SelectItem>
-                            <SelectItem value="decrease">Decrease</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Quantity *</Label>
-                        <Input
-                          type="number"
-                          min="1"
-                          required
-                          value={item.quantity}
-                          onChange={(e) => updateAdjustmentItem(item.id, "quantity", e.target.value)}
-                          placeholder={item.adjustmentType === "increase" ? "Qty to add" : "Qty to remove"}
-                        />
-                      </div>
-                    </div>
+              {/* Product Search */}
+              {showProductSearch && (
+                <div className="border rounded-lg p-4 space-y-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder={t("common.search_products_placeholder")}
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
                   </div>
-                ))}
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {filteredProducts.slice(0, 10).map((product) => (
+                      <button
+                        key={product.id}
+                        type="button"
+                        onClick={() => handleSelectProduct(product)}
+                        className="w-full text-left p-2 hover:bg-muted rounded flex items-center gap-2"
+                      >
+                        <Package className="h-4 w-4" />
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{product.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            SKU: {product.sku || "N/A"} | Stock: {product.stock || 0}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {adjustmentItems.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground border rounded-lg">
+                    <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>No items added. Click "Add Product" to add products.</p>
+                  </div>
+                ) : (
+                  adjustmentItems.map((item, index) => {
+                    const changeQty = parseInt(item.quantity) || 0
+                    const newQty = item.adjustmentType === "increase" 
+                      ? item.current_qty + changeQty 
+                      : item.current_qty - changeQty
+
+                    return (
+                      <div key={item.id} className="p-4 border rounded-lg space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-muted-foreground">
+                            Product {index + 1}
+                          </span>
+                          {adjustmentItems.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeAdjustmentItem(item.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                          <div className="space-y-2">
+                            <Label>Product *</Label>
+                            <Select 
+                              value={item.product_id}
+                              onValueChange={(value) => updateAdjustmentItem(item.id, "product_id", value)}
+                              required
+                              disabled={loadingProducts}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder={t("common.select_product")} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {filteredProducts.length > 0 ? (
+                                  filteredProducts.map(product => (
+                                    <SelectItem key={product.id} value={product.id}>
+                                      {product.name} {product.sku && `(${product.sku})`}
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <SelectItem value="no-results" disabled>
+                                    No products found
+                                  </SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Current Qty</Label>
+                            <Input
+                              value={item.current_qty}
+                              disabled
+                              className="bg-muted"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Change *</Label>
+                            <div className="flex items-center gap-2">
+                              <Select 
+                                value={item.adjustmentType}
+                                onValueChange={(value: "increase" | "decrease") => updateAdjustmentItem(item.id, "adjustmentType", value)}
+                                required
+                              >
+                                <SelectTrigger className="w-[100px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="increase">+</SelectItem>
+                                  <SelectItem value="decrease">-</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Input
+                                type="number"
+                                min="1"
+                                required
+                                value={item.quantity}
+                                onChange={(e) => updateAdjustmentItem(item.id, "quantity", e.target.value)}
+                                placeholder={t("common.qty")}
+                                className="flex-1"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>New Quantity</Label>
+                            <Input
+                              value={item.product_id ? newQty : "—"}
+                              disabled
+                              className={newQty < 0 ? "bg-red-50 text-red-600 font-semibold" : "bg-muted font-semibold"}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
               </div>
             </div>
           </div>
@@ -367,7 +534,7 @@ export function StockAdjustmentModal({ open, onOpenChange, onSuccess }: StockAdj
             </Button>
             <Button 
               type="submit" 
-              disabled={isLoading || loadingProducts || !outlet || adjustmentItems.length === 0}
+              disabled={isLoading || loadingProducts || !selectedOutlet || adjustmentItems.length === 0}
             >
               {isLoading ? `Processing ${adjustmentItems.length} adjustment${adjustmentItems.length > 1 ? 's' : ''}...` : `Apply ${adjustmentItems.length} Adjustment${adjustmentItems.length > 1 ? 's' : ''}`}
             </Button>

@@ -1,20 +1,21 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { ReceiptTemplateTab } from "@/components/settings/receipt-template-tab"
+import { useI18n } from "@/contexts/i18n-context"
 
 export default function ReceiptsSettingsPage() {
+  const { t } = useI18n()
+  
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Receipt Settings</h1>
-          <p className="text-muted-foreground mt-1">
-            Configure receipt templates and settings
-          </p>
-        </div>
+      <PageLayout
+        title={t("settings.receipts.title")}
+        description={t("settings.receipts.description")}
+      >
         <ReceiptTemplateTab />
-      </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

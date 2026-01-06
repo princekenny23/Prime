@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -61,62 +62,66 @@ export default function PurchaseReturnsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Purchase Returns</h1>
-            <p className="text-muted-foreground">Handle returns of purchased items to suppliers</p>
-          </div>
+      <PageLayout
+        title="Purchase Returns"
+        description="Handle returns of purchased items to suppliers"
+        actions={
           <Link href="/dashboard/inventory/suppliers/returns/new">
-            <Button>
+            <Button className="bg-white border-white text-[#1e3a8a] hover:bg-blue-50 hover:border-blue-50">
               <Plus className="mr-2 h-4 w-4" />
               New Return
             </Button>
           </Link>
+        }
+      >
+        {/* Filters */}
+        <div className="mb-6 pb-4 border-b border-gray-300">
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+              <Input
+                placeholder="Search returns..."
+                className="pl-10 bg-white border-gray-300"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>All Purchase Returns</CardTitle>
-            <CardDescription>
+        {/* Returns Table */}
+        <div>
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">All Purchase Returns</h3>
+            <p className="text-sm text-gray-600">
               {returns.length} return{returns.length !== 1 ? "s" : ""} found
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4 mb-4">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search returns..."
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
+            </p>
+          </div>
+          {loading ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600">Loading...</p>
             </div>
-
-            {loading ? (
-              <div className="text-center py-8">Loading...</div>
-            ) : returns.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No returns found. Create your first purchase return to get started.
-              </div>
-            ) : (
+          ) : returns.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600">No returns found. Create your first purchase return to get started.</p>
+            </div>
+          ) : (
+            <div className="rounded-md border border-gray-300 bg-white">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Return Number</TableHead>
-                    <TableHead>Supplier</TableHead>
-                    <TableHead>Return Date</TableHead>
-                    <TableHead>Purchase Order</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="text-gray-900 font-semibold">Return Number</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Supplier</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Return Date</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Purchase Order</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Total</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Status</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {returns.map((returnItem) => (
-                    <TableRow key={returnItem.id}>
+                    <TableRow key={returnItem.id} className="border-gray-300">
                       <TableCell className="font-medium">{returnItem.return_number}</TableCell>
                       <TableCell>{returnItem.supplier?.name || "N/A"}</TableCell>
                       <TableCell>{new Date(returnItem.return_date).toLocaleDateString()}</TableCell>
@@ -125,17 +130,17 @@ export default function PurchaseReturnsPage() {
                       <TableCell>{getStatusBadge(returnItem.status)}</TableCell>
                       <TableCell>
                         <Link href={`/dashboard/inventory/suppliers/returns/${returnItem.id}`}>
-                          <Button variant="ghost" size="sm">View</Button>
+                          <Button variant="ghost" size="sm" className="border-gray-300">View</Button>
                         </Link>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+          )}
+        </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import { CloseRegisterModal } from "@/components/modals/close-register-modal"
 import { ReceiptPreviewModal } from "@/components/modals/receipt-preview-modal"
+import { SaleDiscountModal, type SaleDiscount } from "@/components/modals/sale-discount-modal"
 import { useShift } from "@/contexts/shift-context"
 import { useTenant } from "@/contexts/tenant-context"
 import { cn } from "@/lib/utils"
@@ -73,6 +74,8 @@ export function RestaurantPOS() {
   const [loadingCategories, setLoadingCategories] = useState(true)
   const [loadingTables, setLoadingTables] = useState(true)
   const [isSendingToKitchen, setIsSendingToKitchen] = useState(false)
+  const [showSaleDiscount, setShowSaleDiscount] = useState(false)
+  const [saleDiscount, setSaleDiscount] = useState<SaleDiscount | null>(null)
 
   // Load categories from database
   const loadCategories = useCallback(async () => {
@@ -196,10 +199,16 @@ export function RestaurantPOS() {
     return matchesCategory && matchesSearch && product.isActive
   })
 
-  const cartTotal = cart.reduce((sum, item) => sum + item.total, 0)
-  const cartSubtotal = cartTotal
+  const cartSubtotal = cart.reduce((sum, item) => sum + item.total, 0)
   const cartTax = 0 // Can be calculated based on business settings
-  const cartDiscount = 0 // Can be added later
+  
+  // Calculate discount amount
+  const cartDiscount = saleDiscount
+    ? saleDiscount.type === "percentage"
+      ? (cartSubtotal * saleDiscount.value) / 100
+      : saleDiscount.value
+    : 0
+  
   const cartFinalTotal = cartSubtotal + cartTax - cartDiscount
 
   const handleSelectTable = (table: RestaurantTable) => {
@@ -354,26 +363,131 @@ export function RestaurantPOS() {
     }
   }
 
-  const handleProcessPayment = () => {
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
+
+  const handleProcessPayment = async () => {
+    // Validation
     if (cart.length === 0) {
       toast({
-        title: "Empty Cart",
-        description: "Please add items to the cart before processing payment.",
+        title: "Cart is empty",
+        description: "Please add items to cart before processing payment.",
         variant: "destructive",
       })
       return
     }
 
-    if (!selectedTable) {
+    if (!currentOutlet) {
       toast({
-        title: "No Table Selected",
-        description: "Please select a table before processing payment.",
+        title: "Outlet not selected",
+        description: "Please select an outlet before processing payment.",
         variant: "destructive",
       })
       return
     }
 
-    setShowPayment(true)
+    if (!activeShift) {
+      toast({
+        title: "No active shift",
+        description: "Please start a shift before processing payments.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsProcessingPayment(true)
+
+    try {
+      // Calculate totals - round to 2 decimal places to avoid floating point precision issues
+      const subtotal = Math.round(cartSubtotal * 100) / 100
+      const discount = Math.round(cartDiscount * 100) / 100
+      const tax = 0 // TODO: Calculate tax if needed
+      const total = Math.round((subtotal - discount + tax) * 100) / 100
+
+      // Transform cart items to backend format
+      const items_data = cart.map((item) => {
+        return {
+          product_id: item.productId,
+          variation_id: (item as any).variationId || undefined,
+          unit_id: (item as any).unitId || undefined,
+          quantity: item.quantity,
+          price: Math.round(item.price * 100) / 100, // Round price to 2 decimal places
+          notes: item.modifiers?.join(", ") || item.notes || "",
+        }
+      })
+
+      // Create sale data - ensure all decimal values are rounded to 2 decimal places
+      const saleData = {
+        outlet: currentOutlet.id,
+        shift: activeShift.id,
+        customer: undefined, // Restaurant can add customer later if needed
+        items_data: items_data,
+        subtotal: Math.round(subtotal * 100) / 100,
+        tax: Math.round(tax * 100) / 100,
+        discount: Math.round(discount * 100) / 100,
+        discount_type: saleDiscount?.type,
+        discount_reason: saleDiscount?.reason,
+        total: Math.round(total * 100) / 100,
+        payment_method: "cash" as const,
+        notes: selectedTable ? `Table ${selectedTable.number}` : "",
+        // Restaurant-specific fields
+        table_id: selectedTable?.id || undefined,
+        guests: (selectedTable as any)?.capacity || undefined,
+        priority: "normal" as const,
+      }
+
+      // Call backend API
+      const sale = await saleService.create(saleData)
+
+      // Show success message
+      toast({
+        title: "Sale completed successfully",
+        description: `Receipt #${sale._raw?.receipt_number || sale.id}`,
+      })
+
+      // Dispatch event to notify other components (e.g., sales history page)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sale-completed', { 
+          detail: { saleId: sale.id, receiptNumber: sale._raw?.receipt_number || sale.id }
+        }))
+      }
+
+      // Prepare receipt data for modal
+      const receiptCartItems = cart.map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        discount: 0, // TODO: Calculate from item discounts if implemented
+        total: item.total,
+      }))
+
+      setReceiptData({
+        cart: receiptCartItems,
+        subtotal: subtotal,
+        discount: discount,
+        tax: tax,
+        total: total,
+        sale: sale,
+        discountReason: saleDiscount?.reason,
+      })
+
+      // Clear cart and discount
+      clearCart()
+      setSelectedTable(null)
+      setSaleDiscount(null)
+
+      // Show receipt modal
+      setShowReceipt(true)
+    } catch (error: any) {
+      console.error("Checkout error:", error)
+      toast({
+        title: "Payment failed",
+        description: error.message || "An error occurred while processing the payment. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsProcessingPayment(false)
+    }
   }
 
   if (!currentBusiness) {
@@ -517,6 +631,14 @@ export function RestaurantPOS() {
               <Button variant="outline" onClick={clearCart}>
                 <X className="h-4 w-4 mr-2" />
                 Clear Cart
+              </Button>
+            )}
+            {cart.length > 0 && (
+              <Button 
+                variant={saleDiscount ? "default" : "outline"} 
+                onClick={() => setShowSaleDiscount(true)}
+              >
+                {saleDiscount ? "Discount Applied" : "Apply Discount"}
               </Button>
             )}
             {activeShift && (
@@ -747,11 +869,20 @@ export function RestaurantPOS() {
                     <span className="font-medium">{formatCurrency(cartTax, currentBusiness)}</span>
                   </div>
                 )}
-                {cartDiscount > 0 && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Discount</span>
-                    <span className="font-medium text-green-600">-{formatCurrency(cartDiscount, currentBusiness)}</span>
-                  </div>
+                {saleDiscount && cartDiscount > 0 && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Discount</span>
+                      <span className="font-medium text-green-600 dark:text-green-400">
+                        -{formatCurrency(cartDiscount, currentBusiness)}
+                      </span>
+                    </div>
+                    {saleDiscount.reason && (
+                      <div className="text-xs text-muted-foreground italic">
+                        Reason: {saleDiscount.reason}
+                      </div>
+                    )}
+                  </>
                 )}
                 <div className="border-t my-1" />
                 <div className="flex items-center justify-between text-lg font-bold">
@@ -783,9 +914,19 @@ export function RestaurantPOS() {
                   size="lg"
                   onClick={handleProcessPayment}
                   className="flex-1"
+                  disabled={isProcessingPayment || cart.length === 0}
                 >
-                  <CreditCard className="mr-2 h-5 w-5" />
-                  Pay Now
+                  {isProcessingPayment ? (
+                    <>
+                      <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="mr-2 h-5 w-5" />
+                      Pay Now
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -794,7 +935,19 @@ export function RestaurantPOS() {
       </div>
 
       {/* Modals */}
-      {/* PaymentModal removed - new payment system will be implemented */}
+      <SaleDiscountModal
+        open={showSaleDiscount}
+        onOpenChange={setShowSaleDiscount}
+        subtotal={cartSubtotal}
+        currentDiscount={saleDiscount}
+        business={currentBusiness}
+        onApply={(discount) => {
+          setSaleDiscount(discount)
+        }}
+        onRemove={() => {
+          setSaleDiscount(null)
+        }}
+      />
       <CloseRegisterModal
         open={showCloseRegister}
         onOpenChange={setShowCloseRegister}
@@ -808,6 +961,7 @@ export function RestaurantPOS() {
           discount={receiptData.discount}
           tax={receiptData.tax}
           total={receiptData.total}
+          discountReason={receiptData.discountReason}
           onPrint={() => {
             setShowReceipt(false)
             setReceiptData(null)

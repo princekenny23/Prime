@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { StartShiftForm } from "@/components/pos/start-shift-form"
 import { useToast } from "@/components/ui/use-toast"
@@ -22,17 +23,11 @@ export default function StartShiftPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Start Shift</h1>
-            <p className="text-muted-foreground mt-1">
-              Start a new shift for any outlet and till in your business
-            </p>
-          </div>
-          <PageRefreshButton />
-        </div>
+      <PageLayout
+        title="Start Shift"
+        description="Start a new shift for any outlet and till in your business"
+        actions={<PageRefreshButton />}
+      >
 
         {/* Two Column Layout */}
         <div className="grid gap-6 lg:grid-cols-3">
@@ -184,7 +179,7 @@ export default function StartShiftPage() {
             </Card>
           </div>
         </div>
-      </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

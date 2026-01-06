@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { 
   AlertTriangle,
   ShoppingCart,
@@ -25,11 +26,13 @@ import { productService } from "@/lib/services/productService"
 import { purchaseOrderService, type PurchaseOrder } from "@/lib/services/purchaseOrderService"
 import { useTenant } from "@/contexts/tenant-context"
 import { useBusinessStore } from "@/stores/businessStore"
+import { useI18n } from "@/contexts/i18n-context"
 
 export default function LowStockPage() {
   const { toast } = useToast()
   const { currentOutlet } = useTenant()
   const { currentOutlet: businessOutlet } = useBusinessStore()
+  const { t } = useI18n()
   const [lowStockItems, setLowStockItems] = useState<any[]>([])
   const [isLoadingLowStock, setIsLoadingLowStock] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -189,75 +192,69 @@ export default function LowStockPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold">Low Stock Alerts</h1>
-          <p className="text-muted-foreground mt-1">
-            View and reorder items that are running low on stock
-          </p>
-        </div>
-
+      <PageLayout
+        title={t("inventory.low_stock.title")}
+        description={t("inventory.low_stock.description")}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isRefreshing || isLoadingLowStock}
+            className="bg-white border-white text-[#1e3a8a] hover:bg-blue-50 hover:border-blue-50"
+          >
+            <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing && "animate-spin")} />
+            Refresh
+          </Button>
+        }
+      >
         {/* Low Stock Alerts Section */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-orange-500" />
-                <CardTitle>Low Stock Items</CardTitle>
-                {lowStockItems.length > 0 && (
-                  <Badge variant="destructive" className="ml-2">
-                    {lowStockItems.length}
-                  </Badge>
-                )}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefresh}
-                disabled={isRefreshing || isLoadingLowStock}
-              >
-                <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing && "animate-spin")} />
-                Refresh
-              </Button>
+        <div>
+          <div className="mb-4 flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-orange-500" />
+            <h3 className="text-lg font-semibold text-gray-900">Low Stock Items</h3>
+            {lowStockItems.length > 0 && (
+              <Badge variant="destructive" className="ml-2">
+                {lowStockItems.length}
+              </Badge>
+            )}
+          </div>
+          <p className="text-sm text-gray-600 mb-6">
+            Items that need to be reordered. Click "Order Item" to create a purchase order.
+          </p>
+          {isLoadingLowStock ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600">Loading low stock items...</p>
             </div>
-            <CardDescription>
-              Items that need to be reordered. Click "Order Item" to create a purchase order.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoadingLowStock ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Loading low stock items...
-              </div>
-            ) : lowStockItems.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>No low stock items at the moment</p>
-                <p className="text-sm mt-2">All items are above their minimum stock thresholds</p>
-              </div>
-            ) : (
+          ) : lowStockItems.length === 0 ? (
+            <div className="text-center py-8">
+              <Package className="h-12 w-12 mx-auto mb-2 opacity-50 text-gray-400" />
+              <p className="text-gray-600">No low stock items at the moment</p>
+              <p className="text-sm mt-2 text-gray-500">All items are above their minimum stock thresholds</p>
+            </div>
+          ) : (
+            <div className="rounded-md border border-gray-300 bg-white">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>SKU</TableHead>
-                    <TableHead>Current Stock</TableHead>
-                    <TableHead>Min. Stock</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="text-gray-900 font-semibold">Product</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">SKU</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Current Stock</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Min. Stock</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Category</TableHead>
+                    <TableHead className="text-right text-gray-900 font-semibold">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {lowStockItems.map((item) => (
-                    <TableRow key={item.id}>
+                    <TableRow key={item.id} className="border-gray-300">
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <AlertTriangle className="h-4 w-4 text-orange-500 flex-shrink-0" />
                           <span className="font-medium">{item.name}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{item.sku}</TableCell>
+                      <TableCell className="text-gray-600">{item.sku}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-orange-600 border-orange-300">
                           {item.currentStock}
@@ -266,13 +263,14 @@ export default function LowStockPage() {
                       <TableCell>
                         <Badge variant="secondary">{item.minStock}</Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{item.category}</TableCell>
+                      <TableCell className="text-gray-600">{item.category}</TableCell>
                       <TableCell className="text-right">
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleOrderItem(item)}
                           disabled={orderingItemId === item.id}
+                          className="border-gray-300"
                         >
                           <ShoppingCart className="h-4 w-4 mr-2" />
                           {orderingItemId === item.id ? "Ordering..." : "Order Item"}
@@ -282,10 +280,10 @@ export default function LowStockPage() {
                   ))}
                 </TableBody>
               </Table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+          )}
+        </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

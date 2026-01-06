@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -43,33 +44,23 @@ export default function ActiveShiftsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Active Shifts</h1>
-            <p className="text-muted-foreground mt-1">
-              View currently active shifts
-            </p>
-          </div>
-          <PageRefreshButton />
-        </div>
-
+      <PageLayout
+        title="Active Shifts"
+        description="View currently active shifts"
+        actions={<PageRefreshButton />}
+      >
         {isLoading ? (
-          <Card>
-            <CardContent className="py-8">
-              <p className="text-center text-muted-foreground">Loading active shifts...</p>
-            </CardContent>
-          </Card>
+          <div className="text-center py-8">
+            <p className="text-gray-600">Loading active shifts...</p>
+          </div>
         ) : activeShifts.length === 0 ? (
-          <Card>
-            <CardContent className="py-8">
-              <p className="text-center text-muted-foreground">No active shifts</p>
-            </CardContent>
-          </Card>
+          <div className="text-center py-8">
+            <p className="text-gray-600">No active shifts</p>
+          </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {activeShifts.map((shift) => (
-              <Card key={shift.id}>
+              <Card key={shift.id} className="border-gray-300">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>Shift #{shift.id.slice(-6)}</CardTitle>
@@ -110,7 +101,7 @@ export default function ActiveShiftsPage() {
             ))}
           </div>
         )}
-      </div>
+      </PageLayout>
 
       <CloseShiftModal
         open={!!shiftToClose}

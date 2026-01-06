@@ -1,35 +1,68 @@
 {
-  "python.analysis.extraPaths": [
-    "${workspaceFolder}/backend",
-    "${workspaceFolder}/backend/env/Lib/site-packages"
+  // Exclude backend files from frontend TypeScript/JavaScript language server
+  "typescript.tsdk": "frontend/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  
+  // File watcher exclusions for performance
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/.next/**": true,
+    "**/backend/**": true,
+    "**/__pycache__/**": true,
+    "**/env/**": true,
+    "**/.venv/**": true,
+    "**/templates/**": true,
+    "**/*.pyc": true,
+    "**/.pytest_cache/**": true,
+    "**/dist/**": true,
+    "**/build/**": true,
+    "**/out/**": true
+  },
+  
+  // Search exclusions
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.next": true,
+    "**/backend": true,
+    "**/__pycache__": true,
+    "**/env": true,
+    "**/.venv": true,
+    "**/templates": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/out": true,
+    "**/*.tsbuildinfo": true,
+    "**/.tsbuildinfo": true
+  },
+  
+  // File associations - prevent Python files from being analyzed by TS
+  "files.associations": {
+    "*.py": "python",
+    "*.pyi": "python"
+  },
+  
+  // Python language server settings (only scan backend)
+  "python.analysis.include": [
+    "backend"
   ],
-  "python.analysis.typeCheckingMode": "basic",
-  "python.linting.enabled": true,
-  "python.linting.pylintEnabled": false,
-  "python.linting.flake8Enabled": false,
-  "python.analysis.autoImportCompletions": true,
-  "python.analysis.diagnosticSeverityOverrides": {
-    "reportMissingImports": "none",
-    "reportMissingModuleSource": "none",
-    "reportGeneralTypeIssues": "none",
-    "reportOptionalMemberAccess": "none",
-    "reportOptionalSubscript": "none",
-    "reportUnknownMemberType": "none",
-    "reportUnknownArgumentType": "none",
-    "reportUnknownVariableType": "none",
-    "reportUnknownParameterType": "none",
-    "reportIncompatibleMethodOverride": "none",
-    "reportIncompatibleVariableOverride": "none",
-    "reportUninitializedInstanceVariable": "none"
-  },
-  "python.defaultInterpreterPath": "${workspaceFolder}/backend/env/Scripts/python.exe",
-  "python.analysis.diagnosticMode": "workspace",
-  "[python]": {
-    "editor.defaultFormatter": "ms-python.python",
-    "editor.formatOnSave": true
-  },
-  "python.analysis.ignore": [
-    "**/env/**",
-    "**/__pycache__/**"
-  ]
+  "python.analysis.exclude": [
+    "**/node_modules",
+    "**/frontend",
+    "**/__pycache__",
+    "**/env",
+    "**/.venv"
+  ],
+  
+  // TypeScript/JavaScript language server settings (only scan frontend)
+  "javascript.preferences.includePackageJsonAutoImports": "on",
+  "typescript.preferences.includePackageJsonAutoImports": "on",
+  
+  // Disable unnecessary file watching
+  "files.exclude": {
+    "**/.git": false,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true
+  }
 }

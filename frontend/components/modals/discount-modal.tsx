@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Percent } from "lucide-react"
 import { useState } from "react"
+import { useI18n } from "@/contexts/i18n-context"
 
 interface CartItem {
   id: string
@@ -34,6 +35,7 @@ interface DiscountModalProps {
 export function DiscountModal({ open, onOpenChange, item, onApply }: DiscountModalProps) {
   const [discountType, setDiscountType] = useState<"percentage" | "amount">("percentage")
   const [discountValue, setDiscountValue] = useState<string>("")
+  const { t } = useI18n()
 
   if (!item) return null
 
@@ -81,7 +83,7 @@ export function DiscountModal({ open, onOpenChange, item, onApply }: DiscountMod
                   type="number"
                   min="0"
                   max="100"
-                  placeholder="0"
+                  placeholder={t("common.percentage_placeholder")}
                   value={discountValue}
                   onChange={(e) => setDiscountValue(e.target.value)}
                 />
@@ -104,7 +106,7 @@ export function DiscountModal({ open, onOpenChange, item, onApply }: DiscountMod
                   step="0.01"
                   min="0"
                   max={maxDiscount}
-                  placeholder="0.00"
+                  placeholder={t("common.amount_placeholder")}
                   className="pl-7"
                   value={discountValue}
                   onChange={(e) => setDiscountValue(e.target.value)}

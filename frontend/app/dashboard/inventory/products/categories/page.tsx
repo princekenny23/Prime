@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -56,69 +57,63 @@ export default function CategoriesPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard/inventory/products">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold">Categories</h1>
-              <p className="text-muted-foreground">Organize your products into categories</p>
-            </div>
-          </div>
-          <Button onClick={() => {
-            setSelectedCategory(null)
-            setShowAddCategory(true)
-          }}>
+      <PageLayout
+        title="Categories"
+        description="Organize your products into categories"
+        actions={
+          <Button 
+            onClick={() => {
+              setSelectedCategory(null)
+              setShowAddCategory(true)
+            }}
+            className="bg-white border-white text-[#1e3a8a] hover:bg-blue-50 hover:border-blue-50"
+          >
             <Plus className="mr-2 h-4 w-4" />
             Add Category
           </Button>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Product Categories</CardTitle>
-            <CardDescription>
+        }
+      >
+        <div>
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Product Categories</h3>
+            <p className="text-sm text-gray-600">
               {isLoading ? "Loading..." : `${categories.length} categor${categories.length !== 1 ? "ies" : "y"} defined`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center h-64">
-                <p className="text-muted-foreground">Loading categories...</p>
-              </div>
-            ) : categories.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-64 text-center">
-                <Folder className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">No categories found</p>
-                <Button
-                  variant="outline"
-                  className="mt-4"
-                  onClick={() => {
-                    setSelectedCategory(null)
-                    setShowAddCategory(true)
-                  }}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Your First Category
-                </Button>
-              </div>
-            ) : (
+            </p>
+          </div>
+          {isLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <p className="text-gray-600">Loading categories...</p>
+            </div>
+          ) : categories.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <Folder className="h-12 w-12 text-gray-400 mb-4" />
+              <p className="text-gray-600">No categories found</p>
+              <Button
+                variant="outline"
+                className="mt-4 border-gray-300"
+                onClick={() => {
+                  setSelectedCategory(null)
+                  setShowAddCategory(true)
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Create Your First Category
+              </Button>
+            </div>
+          ) : (
+            <div className="rounded-md border border-gray-300 bg-white">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Products</TableHead>
-                    <TableHead>Actions</TableHead>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="text-gray-900 font-semibold">Category</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Description</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Products</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {categories.map((category) => (
-                    <TableRow key={category.id}>
+                    <TableRow key={category.id} className="border-gray-300">
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Folder className="h-4 w-4 text-primary" />
@@ -130,7 +125,7 @@ export default function CategoriesPage() {
                       </TableCell>
                       <TableCell>
                         {/* Product count will be available from backend */}
-                        <span className="text-muted-foreground">-</span>
+                        <span className="text-gray-600">-</span>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -141,13 +136,14 @@ export default function CategoriesPage() {
                               setSelectedCategory(category)
                               setShowAddCategory(true)
                             }}
+                            className="border-gray-300"
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            className="text-destructive"
+                            className="text-destructive border-gray-300"
                             onClick={() => {
                               // TODO: Implement delete functionality
                               alert("Delete functionality coming soon")
@@ -161,10 +157,10 @@ export default function CategoriesPage() {
                   ))}
                 </TableBody>
               </Table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+          )}
+        </div>
+      </PageLayout>
 
       <AddCategoryModal
         open={showAddCategory}

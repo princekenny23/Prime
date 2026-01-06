@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -255,6 +256,7 @@ export default function TabsPage() {
         open={showOpenTab}
         onOpenChange={setShowOpenTab}
       />
+      </PageLayout>
       <CloseTabModal
         open={showCloseTab}
         onOpenChange={setShowCloseTab}

@@ -70,6 +70,7 @@ export const useBusinessStore = create<BusinessState>()(
         try {
           // Get outlets from tenant data (which includes outlets) or from outlet service
           // Backend filters by tenant automatically via TenantFilterMixin
+          // For SaaS admins, backend will return all outlets, so we filter client-side
           const outlets = await outletService.list()
           // Filter outlets to ensure they belong to this tenant (extra safety check)
           const tenantOutlets = outlets.filter((outlet: any) => {

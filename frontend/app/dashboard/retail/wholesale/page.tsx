@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,10 +19,12 @@ import { useState, useEffect } from "react"
 import { useBusinessStore } from "@/stores/businessStore"
 import { productService } from "@/lib/services/productService"
 import { useRouter } from "next/navigation"
+import { useI18n } from "@/contexts/i18n-context"
 
 export default function WholesalePricingPage() {
   const { currentBusiness } = useBusinessStore()
   const router = useRouter()
+  const { t } = useI18n()
   const [products, setProducts] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -62,20 +65,16 @@ export default function WholesalePricingPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Wholesale Pricing</h1>
-            <p className="text-muted-foreground mt-1">
-              Manage wholesale pricing and minimum order quantities
-            </p>
-          </div>
+      <PageLayout
+        title={t("sales.menu.wholesale")}
+        description={t("sales.wholesale.description")}
+        actions={
           <Button>
             <Plus className="mr-2 h-4 w-4" />
             Enable Wholesale
           </Button>
-        </div>
+        }
+      >
 
         {/* Search */}
         <Card>
@@ -83,7 +82,7 @@ export default function WholesalePricingPage() {
             <div className="flex items-center gap-2">
               <Search className="h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search products by name or SKU..."
+                placeholder={t("common.search_products_placeholder")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -155,7 +154,7 @@ export default function WholesalePricingPage() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -38,6 +39,7 @@ import { formatCurrency } from "@/lib/utils/currency"
 import Link from "next/link"
 import { format } from "date-fns"
 import { expenseService } from "@/lib/services/expenseService"
+import { useI18n } from "@/contexts/i18n-context"
 
 interface Expense {
   id: string
@@ -78,6 +80,7 @@ const paymentMethods = [
 export default function ExpensesPage() {
   const { currentBusiness } = useBusinessStore()
   const { toast } = useToast()
+  const { t } = useI18n()
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -182,62 +185,18 @@ export default function ExpensesPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Expenses</h1>
-            <p className="text-muted-foreground">Track and manage business expenses</p>
-          </div>
+      <PageLayout
+        title={t("reports.menu.expenses")}
+        description={t("reports.expense_report.description")}
+        actions={
           <Link href="/dashboard/office/expenses/new">
             <Button>
               <Plus className="h-4 w-4 mr-2" />
               Add Expense
             </Button>
           </Link>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-              <Receipt className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(totalExpenses, currentBusiness)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {filteredExpenses.length} {filteredExpenses.length === 1 ? "expense" : "expenses"}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Today's Expenses</CardTitle>
-              <Receipt className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(todayExpenses, currentBusiness)}
-              </div>
-              <p className="text-xs text-muted-foreground">Today</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Approval</CardTitle>
-              <Filter className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {expenses.filter(e => e.status === "pending").length}
-              </div>
-              <p className="text-xs text-muted-foreground">Awaiting review</p>
-            </CardContent>
-          </Card>
-        </div>
+        }
+      >
 
         {/* Filters */}
         <Card>
@@ -250,7 +209,7 @@ export default function ExpensesPage() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search by number, description, or vendor..."
+                    placeholder={t("reports.expenses.search_placeholder")}
                     className="pl-10"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -259,7 +218,7 @@ export default function ExpensesPage() {
               </div>
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Category" />
+                  <SelectValue placeholder={t("common.category")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
@@ -270,7 +229,7 @@ export default function ExpensesPage() {
               </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Status" />
+                  <SelectValue placeholder={t("common.status")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
@@ -382,7 +341,7 @@ export default function ExpensesPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

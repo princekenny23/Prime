@@ -48,17 +48,24 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
   const [shiftHistory, setShiftHistory] = useState<Shift[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  // Load active shift and history on mount
+  // Load active shift and history on mount - only reload when outlet ID changes
   useEffect(() => {
+    if (!currentOutlet?.id) {
+      setActiveShiftState(null)
+      setShiftHistory([])
+      setIsLoading(false)
+      return
+    }
+
     const loadShifts = async () => {
       setIsLoading(true)
       try {
-        if (useRealAPI() && currentOutlet) {
+        if (useRealAPI()) {
           // Use real API
           try {
             const active = await shiftService.getActive(currentOutlet.id)
-            if (active) {
-              // Transform to context format
+            if (active && active.outletId === currentOutlet.id) {
+              // Only set shift if it belongs to current outlet
               const contextShift: Shift = {
                 id: active.id,
                 outletId: active.outletId,
@@ -73,12 +80,15 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
                 endTime: active.endTime,
               }
               setActiveShiftState(contextShift)
+            } else {
+              setActiveShiftState(null)
             }
           } catch (error: any) {
             // No active shift found is OK
             if (!error.message?.includes("404") && !error.message?.includes("No active shift")) {
               console.error("Error loading active shift:", error)
             }
+            setActiveShiftState(null)
           }
           
           // Load shift history
@@ -108,28 +118,38 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
           const stored = localStorage.getItem("activeShift")
           if (stored) {
             const shift = JSON.parse(stored) as Shift
-            if (shift.status === "OPEN") {
+            // Only use shift if it belongs to current outlet
+            if (shift.status === "OPEN" && shift.outletId === currentOutlet.id) {
               setActiveShiftState(shift)
             } else {
               localStorage.removeItem("activeShift")
+              setActiveShiftState(null)
             }
+          } else {
+            setActiveShiftState(null)
           }
 
           const historyStored = localStorage.getItem("shiftHistory")
           if (historyStored) {
             const history = JSON.parse(historyStored) as Shift[]
-            setShiftHistory(history)
+            // Filter history by current outlet
+            const filteredHistory = history.filter(h => h.outletId === currentOutlet.id)
+            setShiftHistory(filteredHistory)
+          } else {
+            setShiftHistory([])
           }
         }
       } catch (error) {
         console.error("Error loading shifts:", error)
+        setActiveShiftState(null)
+        setShiftHistory([])
       } finally {
         setIsLoading(false)
       }
     }
 
     loadShifts()
-  }, [currentOutlet])
+  }, [currentOutlet?.id])
 
   // Save active shift to localStorage whenever it changes
   useEffect(() => {

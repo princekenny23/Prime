@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,13 +21,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Search, Upload, Filter, Folder, Trash2, RefreshCw, AlertTriangle, Package, AlertCircle, Clock } from "lucide-react"
+import { FilterableTabs, TabsContent, type TabConfig } from "@/components/ui/filterable-tabs"
+import { Plus, Search, Upload, Filter, Folder, Trash2, RefreshCw, AlertTriangle, Package, AlertCircle, Clock, Download, Edit, Menu, ShoppingCart } from "lucide-react"
+import { OrderProductModal } from "@/components/modals/order-product-modal"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import Link from "next/link"
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { AddEditProductModal } from "@/components/modals/add-edit-product-modal"
 import { ImportProductsModal } from "@/components/modals/import-products-modal"
 import { productService, categoryService } from "@/lib/services/productService"
+import { apiEndpoints } from "@/lib/api"
 import { useBusinessStore } from "@/stores/businessStore"
 import { useToast } from "@/components/ui/use-toast"
 import {
@@ -39,8 +50,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { useI18n } from "@/contexts/i18n-context"
 
 export default function ProductsPage() {
+  const { t } = useI18n()
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<any>(null)
@@ -53,9 +66,12 @@ export default function ProductsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isAutoRefreshing, setIsAutoRefreshing] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [productToDelete, setProductToDelete] = useState<any>(null)
+  const [showOrderModal, setShowOrderModal] = useState(false)
+  const [productToOrder, setProductToOrder] = useState<any>(null)
   const { currentBusiness } = useBusinessStore()
   const { toast } = useToast()
   
@@ -302,6 +318,31 @@ export default function ProductsPage() {
     return { allCount, lowStockCount, expiriesCount }
   }, [baseFilteredProducts])
 
+  // Tab configuration
+  const tabsConfig: TabConfig[] = useMemo(() => [
+    {
+      value: "all",
+      label: "All Products",
+      icon: Package,
+      badgeCount: stats.allCount > 0 ? stats.allCount : undefined,
+      badgeVariant: "secondary",
+    },
+    {
+      value: "low-stock",
+      label: "Low Stocks",
+      icon: AlertCircle,
+      badgeCount: stats.lowStockCount > 0 ? stats.lowStockCount : undefined,
+      badgeVariant: "destructive",
+    },
+    {
+      value: "expiries",
+      label: "Expiries",
+      icon: Clock,
+      badgeCount: stats.expiriesCount > 0 ? stats.expiriesCount : undefined,
+      badgeVariant: "destructive",
+    },
+  ], [stats])
+
   const handleRefresh = async () => {
     setIsRefreshing(true)
     try {
@@ -355,100 +396,201 @@ export default function ProductsPage() {
     }
   }
 
+  const handleExportProducts = async () => {
+    if (!currentBusiness) {
+      toast({
+        title: "Error",
+        description: "No business selected.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (products.length === 0) {
+      toast({
+        title: "No Products",
+        description: "There are no products to export.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsExporting(true)
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"
+      
+      // Construct the URL - ensure proper path joining
+      const exportUrl = `${API_BASE_URL}${apiEndpoints.products.list.replace(/\/$/, '')}/bulk-export/?format=xlsx`
+      console.log("Exporting products from:", exportUrl)
+      
+      // Call the backend export endpoint
+      const response = await fetch(exportUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        // Don't set Content-Type for GET requests with file downloads
+      })
+
+      if (!response.ok) {
+        // Try to get error message from response
+        let errorMessage = `Failed to export products (${response.status})`
+        const contentType = response.headers.get('content-type')
+        
+        // Clone the response to read it without consuming the body
+        const clonedResponse = response.clone()
+        
+        try {
+          if (contentType && contentType.includes('application/json')) {
+            const errorData = await clonedResponse.json()
+            errorMessage = errorData.error || errorData.message || errorMessage
+          } else {
+            const text = await clonedResponse.text()
+            try {
+              const errorData = JSON.parse(text)
+              errorMessage = errorData.error || errorData.message || errorMessage
+            } catch {
+              errorMessage = text || response.statusText || errorMessage
+            }
+          }
+        } catch {
+          errorMessage = response.statusText || errorMessage
+        }
+        throw new Error(errorMessage)
+      }
+
+      // Check if response is actually a file
+      const contentType = response.headers.get('content-type')
+      if (contentType && contentType.includes('application/json')) {
+        // Might be an error response in JSON format
+        const errorData = await response.json()
+        throw new Error(errorData.error || errorData.message || 'Invalid response from server')
+      }
+
+      // Get the blob from response
+      const blob = await response.blob()
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      const timestamp = new Date().toISOString().split('T')[0].replace(/-/g, '')
+      link.download = `products_export_${timestamp}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      toast({
+        title: "Export Successful",
+        description: "Products have been exported to Excel file.",
+      })
+    } catch (error: any) {
+      console.error("Failed to export products:", error)
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+      })
+      toast({
+        title: "Export Failed",
+        description: error.message || "Failed to export products. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Products</h1>
-            <p className="text-muted-foreground">
-              Manage your product catalog
-              {isAutoRefreshing && (
-                <span className="ml-2 text-xs text-muted-foreground">
-                  (Updating...)
-                </span>
-              )}
-            </p>
-          </div>
+      <PageLayout
+        title="Products"
+        description={
+          <>
+            Manage your product catalog
+            {isAutoRefreshing && (
+              <span className="ml-2 text-xs text-blue-100">
+                (Updating...)
+              </span>
+            )}
+          </>
+        }
+        actions={
           <div className="flex gap-2">
             <Button
               variant="outline"
               onClick={handleRefresh}
               disabled={isRefreshing || isLoading}
+              className="bg-white border-white text-[#1e3a8a] hover:bg-blue-50 hover:border-blue-50"
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing || isAutoRefreshing ? "animate-spin" : ""}`} />
               Refresh
             </Button>
+            <Button
+              variant="outline"
+              onClick={handleExportProducts}
+              disabled={isExporting || isLoading || products.length === 0}
+              className="bg-white border-white text-[#1e3a8a] hover:bg-blue-50 hover:border-blue-50"
+            >
+              <Download className={`mr-2 h-4 w-4 ${isExporting ? "animate-pulse" : ""}`} />
+              {isExporting ? "Exporting..." : "Export"}
+            </Button>
             <Link href="/dashboard/inventory/products/categories">
-              <Button variant="outline">
+              <Button 
+                variant="outline"
+                className="bg-white border-white text-[#1e3a8a] hover:bg-blue-50 hover:border-blue-50"
+              >
                 <Folder className="mr-2 h-4 w-4" />
                 Categories
               </Button>
             </Link>
-            <Button variant="outline" onClick={() => setShowImport(true)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowImport(true)}
+              className="bg-white border-white text-[#1e3a8a] hover:bg-blue-50 hover:border-blue-50"
+            >
               <Upload className="mr-2 h-4 w-4" />
               Import
             </Button>
-            <Button onClick={() => {
-              setSelectedProduct(null)
-              setShowAddProduct(true)
-            }}>
+            <Button 
+              onClick={() => {
+                setSelectedProduct(null)
+                setShowAddProduct(true)
+              }}
+              className="bg-white border-white text-[#1e3a8a] hover:bg-blue-50 hover:border-blue-50"
+            >
               <Plus className="mr-2 h-4 w-4" />
               Add Product
             </Button>
           </div>
-        </div>
-
+        }
+        noPadding={true}
+      >
         {/* Tabs Navigation */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-[600px]">
-            <TabsTrigger value="all" className="flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              All Products
-              {stats.allCount > 0 && (
-                <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
-                  {stats.allCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="low-stock" className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4" />
-              Low Stocks
-              {stats.lowStockCount > 0 && (
-                <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
-                  {stats.lowStockCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="expiries" className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Expiries
-              {stats.expiriesCount > 0 && (
-                <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
-                  {stats.expiriesCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
+        <div className="px-6 pt-4 border-b border-gray-300">
+          <FilterableTabs
+            tabs={tabsConfig}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          >
 
-          {/* Filters */}
-          <Card>
-            <CardContent className="pt-6">
+            {/* Filters */}
+            <div className="px-6 py-4 border-b border-gray-300">
               <div className="flex gap-4">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
                   <Input
-                    placeholder="Search products by name or SKU..."
-                    className="pl-10"
+                    placeholder={t("common.search_products_placeholder")}
+                    className="pl-10 bg-white border-gray-300"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
                 <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="w-[200px]">
+                  <SelectTrigger className="w-[200px] bg-white border-gray-300">
                     <Filter className="mr-2 h-4 w-4" />
-                    <SelectValue placeholder="All Categories" />
+                    <SelectValue placeholder={t("common.all_categories")} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
@@ -458,40 +600,53 @@ export default function ProductsPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </CardContent>
-          </Card>
+            </div>
 
-          {/* All Products Tab */}
-          <TabsContent value="all" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>All Products</CardTitle>
-                <CardDescription>
-                  {filteredProducts.length} product{filteredProducts.length !== 1 ? "s" : ""} found
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Outlet</TableHead>
-                  <TableHead>Cost</TableHead>
-                  <TableHead>Retail Price</TableHead>
-                  {isWholesaleRetail && <TableHead>Wholesale Price</TableHead>}
-                  {isBar && <TableHead>Volume (ml)</TableHead>}
-                  {isBar && <TableHead>Alcohol %</TableHead>}
-                  {isRestaurant && <TableHead>Prep Time</TableHead>}
-                  {isRestaurant && <TableHead>Menu Item</TableHead>}
-                  <TableHead>Stock</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProducts.map((product) => {
+            {/* All Products Tab */}
+            <TabsContent value="all" className="mt-0">
+              <div className="px-6 py-4">
+                <div className="mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">All Products</h3>
+                  <p className="text-sm text-gray-600">
+                    {filteredProducts.length} product{filteredProducts.length !== 1 ? "s" : ""} found
+                  </p>
+                </div>
+                <div>
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <p className="text-muted-foreground">Loading products...</p>
+                  </div>
+                ) : filteredProducts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-center">
+                    <Package className="h-12 w-12 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">
+                      {searchTerm || categoryFilter !== "all" 
+                        ? "No products found matching your filters" 
+                        : "No products found"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-md border border-gray-300 bg-white">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-gray-50">
+                          <TableHead className="text-gray-900 font-semibold">Product</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">SKU</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">Category</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">Outlet</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">Cost</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">Retail Price</TableHead>
+                          {isWholesaleRetail && <TableHead className="text-gray-900 font-semibold">Wholesale Price</TableHead>}
+                          {isBar && <TableHead className="text-gray-900 font-semibold">Volume (ml)</TableHead>}
+                          {isBar && <TableHead className="text-gray-900 font-semibold">Alcohol %</TableHead>}
+                          {isRestaurant && <TableHead>Prep Time</TableHead>}
+                          {isRestaurant && <TableHead>Menu Item</TableHead>}
+                          <TableHead>Stock</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredProducts.map((product) => {
                   const status = getProductStatus(product)
                   const categoryName = product.category?.name || (product.categoryId ? categories.find(c => c.id === product.categoryId)?.name : "N/A")
                   const businessFields = parseBusinessFields(product)
@@ -557,75 +712,79 @@ export default function ProductsPage() {
                       )}
                       <TableCell>{product.stock}</TableCell>
                       <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          status === "active" 
-                            ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200"
-                            : status === "low-stock"
-                            ? "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200"
-                            : "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200"
-                        }`}>
-                          {status === "active" ? "In Stock" : 
-                           status === "low-stock" ? "Low Stock" : "Out of Stock"}
-                        </span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Menu className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedProduct(product)
+                                setShowAddProduct(true)
+                              }}
+                            >
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit Product
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteClick(product)}
+                              disabled={deletingProductId === product.id}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete Product
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedProduct(product)
-                              setShowAddProduct(true)
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteClick(product)}
-                            disabled={deletingProductId === product.id}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-          </TabsContent>
+                        </TableRow>
+                      )
+                    })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+                </div>
+              </div>
+            </TabsContent>
 
-          {/* Low Stocks Tab */}
-          <TabsContent value="low-stock" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertCircle className="h-5 w-5 text-orange-600" />
-                  Low Stock Products
-                </CardTitle>
-                <CardDescription>
-                  {filteredProducts.length} product{filteredProducts.length !== 1 ? "s" : ""} with low or out of stock
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Product</TableHead>
-                      <TableHead>SKU</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Outlet</TableHead>
-                      <TableHead>Current Stock</TableHead>
-                      <TableHead>Low Stock Threshold</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
+            {/* Low Stocks Tab */}
+            <TabsContent value="low-stock" className="mt-0">
+              <div className="px-6 py-4">
+                <div className="mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-orange-600" />
+                    Low Stock Products
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    {filteredProducts.length} product{filteredProducts.length !== 1 ? "s" : ""} with low or out of stock
+                  </p>
+                </div>
+                <div>
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <p className="text-gray-600">Loading products...</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-md border border-gray-300 bg-white">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-gray-50">
+                          <TableHead className="text-gray-900 font-semibold">Product</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">SKU</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">Category</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">Outlet</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">Current Stock</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">Low Stock Threshold</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">Status</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
                   <TableBody>
                     {filteredProducts.length === 0 ? (
                       <TableRow>
@@ -669,70 +828,86 @@ export default function ProductsPage() {
                               </span>
                             </TableCell>
                             <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedProduct(product)
-                                    setShowAddProduct(true)
-                                  }}
-                                >
-                                  Edit
-                                </Button>
-                              </div>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="outline" size="sm" className="border-gray-300">
+                                    <Menu className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setProductToOrder(product)
+                                      setShowOrderModal(true)
+                                    }}
+                                  >
+                                    <ShoppingCart className="mr-2 h-4 w-4" />
+                                    Order
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </TableCell>
                           </TableRow>
                         )
                       })
                     )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+                </div>
+              </div>
+            </TabsContent>
 
-          {/* Expiries Tab */}
-          <TabsContent value="expiries" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-orange-600" />
-                  Expiring Products
-                </CardTitle>
-                <CardDescription>
-                  {filteredProducts.length} product{filteredProducts.length !== 1 ? "s" : ""} expiring soon or expired
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Product</TableHead>
-                      <TableHead>SKU</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Outlet</TableHead>
-                      <TableHead>Manufacturing Date</TableHead>
-                      <TableHead>Expiry Date</TableHead>
-                      <TableHead>Days Left</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredProducts.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                          No expiring products found
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredProducts.map((product) => {
-                        const categoryName = product.category?.name || (product.categoryId ? categories.find(c => c.id === product.categoryId)?.name : "N/A")
-                        const expiryStatus = getExpiryStatus(product.expiry_date)
-                        
-                        return (
-                          <TableRow key={product.id}>
+            {/* Expiries Tab */}
+            <TabsContent value="expiries" className="mt-0">
+              <div className="px-6 py-4">
+                <div className="mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-orange-600" />
+                    Expiring Products
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    {filteredProducts.length} product{filteredProducts.length !== 1 ? "s" : ""} expiring soon or expired
+                  </p>
+                </div>
+                <div>
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <p className="text-gray-600">Loading products...</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-md border border-gray-300 bg-white">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-gray-50">
+                          <TableHead className="text-gray-900 font-semibold">Product</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">SKU</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">Category</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">Outlet</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">Manufacturing Date</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">Expiry Date</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">Days Left</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">Status</TableHead>
+                          <TableHead className="text-gray-900 font-semibold">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredProducts.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={9} className="text-center py-8 text-gray-600">
+                              No expiring products found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredProducts.map((product) => {
+                            const categoryName = product.category?.name || (product.categoryId ? categories.find(c => c.id === product.categoryId)?.name : "N/A")
+                            const expiryStatus = getExpiryStatus(product.expiry_date)
+                            
+                            return (
+                              <TableRow key={product.id} className="border-gray-300">
                             <TableCell>
                               <Link 
                                 href={`/dashboard/inventory/products/${product.id}`}
@@ -773,30 +948,41 @@ export default function ProductsPage() {
                               </span>
                             </TableCell>
                             <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedProduct(product)
-                                    setShowAddProduct(true)
-                                  }}
-                                >
-                                  Edit
-                                </Button>
-                              </div>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="outline" size="sm" className="border-gray-300">
+                                    <Menu className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setSelectedProduct(product)
+                                      setShowAddProduct(true)
+                                    }}
+                                  >
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit Product
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </TableCell>
                           </TableRow>
                         )
                       })
                     )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+                </div>
+              </div>
+            </TabsContent>
+          </FilterableTabs>
+        </div>
+      </PageLayout>
 
       {/* Modals */}
       <AddEditProductModal
@@ -821,6 +1007,22 @@ export default function ProductsPage() {
         onOpenChange={setShowImport}
         onSuccess={() => {
           handleProductSaved() // Reload products after successful import
+        }}
+      />
+
+      {/* Order Product Modal */}
+      <OrderProductModal
+        open={showOrderModal}
+        onOpenChange={(open) => {
+          setShowOrderModal(open)
+          if (!open) {
+            setProductToOrder(null)
+          }
+        }}
+        product={productToOrder}
+        onSuccess={() => {
+          // Refresh products after successful order
+          handleProductSaved()
         }}
       />
 

@@ -204,7 +204,7 @@ export default function LoginPage() {
                 <h2 className="text-3xl font-bold text-white">PrimePOS – Smart Point of Sale for Modern Businesses</h2>
                 <p className="text-base text-white/90 leading-relaxed">
                 Track sales, manage inventory, control outlets, and grow your business with ease.
-                PrimePOS gives you a secure system to run your business operations—all in one place.
+                PrimePOS gives you a secure system to run your business       operations—all in one place.
                 </p>
               </div>
 

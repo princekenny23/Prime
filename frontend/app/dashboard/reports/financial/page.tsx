@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Table,
@@ -75,11 +76,10 @@ export default function FinancialReportsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Financial Report</h1>
-          <p className="text-muted-foreground">Profit & loss, expenses, and comprehensive financial analysis</p>
-        </div>
+      <PageLayout
+        title="Financial Report"
+        description="Profit & loss, expenses, and comprehensive financial analysis"
+      >
 
         <ReportFilters
           onExport={() => setShowExport(true)}
@@ -303,6 +303,7 @@ export default function FinancialReportsPage() {
         open={showSettings}
         onOpenChange={setShowSettings}
       />
+      </PageLayout>
     </DashboardLayout>
   )
 }

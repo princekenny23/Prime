@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -69,12 +70,10 @@ export default function RecipesPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Recipe Management</h1>
-            <p className="text-muted-foreground">Manage recipes and ingredient costs</p>
-          </div>
+      <PageLayout
+        title="Recipe Management"
+        description="Manage recipes and ingredient costs"
+        actions={
           <Button onClick={() => {
             setSelectedRecipe(null)
             setShowAddRecipe(true)
@@ -82,7 +81,8 @@ export default function RecipesPage() {
             <Plus className="mr-2 h-4 w-4" />
             Add Recipe
           </Button>
-        </div>
+        }
+      >
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-4">
@@ -219,6 +219,7 @@ export default function RecipesPage() {
         onOpenChange={setShowAddRecipe}
         recipe={selectedRecipe}
       />
+      </PageLayout>
     </DashboardLayout>
   )
 }

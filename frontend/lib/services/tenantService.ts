@@ -25,6 +25,7 @@ export const tenantService = {
       ...tenant,
       id: String(tenant.id),
       type: mapBackendTypeToFrontend(tenant.type) as Business["type"],
+      posType: (tenant.pos_type || tenant.posType || "standard") as Business["posType"],
     }))
   },
 
@@ -36,6 +37,7 @@ export const tenantService = {
       id: String(response.id),
       name: response.name,
       type: mapBackendTypeToFrontend(response.type) as Business["type"],
+      posType: (response.pos_type || response.posType || "standard") as Business["posType"],
       currency: response.currency || "MWK",
       currencySymbol: response.currency_symbol || response.currencySymbol || "MK",
       phone: response.phone || "",
@@ -60,6 +62,7 @@ export const tenantService = {
       id: String(response.id),
       name: response.name,
       type: mapBackendTypeToFrontend(response.type) as Business["type"],
+      posType: (response.pos_type || response.posType || "standard") as Business["posType"],
       currency: response.currency || "MWK",
       currencySymbol: response.currency_symbol || response.currencySymbol || "MK",
       phone: response.phone || "",
@@ -81,6 +84,7 @@ export const tenantService = {
     const backendData: any = {
       name: data.name,
       type: mapFrontendTypeToBackend(data.type),
+      pos_type: data.posType || "standard",
       currency: data.currency || "MWK",
       currency_symbol: data.currencySymbol || data.currency_symbol || "MK",
       phone: data.phone || "",
@@ -97,6 +101,7 @@ export const tenantService = {
       id: String(response.id),
       name: response.name,
       type: mapBackendTypeToFrontend(response.type) as Business["type"],
+      posType: (response.pos_type || response.posType || "standard") as Business["posType"],
       currency: response.currency,
       currencySymbol: response.currency_symbol || response.currencySymbol || "MK",
       phone: response.phone || "",
@@ -108,20 +113,25 @@ export const tenantService = {
   },
 
   async update(id: string, data: Partial<Business>): Promise<Business> {
-    // Get current tenant to merge settings
+    // Get current tenant to merge settings and fill required fields
     const currentTenant = await this.get(id)
     
     // Transform frontend data to backend format
+    // Use current tenant values as fallback for required fields
     const backendData: any = {
-      name: data.name,
-      // Include type if provided (for business type updates)
-      ...(data.type && { type: mapFrontendTypeToBackend(data.type) }),
-      currency: data.currency,
-      currency_symbol: data.currencySymbol || data.currency_symbol,
-      phone: data.phone || "",
-      // Only include email if it's a valid non-empty string
-      ...(data.email && data.email.trim() ? { email: data.email.trim() } : {}),
-      address: data.address || "",
+      name: data.name ?? currentTenant.name,
+      type: mapFrontendTypeToBackend(data.type ?? currentTenant.type),
+      pos_type: data.posType ?? currentTenant.posType ?? "standard",
+      currency: data.currency ?? currentTenant.currency ?? "MWK",
+      currency_symbol: data.currencySymbol || data.currency_symbol || currentTenant.currencySymbol || "MK",
+      phone: data.phone ?? currentTenant.phone ?? "",
+      address: data.address ?? currentTenant.address ?? "",
+    }
+    
+    // Only include email if it's a valid non-empty string
+    const email = data.email ?? currentTenant.email
+    if (email && email.trim()) {
+      backendData.email = email.trim()
     }
     
     // Merge settings if provided
@@ -141,6 +151,7 @@ export const tenantService = {
       id: String(response.id),
       name: response.name,
       type: mapBackendTypeToFrontend(response.type) as Business["type"],
+      posType: (response.pos_type || response.posType || "standard") as Business["posType"],
       currency: response.currency,
       currencySymbol: response.currency_symbol || response.currencySymbol || "MK",
       phone: response.phone || "",

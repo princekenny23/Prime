@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { FlaskConical } from "lucide-react"
@@ -8,13 +9,10 @@ import { FlaskConical } from "lucide-react"
 export default function BarRecipesPage() {
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Mix Recipes</h1>
-          <p className="text-muted-foreground mt-1">
-            Create and manage cocktail recipes
-          </p>
-        </div>
+      <PageLayout
+        title="Mix Recipes"
+        description="Create and manage cocktail recipes"
+      >
 
         <Card>
           <CardHeader>
@@ -33,7 +31,7 @@ export default function BarRecipesPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

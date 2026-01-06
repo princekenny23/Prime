@@ -8,8 +8,9 @@ from django.db import transaction
 from django.utils import timezone
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from .models import Sale, SaleItem, Delivery, DeliveryItem, DeliveryStatusHistory
-from .serializers import SaleSerializer, SaleItemSerializer, DeliverySerializer, DeliveryItemSerializer, DeliveryStatusHistorySerializer
+from .models import Sale, SaleItem, Delivery, DeliveryItem, DeliveryStatusHistory, Receipt
+from .serializers import SaleSerializer, SaleItemSerializer, DeliverySerializer, DeliveryItemSerializer, DeliveryStatusHistorySerializer, ReceiptSerializer
+from .services import ReceiptService
 from apps.products.models import Product, ProductUnit, ItemVariation
 from apps.inventory.models import StockMovement, LocationStock
 from apps.tenants.permissions import TenantFilterMixin
@@ -65,27 +66,33 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                 return queryset.none()
         
         # Apply outlet filter for outlet isolation - CRITICAL for data security
-        # Always filter by outlet to ensure transactions are isolated per outlet
-        outlet = self.get_outlet_for_request(self.request)
-        if not outlet:
-            # Also check explicit outlet filter in query params (for backward compatibility)
-            outlet_id = self.request.query_params.get('outlet')
-            if outlet_id:
-                try:
-                    # Validate outlet belongs to tenant before filtering
-                    from apps.outlets.models import Outlet
-                    outlet = Outlet.objects.filter(id=outlet_id, tenant=tenant).first()
-                except (ValueError, TypeError):
-                    outlet = None
-        
-        # STRICT OUTLET ISOLATION: Always filter by outlet if tenant is set
-        # This ensures users only see transactions from their current outlet
-        if outlet and tenant:
-            queryset = queryset.filter(outlet=outlet)
-        elif tenant and not is_saas_admin:
-            # If tenant exists but no outlet specified, return empty queryset for security
-            # (unless user is SaaS admin who can see all outlets)
-            return queryset.none()
+        # SaaS admins can see all sales, regular users need outlet filter
+        if not is_saas_admin:
+            # Always filter by outlet to ensure transactions are isolated per outlet
+            outlet = self.get_outlet_for_request(self.request)
+            if not outlet:
+                # Also check explicit outlet filter in query params (for backward compatibility)
+                outlet_id = self.request.query_params.get('outlet')
+                if outlet_id:
+                    try:
+                        # Validate outlet belongs to tenant before filtering
+                        from apps.outlets.models import Outlet
+                        outlet = Outlet.objects.filter(id=outlet_id, tenant=tenant).first()
+                    except (ValueError, TypeError):
+                        outlet = None
+            
+            # STRICT OUTLET ISOLATION: Always filter by outlet if tenant is set
+            # This ensures users only see transactions from their current outlet
+            if outlet and tenant:
+                queryset = queryset.filter(outlet=outlet)
+            elif tenant:
+                # If tenant exists but no outlet specified, return empty queryset for security
+                return queryset.none()
+        else:
+            # SaaS admin can optionally filter by outlet if provided
+            outlet = self.get_outlet_for_request(self.request)
+            if outlet:
+                queryset = queryset.filter(outlet=outlet)
         
         # Filter by date range if provided
         start_date = self.request.query_params.get('start_date')
@@ -146,10 +153,14 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
             )
         
         # Set tenant and user
-        tenant = getattr(request, 'tenant', None) or request.user.tenant
-        if not tenant:
+        # SaaS admins can provide tenant_id in request data
+        tenant = self.get_tenant_for_request(request)
+        if not tenant and not request.user.is_saas_admin:
             logger.error("No tenant found for user")
             return Response({"detail": "User must have a tenant"}, status=status.HTTP_400_BAD_REQUEST)
+        if not tenant:
+            logger.error("No tenant found - SaaS admin must provide tenant_id in request data")
+            return Response({"detail": "Tenant is required. Please provide tenant_id in request data."}, status=status.HTTP_400_BAD_REQUEST)
         
         logger.info(f"Sale validated - Tenant: {tenant.id}, Outlet: {serializer.validated_data.get('outlet')}")
         
@@ -912,9 +923,23 @@ class DeliveryViewSet(viewsets.ModelViewSet, TenantFilterMixin):
     ordering = ['-created_at']
     
     def get_queryset(self):
-        """Apply tenant filtering"""
+        """Apply tenant and outlet filtering"""
         queryset = super().get_queryset()
-        return self.filter_by_tenant(queryset)
+        queryset = self.filter_by_tenant(queryset)
+        
+        # Apply outlet filter if provided in query params
+        outlet_id = self.request.query_params.get('outlet')
+        if outlet_id:
+            try:
+                from apps.outlets.models import Outlet
+                tenant = getattr(self.request, 'tenant', None) or self.request.user.tenant
+                outlet = Outlet.objects.filter(id=outlet_id, tenant=tenant).first()
+                if outlet:
+                    queryset = queryset.filter(outlet=outlet)
+            except (ValueError, TypeError):
+                pass
+        
+        return queryset
     
     def perform_create(self, serializer):
         """Set tenant and created_by, and create delivery items for all sale items"""
@@ -1098,4 +1123,130 @@ class DeliveryViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         queryset = queryset.filter(scheduled_date=today, status__in=['confirmed', 'preparing', 'ready', 'in_transit'])
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+
+class ReceiptViewSet(viewsets.ReadOnlyModelViewSet, TenantFilterMixin):
+    """Receipt ViewSet - Read-only for retrieving receipts"""
+    queryset = Receipt.objects.select_related('sale', 'tenant', 'generated_by', 'sale__outlet', 'sale__customer')
+    serializer_class = ReceiptSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['tenant', 'sale', 'format', 'is_sent']
+    search_fields = ['receipt_number']
+    ordering_fields = ['generated_at', 'access_count']
+    ordering = ['-generated_at']
+    
+    def get_queryset(self):
+        """Ensure tenant filtering is applied"""
+        user = self.request.user
+        if not hasattr(user, '_tenant_loaded'):
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+                user = User.objects.select_related('tenant').get(pk=user.pk)
+                self.request.user = user
+                user._tenant_loaded = True
+            except User.DoesNotExist:
+                pass
+        
+        is_saas_admin = getattr(user, 'is_saas_admin', False)
+        request_tenant = getattr(self.request, 'tenant', None)
+        user_tenant = getattr(user, 'tenant', None)
+        tenant = request_tenant or user_tenant
+        
+        queryset = Receipt.objects.select_related(
+            'sale', 'tenant', 'generated_by', 'sale__outlet', 'sale__customer'
+        ).all()
+        
+        if not is_saas_admin:
+            if tenant:
+                queryset = queryset.filter(tenant=tenant)
+            else:
+                queryset = queryset.none()
+        
+        # Filter by outlet through sale relationship if provided
+        outlet_id = self.request.query_params.get('outlet')
+        if outlet_id:
+            try:
+                from apps.outlets.models import Outlet
+                # Validate outlet belongs to tenant
+                outlet = Outlet.objects.filter(id=outlet_id, tenant=tenant).first()
+                if outlet:
+                    queryset = queryset.filter(sale__outlet=outlet)
+            except (ValueError, TypeError):
+                pass
+        
+        return queryset
+    
+    @action(detail=False, methods=['get'], url_path='by-number/(?P<receipt_number>[^/.]+)')
+    def by_number(self, request, receipt_number=None):
+        """Get receipt by receipt number (public access)"""
+        try:
+            receipt = ReceiptService.get_receipt_by_number(receipt_number)
+            
+            # Check tenant access if authenticated
+            if request.user.is_authenticated:
+                tenant = getattr(request, 'tenant', None) or request.user.tenant
+                if tenant and receipt.tenant != tenant:
+                    return Response(
+                        {'error': 'Receipt not found'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            
+            serializer = self.get_serializer(receipt)
+            return Response(serializer.data)
+        except Receipt.DoesNotExist:
+            return Response(
+                {'error': 'Receipt not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=False, methods=['get'], url_path='by-sale/(?P<sale_id>[^/.]+)')
+    def by_sale(self, request, sale_id=None):
+        """Get receipt by sale ID"""
+        try:
+            receipt = ReceiptService.get_receipt_by_sale(sale_id)
+            
+            # Verify tenant access
+            tenant = getattr(request, 'tenant', None) or request.user.tenant
+            if not tenant or receipt.tenant != tenant:
+                return Response(
+                    {'error': 'Receipt not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            serializer = self.get_serializer(receipt)
+            return Response(serializer.data)
+        except Receipt.DoesNotExist:
+            return Response(
+                {'error': 'Receipt not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=True, methods=['post'], url_path='regenerate')
+    def regenerate(self, request, pk=None):
+        """Regenerate receipt (admin only)"""
+        receipt = self.get_object()
+        format_type = request.data.get('format', 'html')
+        
+        try:
+            updated_receipt = ReceiptService.regenerate_receipt(receipt.id, format=format_type)
+            serializer = self.get_serializer(updated_receipt)
+            return Response(serializer.data)
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to regenerate receipt: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['get'], url_path='download')
+    def download(self, request, pk=None):
+        """Download receipt as HTML file"""
+        receipt = self.get_object()
+        
+        from django.http import HttpResponse
+        
+        response = HttpResponse(receipt.content, content_type='text/html')
+        response['Content-Disposition'] = f'attachment; filename="receipt_{receipt.receipt_number}.html"'
+        return response
 

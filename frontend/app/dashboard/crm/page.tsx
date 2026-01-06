@@ -1,4 +1,5 @@
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,17 +16,16 @@ import { Plus, Search, Users, Mail, Phone } from "lucide-react"
 export default function CRMPage() {
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">CRM</h1>
-            <p className="text-muted-foreground">Manage your customer relationships</p>
-          </div>
+      <PageLayout
+        title="CRM"
+        description="Manage your customer relationships"
+        actions={
           <Button>
             <Plus className="mr-2 h-4 w-4" />
             Add Customer
           </Button>
-        </div>
+        }
+      >
 
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
@@ -116,7 +116,7 @@ export default function CRMPage() {
             </Table>
           </CardContent>
         </Card>
-      </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

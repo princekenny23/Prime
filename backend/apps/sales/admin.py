@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Sale, SaleItem, Delivery, DeliveryItem, DeliveryStatusHistory
+from .models import Sale, SaleItem, Delivery, DeliveryItem, DeliveryStatusHistory, Receipt
 
 
 class SaleItemInline(admin.TabularInline):
@@ -79,4 +79,29 @@ class DeliveryStatusHistoryAdmin(admin.ModelAdmin):
     list_filter = ('status', 'created_at')
     search_fields = ('delivery__delivery_number', 'notes')
     readonly_fields = ('created_at',)
+
+
+@admin.register(Receipt)
+class ReceiptAdmin(admin.ModelAdmin):
+    list_display = ('receipt_number', 'sale', 'tenant', 'format', 'is_sent', 'sent_via', 'access_count', 'generated_at')
+    list_filter = ('tenant', 'format', 'is_sent', 'sent_via', 'generated_at')
+    search_fields = ('receipt_number', 'sale__receipt_number')
+    readonly_fields = ('receipt_number', 'generated_at', 'access_count', 'last_accessed_at')
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('tenant', 'sale', 'receipt_number', 'format')
+        }),
+        ('Content', {
+            'fields': ('content', 'pdf_file')
+        }),
+        ('Metadata', {
+            'fields': ('generated_at', 'generated_by')
+        }),
+        ('Delivery', {
+            'fields': ('is_sent', 'sent_at', 'sent_via')
+        }),
+        ('Access Tracking', {
+            'fields': ('access_count', 'last_accessed_at')
+        }),
+    )
 

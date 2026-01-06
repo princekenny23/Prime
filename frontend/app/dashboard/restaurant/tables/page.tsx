@@ -101,7 +101,7 @@ export default function TablesPage() {
       case "available":
         return "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200 border-green-200 dark:border-green-800"
       case "out_of_service":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-200 border-gray-200 dark:border-gray-800"
+        return "bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-350 border-gray-350 dark:border-gray-800"
       default:
         return ""
     }
@@ -109,12 +109,10 @@ export default function TablesPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Table Management</h1>
-            <p className="text-muted-foreground">Manage restaurant tables and seating</p>
-          </div>
+      <PageLayout
+        title="Table Management"
+        description="Manage restaurant tables and seating"
+        actions={
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}>
               <Grid className="mr-2 h-4 w-4" />
@@ -128,7 +126,8 @@ export default function TablesPage() {
               Add Table
             </Button>
           </div>
-        </div>
+        }
+      >
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-4">
@@ -239,7 +238,7 @@ export default function TablesPage() {
                     className={`p-4 border rounded-lg cursor-pointer hover:bg-muted transition-colors ${
                       table.status === "occupied" ? "border-red-200" :
                       table.status === "reserved" ? "border-yellow-200" :
-                      table.status === "out_of_service" ? "border-gray-200" :
+                      table.status === "out_of_service" ? "border-gray-350" :
                       "border-green-200"
                     }`}
                     onClick={() => {
@@ -296,6 +295,7 @@ export default function TablesPage() {
         open={showTransfer}
         onOpenChange={setShowTransfer}
       />
+      </PageLayout>
     </DashboardLayout>
   )
 }

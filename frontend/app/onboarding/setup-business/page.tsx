@@ -20,7 +20,7 @@ import { useAuthStore } from "@/stores/authStore"
 import { useBusinessStore } from "@/stores/businessStore"
 import { tenantService } from "@/lib/services/tenantService"
 import { authService } from "@/lib/services/authService"
-import type { BusinessType } from "@/lib/types"
+import type { BusinessType, POSType } from "@/lib/types"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function SetupBusinessPage() {
@@ -35,6 +35,7 @@ export default function SetupBusinessPage() {
   const [formData, setFormData] = useState({
     businessName: "",
     businessType: "" as BusinessType | "",
+    posType: "standard" as POSType,
     email: "",
     phone: "",
     address: "",
@@ -58,7 +59,7 @@ export default function SetupBusinessPage() {
       return
     }
 
-    if (!formData.businessName || !formData.businessType) {
+    if (!formData.businessName || !formData.businessType || !formData.posType) {
       setError("Please fill in all required fields")
       return
     }
@@ -75,6 +76,7 @@ export default function SetupBusinessPage() {
       const business = await tenantService.create({
         name: formData.businessName,
         type: formData.businessType,
+        posType: formData.posType,
         currency: formData.currency,
         currencySymbol: formData.currencySymbol,
         phone: formData.phone || "",
@@ -164,6 +166,28 @@ export default function SetupBusinessPage() {
               </Select>
               <p className="text-xs text-muted-foreground">
                 Only wholesale and retail, restaurant, and bar are supported at this time
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pos-type">POS Type *</Label>
+              <Select 
+                value={formData.posType}
+                onValueChange={(value) => setFormData({ ...formData, posType: value as POSType })}
+                required
+              >
+                <SelectTrigger id="pos-type">
+                  <SelectValue placeholder="Select POS type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="standard">Standard POS</SelectItem>
+                  <SelectItem value="single_product">Single-Product POS</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Standard POS: For businesses with multiple products, categories, and cart-based checkout.
+                <br />
+                Single-Product POS: For businesses that mainly sell one product in high volume (e.g., maize, rice, juice) with multiple selling units and fast quantity-first checkout.
               </p>
             </div>
 

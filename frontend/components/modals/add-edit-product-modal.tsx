@@ -26,6 +26,7 @@ import { useBusinessStore } from "@/stores/businessStore"
 import { useTenant } from "@/contexts/tenant-context"
 import type { Category } from "@/lib/types"
 import { Package, Plus, Trash2, X } from "lucide-react"
+import { useI18n } from "@/contexts/i18n-context"
 
 interface AddEditProductModalProps {
   open: boolean
@@ -38,6 +39,7 @@ export function AddEditProductModal({ open, onOpenChange, product, onProductSave
   const { toast } = useToast()
   const { currentBusiness } = useBusinessStore()
   const { outlets } = useTenant()
+  const { t } = useI18n()
   const [isLoading, setIsLoading] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [sellingUnits, setSellingUnits] = useState<any[]>([])

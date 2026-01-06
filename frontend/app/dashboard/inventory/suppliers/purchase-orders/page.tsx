@@ -65,62 +65,66 @@ export default function PurchaseOrdersPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Purchase Orders</h1>
-            <p className="text-muted-foreground">Create and manage purchase orders from suppliers</p>
-          </div>
+      <PageLayout
+        title="Purchase Orders"
+        description="Create and manage purchase orders from suppliers"
+        actions={
           <Link href="/dashboard/inventory/suppliers/purchase-orders/new">
-            <Button>
+            <Button className="bg-white border-white text-[#1e3a8a] hover:bg-blue-50 hover:border-blue-50">
               <Plus className="mr-2 h-4 w-4" />
               New Purchase Order
             </Button>
           </Link>
+        }
+      >
+        {/* Filters */}
+        <div className="mb-6 pb-4 border-b border-gray-300">
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+              <Input
+                placeholder="Search purchase orders..."
+                className="pl-10 bg-white border-gray-300"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>All Purchase Orders</CardTitle>
-            <CardDescription>
+        {/* Purchase Orders Table */}
+        <div>
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">All Purchase Orders</h3>
+            <p className="text-sm text-gray-600">
               {purchaseOrders.length} purchase order{purchaseOrders.length !== 1 ? "s" : ""} found
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4 mb-4">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search purchase orders..."
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
+            </p>
+          </div>
+          {loading ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600">Loading...</p>
             </div>
-
-            {loading ? (
-              <div className="text-center py-8">Loading...</div>
-            ) : purchaseOrders.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No purchase orders found. Create your first purchase order to get started.
-              </div>
-            ) : (
+          ) : purchaseOrders.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600">No purchase orders found. Create your first purchase order to get started.</p>
+            </div>
+          ) : (
+            <div className="rounded-md border border-gray-300 bg-white">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>PO Number</TableHead>
-                    <TableHead>Supplier</TableHead>
-                    <TableHead>Order Date</TableHead>
-                    <TableHead>Expected Delivery</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="text-gray-900 font-semibold">PO Number</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Supplier</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Order Date</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Expected Delivery</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Total</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Status</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {purchaseOrders.map((po) => (
-                    <TableRow key={po.id}>
+                    <TableRow key={po.id} className="border-gray-300">
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           {po.po_number}
@@ -133,7 +137,7 @@ export default function PurchaseOrdersPage() {
                       </TableCell>
                       <TableCell>
                         {po.supplier?.name || (
-                          <span className="text-muted-foreground italic">No Supplier</span>
+                          <span className="text-gray-600 italic">No Supplier</span>
                         )}
                       </TableCell>
                       <TableCell>{new Date(po.order_date).toLocaleDateString()}</TableCell>
@@ -146,17 +150,17 @@ export default function PurchaseOrdersPage() {
                       <TableCell>{getStatusBadge(po.status)}</TableCell>
                       <TableCell>
                         <Link href={`/dashboard/inventory/suppliers/purchase-orders/${po.id}`}>
-                          <Button variant="ghost" size="sm">View</Button>
+                          <Button variant="ghost" size="sm" className="border-gray-300">View</Button>
                         </Link>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+          )}
+        </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

@@ -1,0 +1,180 @@
+{
+  "title": "Katundu",
+  "menu": {
+    "stock_items": "Katundu ndi Zinthu",
+    "stock_control": "Kuyang'anira Katundu",
+    "stock_taking": "Kuwerenga Katundu",
+    "suppliers": "Ogulitsa",
+    "low_stock": "Katundu Wochepa",
+    "expiry": "Zinthu Zomwe Zikutha",
+    "products": "Zinthu",
+    "categories": "Magulu"
+  },
+  "stock_control_description": "Yang'anirani zosintha, kutumiza, kulandira, ndi kubweza katundu",
+  "overview": {
+    "title": "Kufotokoza Katundu",
+    "total_products": "Zinthu Zonse",
+    "total_value": "Mtengo Wonse",
+    "low_stock_items": "Zinthu Zotsala Pang'ono",
+    "out_of_stock": "Zatha"
+  },
+  "stock": {
+    "title": "Katundu",
+    "current": "Katundu Wapano",
+    "available": "Wopezeka",
+    "quantity": "Kuchuluka",
+    "location": "Malo",
+    "outlet": "Outlet"
+  },
+  "movements": {
+    "title": "Kusunthika kwa Katundu",
+    "type": "Mtundu wa Kusunthika",
+    "sale": "Kugulitsa",
+    "purchase": "Kugula",
+    "adjustment": "Kusintha",
+    "transfer_in": "Kubwera",
+    "transfer_out": "Kupita",
+    "return": "Kubweza",
+    "damage": "Kuonongeka",
+    "expiry": "Kutha",
+    "reason": "Chifukwa",
+    "reference": "Nambala",
+    "date": "Tsiku"
+  },
+  "total_movements": "Kusunthika Konse",
+  "stock_in": "Katundu Wolowa",
+  "stock_out": "Katundu Wotuluka",
+  "net_movement": "Kusintha Kweniseni",
+  "recent_movements": "Kusunthika Kwapanopo",
+  "total_stock_value": "Mtengo Wonse wa Katundu",
+  "low_stock_label": "Katundu Wochepa",
+  "out_of_stock_label": "Katundu Watha",
+  "movement_types": {
+    "sale": "Kugulitsa",
+    "purchase": "Kugula",
+    "adjustment": "Kusintha",
+    "transfer_in": "Kubwera",
+    "transfer_out": "Kupita",
+    "return": "Kubweza",
+    "damage": "Kuonongeka",
+    "expiry": "Kutha"
+  },
+  "stock_status": {
+    "in_stock": "Alipo",
+    "low_stock": "Wochepa",
+    "out_of_stock": "Palibe"
+  },
+  "stock_adjustment": {
+    "select_reason": "Sankhani chifukwa"
+  },
+  "adjustments": {
+    "title": "Kusintha Katundu",
+    "new": "Kusintha Kwatsopano",
+    "product": "Chinthu",
+    "current_qty": "Wapano",
+    "new_qty": "Watsopano",
+    "change": "Kusintha",
+    "reason": "Chifukwa",
+    "add": "Onjezani Katundu",
+    "remove": "Chotsani Katundu",
+    "set": "Khazikitsani Katundu",
+    "notes": "Mawu"
+  },
+  "transfers": {
+    "title": "Kutumiza Katundu",
+    "new": "Kutumiza Kwatsopano",
+    "from_outlet": "Kuchokera Outlet",
+    "to_outlet": "Kupita Outlet",
+    "quantity": "Kuchuluka",
+    "status": "Mkhalidwe",
+    "pending": "Ikudikirira",
+    "in_transit": "Ikupita",
+    "completed": "Yatheka",
+    "cancelled": "Yakanidiwa"
+  },
+  "receiving": {
+    "title": "Kulandira Katundu",
+    "new": "Landirani Katundu",
+    "supplier": "Wogulitsa",
+    "purchase_order": "Odala ya Kugula",
+    "received_date": "Tsiku Lolandira",
+    "received_by": "Wolandira",
+    "items": "Zinthu Zolandidwa"
+  },
+  "stock_take": {
+    "title": "Kuwerenga Katundu",
+    "description": "Yang'anirani ndi kutsata kuwerenga katundu",
+    "new": "Kuwerenga Kwatsopano",
+    "date": "Tsiku Lowerenga",
+    "status": "Mkhalidwe",
+    "running": "Ikuchitika",
+    "completed": "Yatheka",
+    "cancelled": "Yakanidiwa",
+    "expected": "Zoyembekezeka",
+    "counted": "Zowerengedwa",
+    "difference": "Kusiyana",
+    "start": "Yambani Kuwerenga",
+    "complete": "Malizani Kuwerenga",
+    "cancel": "Kanizani Kuwerenga"
+  },
+  "low_stock": {
+    "title": "Zichenjezi za Katundu Wochepa",
+    "description": "Onani ndi kugulanso zinthu zomwe zikutha",
+    "items": "Zinthu Zotsala Pang'ono",
+    "threshold": "Malire",
+    "current": "Wapano",
+    "reorder": "Gulani Kachiwiri"
+  },
+  "expiry": {
+    "title": "Zinthu Zomwe Zikutha",
+    "description": "Yang'anirani masiku a zinthu zomwe zikutha"
+  },
+  "suppliers": {
+    "title": "Kugula ndi Ogulitsa",
+    "description": "Yang'anirani ogulitsa ndi zogula",
+    "list": "Mndandanda wa Ogulitsa",
+    "add": "Onjezani Wogulitsa",
+    "name": "Dzina",
+    "contact": "Kulumikizana",
+    "email": "Imelo",
+    "phone": "Foni",
+    "address": "Adilesi",
+    "invoices": "Ma Invoice a Ogulitsa"
+  },
+  "purchase_orders": {
+    "title": "Ma Odala a Kugula",
+    "new": "Odala Yatsopano",
+    "number": "Nambala ya Odala",
+    "supplier": "Wogulitsa",
+    "status": "Mkhalidwe",
+    "draft": "Yakonzedwa",
+    "pending": "Ikudikirira",
+    "approved": "Yavomerezedwa",
+    "ordered": "Yatumizdwa",
+    "received": "Yalandidwa",
+    "cancelled": "Yakanidiwa",
+    "expected_date": "Tsiku Loyembekezeka",
+    "total": "Zonse"
+  },
+  "returns": {
+    "title": "Kubweza Katundu",
+    "new": "Kubweza Kwatsopano",
+    "type": "Mtundu wa Kubweza",
+    "customer_return": "Kubwezeka kwa Kasitomala",
+    "supplier_return": "Kubwezera kwa Wogulitsa",
+    "reason": "Chifukwa",
+    "quantity": "Kuchuluka",
+    "refund": "Ndalama Zobwezedwa"
+  },
+  "messages": {
+    "adjustment_saved": "Kusintha kwasungidwa",
+    "transfer_created": "Kutumiza kwayambika",
+    "transfer_completed": "Kutumiza kwatheka",
+    "stock_received": "Katundu walandidwa bwino",
+    "stock_take_started": "Kuwerenga kwayamba",
+    "stock_take_completed": "Kuwerenga kwatha",
+    "po_created": "Odala yapangidwa",
+    "po_sent": "Odala yatumizidwa kwa wogulitsa"
+  }
+}
+

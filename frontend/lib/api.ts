@@ -411,6 +411,15 @@ export const apiEndpoints = {
     refund: (id: string) => `/sales/${id}/refund/`,
     stats: "/sales/stats/",
   },
+  // Receipts
+  receipts: {
+    list: "/receipts/",
+    get: (id: string) => `/receipts/${id}/`,
+    byNumber: (receiptNumber: string) => `/receipts/by-number/${receiptNumber}/`,
+    bySale: (saleId: string) => `/receipts/by-sale/${saleId}/`,
+    download: (id: string) => `/receipts/${id}/download/`,
+    regenerate: (id: string) => `/receipts/${id}/regenerate/`,
+  },
   // Deliveries
   deliveries: {
     list: "/deliveries/",
@@ -539,6 +548,11 @@ export const apiEndpoints = {
     profitLoss: "/reports/profit-loss/",
     stockMovement: "/reports/stock-movement/",
     expenses: "/reports/expenses/",
+    inventoryValuation: "/reports/inventory-valuation/",
+    dailySales: "/reports/daily-sales/",
+    topProducts: "/reports/top-products/",
+    cashSummary: "/reports/cash-summary/",
+    shiftSummary: "/reports/shift-summary/",
   },
   // Admin
   admin: {
@@ -583,6 +597,16 @@ export const apiEndpoints = {
     create: "/customer-groups/",
     update: (id: string) => `/customer-groups/${id}/`,
     delete: (id: string) => `/customer-groups/${id}/`,
+  },
+  // Quotations
+  quotations: {
+    list: "/quotations/",
+    get: (id: string) => `/quotations/${id}/`,
+    create: "/quotations/",
+    update: (id: string) => `/quotations/${id}/`,
+    delete: (id: string) => `/quotations/${id}/`,
+    send: (id: string) => `/quotations/${id}/send/`,
+    convertToSale: (id: string) => `/quotations/${id}/convert-to-sale/`,
   },
 }
 

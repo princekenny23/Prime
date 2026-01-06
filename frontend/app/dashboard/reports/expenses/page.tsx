@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Table,
@@ -84,11 +85,10 @@ export default function ExpensesReportsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Expense Reports</h1>
-          <p className="text-muted-foreground">Track and analyze your business expenses</p>
-        </div>
+      <PageLayout
+        title="Expense Reports"
+        description="Track and analyze your business expenses"
+      >
 
         <ReportFilters
           onExport={() => setShowExport(true)}
@@ -261,6 +261,7 @@ export default function ExpensesReportsPage() {
         open={showSettings}
         onOpenChange={setShowSettings}
       />
+      </PageLayout>
     </DashboardLayout>
   )
 }

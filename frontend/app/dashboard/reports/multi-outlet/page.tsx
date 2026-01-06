@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Table,
@@ -116,11 +117,10 @@ export default function MultiOutletReportsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Multi-Outlet Report</h1>
-          <p className="text-muted-foreground">Compare performance across all outlets and locations</p>
-        </div>
+      <PageLayout
+        title="Multi-Outlet Report"
+        description="Compare performance across all outlets and locations"
+      >
 
         <ReportFilters
           onExport={() => setShowExport(true)}
@@ -330,6 +330,7 @@ export default function MultiOutletReportsPage() {
         open={showSettings}
         onOpenChange={setShowSettings}
       />
+      </PageLayout>
     </DashboardLayout>
   )
 }

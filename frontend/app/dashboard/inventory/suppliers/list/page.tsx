@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -130,112 +131,85 @@ export default function SuppliersListPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Suppliers</h1>
-            <p className="text-muted-foreground">Manage your supplier relationships</p>
-          </div>
-          <Button onClick={() => {
-            setSelectedSupplier(null)
-            setShowAddSupplier(true)
-          }}>
+      <PageLayout
+        title="Suppliers"
+        description="Manage your supplier relationships"
+        actions={
+          <Button 
+            onClick={() => {
+              setSelectedSupplier(null)
+              setShowAddSupplier(true)
+            }}
+            className="bg-white border-white text-[#1e3a8a] hover:bg-blue-50 hover:border-blue-50"
+          >
             <Plus className="mr-2 h-4 w-4" />
             Add Supplier
           </Button>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Suppliers</CardTitle>
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalSuppliers}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Suppliers</CardTitle>
-              <Building2 className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{activeSuppliers}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Inactive Suppliers</CardTitle>
-              <Building2 className="h-4 w-4 text-gray-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{inactiveSuppliers}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>All Suppliers</CardTitle>
-            <CardDescription>
-              {filteredSuppliers.length} supplier{filteredSuppliers.length !== 1 ? "s" : ""} found
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4 mb-4">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search suppliers..."
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <Select value={statusFilter || "all"} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="Filter by status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        }
+      >
+        {/* Filters */}
+        <div className="mb-6 pb-4 border-b border-gray-300">
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+              <Input
+                placeholder="Search suppliers..."
+                className="pl-10 bg-white border-gray-300"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-gray-500" />
+              <Select value={statusFilter || "all"} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[150px] bg-white border-gray-300">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
 
+        {/* Suppliers Table */}
+        <div>
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">All Suppliers</h3>
+            <p className="text-sm text-gray-600">
+              {filteredSuppliers.length} supplier{filteredSuppliers.length !== 1 ? "s" : ""} found
+            </p>
+          </div>
+          <div className="rounded-md border border-gray-300 bg-white">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Payment Terms</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
+                <TableRow className="bg-gray-50">
+                  <TableHead className="text-gray-900 font-semibold">Supplier</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">Contact</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">Payment Terms</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">Status</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-8">
-                      <p className="text-muted-foreground">Loading suppliers...</p>
+                      <p className="text-gray-600">Loading suppliers...</p>
                     </TableCell>
                   </TableRow>
                 ) : filteredSuppliers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-8">
-                      <p className="text-muted-foreground">No suppliers found</p>
+                      <p className="text-gray-600">No suppliers found</p>
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredSuppliers.map((supplier) => (
-                    <TableRow key={supplier.id}>
+                    <TableRow key={supplier.id} className="border-gray-300">
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Building2 className="h-4 w-4 text-primary" />
@@ -314,9 +288,9 @@ export default function SuppliersListPage() {
                 )}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
+      </PageLayout>
 
       <AddSupplierModal
         open={showAddSupplier}

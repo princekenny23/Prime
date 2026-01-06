@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { TrendingUp, TrendingDown, DollarSign, Users, Package, ArrowUpRight, ArrowDownRight } from "lucide-react"
+import { TrendingUp, TrendingDown, DollarSign, Users, Package, ArrowUpRight, ArrowDownRight, ShoppingCart, Receipt, AlertTriangle, CreditCard, RotateCcw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils/currency"
 import type { Business } from "@/lib/types"
@@ -55,6 +55,11 @@ interface KPICardsProps {
     products: { value: number; change: number }
     expenses: { value: number; change: number }
     profit: { value: number; change: number }
+    transactions: { value: number; change: number }
+    avgOrderValue: { value: number; change: number }
+    lowStockItems: { value: number; change: number }
+    outstandingCredit: { value: number; change: number }
+    returns: { value: number; change: number }
   }
   business?: Business | null
 }
@@ -72,10 +77,28 @@ export function KPICards({ data, business }: KPICardsProps) {
         business={business}
       />
       <KPICard
+        title="Transactions"
+        value={data.transactions.value.toLocaleString('en-US')}
+        change={data.transactions.change}
+        changeLabel="from yesterday"
+        icon={<ShoppingCart className="h-4 w-4" />}
+        trend={data.transactions.change >= 0 ? "up" : "down"}
+        business={business}
+      />
+      <KPICard
+        title="Avg Order Value"
+        value={formatCurrency(data.avgOrderValue.value, business)}
+        change={data.avgOrderValue.change}
+        changeLabel="from yesterday"
+        icon={<Receipt className="h-4 w-4" />}
+        trend={data.avgOrderValue.change >= 0 ? "up" : "down"}
+        business={business}
+      />
+      <KPICard
         title="Customers"
         value={data.customers.value.toLocaleString('en-US')}
         change={data.customers.change}
-        changeLabel="this month"
+        changeLabel="total"
         icon={<Users className="h-4 w-4" />}
         trend={data.customers.change >= 0 ? "up" : "down"}
         business={business}
@@ -86,6 +109,32 @@ export function KPICards({ data, business }: KPICardsProps) {
         change={data.products.change}
         changeLabel="total items"
         icon={<Package className="h-4 w-4" />}
+        business={business}
+      />
+      <KPICard
+        title="Low Stock Items"
+        value={data.lowStockItems.value.toLocaleString('en-US')}
+        change={data.lowStockItems.change}
+        changeLabel="needs attention"
+        icon={<AlertTriangle className="h-4 w-4" />}
+        trend={data.lowStockItems.value > 0 ? "down" : "up"}
+        business={business}
+      />
+      <KPICard
+        title="Outstanding Credit"
+        value={formatCurrency(data.outstandingCredit.value, business)}
+        change={data.outstandingCredit.change}
+        changeLabel="receivables"
+        icon={<CreditCard className="h-4 w-4" />}
+        business={business}
+      />
+      <KPICard
+        title="Returns Today"
+        value={data.returns.value.toLocaleString('en-US')}
+        change={data.returns.change}
+        changeLabel="from yesterday"
+        icon={<RotateCcw className="h-4 w-4" />}
+        trend={data.returns.change >= 0 ? "down" : "up"}
         business={business}
       />
       <KPICard
@@ -101,7 +150,7 @@ export function KPICards({ data, business }: KPICardsProps) {
         title="Profit"
         value={formatCurrency(data.profit.value, business)}
         change={data.profit.change}
-        changeLabel="this month"
+        changeLabel="today"
         icon={<ArrowUpRight className="h-4 w-4" />}
         trend={data.profit.change >= 0 ? "up" : "down"}
         business={business}

@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,9 +26,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import Link from "next/link"
+import { useI18n } from "@/contexts/i18n-context"
 
 export default function ExpiryManagementPage() {
   const { toast } = useToast()
+  const { t } = useI18n()
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [products, setProducts] = useState<any[]>([])
@@ -108,108 +111,78 @@ export default function ExpiryManagementPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Expiry Management</h1>
-          <p className="text-muted-foreground">Track and manage product expiration dates</p>
-        </div>
+      <PageLayout
+        title={t("inventory.menu.expiry")}
+        description={t("inventory.expiry.description")}
+      >
 
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total with Expiry</CardTitle>
-              <CalendarX className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalWithExpiry}</div>
-              <p className="text-xs text-muted-foreground">Products tracking expiry</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Expired</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{expiredCount}</div>
-              <p className="text-xs text-muted-foreground">Products past expiry date</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Expiring Soon</CardTitle>
-              <Clock className="h-4 w-4 text-orange-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{expiringSoonCount}</div>
-              <p className="text-xs text-muted-foreground">Expiring within 7 days</p>
-            </CardContent>
-          </Card>
+        {/* Filters */}
+        <div className="mb-6 pb-4 border-b border-gray-300">
+          <div className="flex gap-4">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+              <Input
+                placeholder={t("common.search_products_placeholder")}
+                className="pl-10 bg-white border-gray-300"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[200px] bg-white border-gray-300">
+                <SelectValue placeholder={t("common.filter_by_status")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="expired">Expired</SelectItem>
+                <SelectItem value="expires-today">Expires Today</SelectItem>
+                <SelectItem value="expiring-soon">Expiring Soon (≤7 days)</SelectItem>
+                <SelectItem value="expiring-month">Expiring This Month</SelectItem>
+                <SelectItem value="valid">Valid</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Products Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Products with Expiry Dates</CardTitle>
-            <CardDescription>
+        <div>
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Products with Expiry Dates</h3>
+            <p className="text-sm text-gray-600">
               {filteredProducts.length} product{filteredProducts.length !== 1 ? "s" : ""} found
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4 mb-4">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search products..."
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="expired">Expired</SelectItem>
-                  <SelectItem value="expires-today">Expires Today</SelectItem>
-                  <SelectItem value="expiring-soon">Expiring Soon (≤7 days)</SelectItem>
-                  <SelectItem value="expiring-month">Expiring This Month</SelectItem>
-                  <SelectItem value="valid">Valid</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {isLoading ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">Loading products...</p>
-              </div>
-            ) : filteredProducts.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No products with expiry information found.
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
+            </p>
+          </div>
+          <div className="rounded-md border border-gray-300 bg-white">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50">
+                  <TableHead className="text-gray-900 font-semibold">Product</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">SKU</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">Manufacturing Date</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">Expiry Date</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">Status</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">Stock</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
                   <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>SKU</TableHead>
-                    <TableHead>Manufacturing Date</TableHead>
-                    <TableHead>Expiry Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Stock</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <p className="text-gray-600">Loading products...</p>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredProducts.map((product) => {
+                ) : filteredProducts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <p className="text-gray-600">No products with expiry information found.</p>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredProducts.map((product) => {
                     const expiryStatus = getExpiryStatus(product.expiry_date)
                     return (
-                      <TableRow key={product.id}>
+                      <TableRow key={product.id} className="border-gray-300">
                         <TableCell className="font-medium">{product.name}</TableCell>
                         <TableCell>{product.sku || "N/A"}</TableCell>
                         <TableCell>
@@ -236,12 +209,11 @@ export default function ExpiryManagementPage() {
                       </TableRow>
                     )
                   })}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

@@ -1,0 +1,121 @@
+{
+  "title": "Reports",
+  "description": "Comprehensive business insights and analytics",
+  "available_reports": "Available Reports",
+  "saved_reports": "Saved Reports",
+  "menu": {
+    "sales": "Sales Report",
+    "products": "Product Reports",
+    "inventory": "Inventory & Stock",
+    "customers": "Customer Report",
+    "expenses": "Expense Reports",
+    "financial": "Financial Report",
+    "tax": "Tax Report",
+    "multi_outlet": "Multi-Outlet Report",
+    "staff": "Staff Reports",
+    "profit_loss": "Profit & Loss",
+    "stock_movement": "Stock Movement",
+    "stock_valuation": "Stock Valuation",
+    "shift_reports": "Shift Reports"
+  },
+  "stats": {
+    "total_revenue": "Total Revenue",
+    "total_transactions": "Total Transactions",
+    "active_customers": "Active Customers",
+    "products_sold": "Products Sold",
+    "from_last_month": "from last month"
+  },
+  "daily_sales": {
+    "title": "Daily Sales Report",
+    "date": "Date",
+    "total_sales": "Total Sales",
+    "total_revenue": "Total Revenue",
+    "total_tax": "Total Tax",
+    "total_discount": "Total Discount",
+    "by_payment": "By Payment Method",
+    "by_shift": "By Shift"
+  },
+  "top_products": {
+    "title": "Top Products",
+    "product": "Product",
+    "quantity_sold": "Quantity Sold",
+    "revenue": "Revenue",
+    "rank": "Rank"
+  },
+  "cash_summary": {
+    "title": "Cash Summary",
+    "date": "Date",
+    "opening_cash": "Opening Cash",
+    "closing_cash": "Closing Cash",
+    "cash_sales": "Cash Sales",
+    "cash_received": "Cash Received",
+    "change_given": "Change Given",
+    "difference": "Difference"
+  },
+  "shift_summary": {
+    "title": "Shift Summary",
+    "shift": "Shift",
+    "cashier": "Cashier",
+    "start_time": "Start Time",
+    "end_time": "End Time",
+    "total_sales": "Total Sales",
+    "cash_sales": "Cash Sales",
+    "difference": "Difference"
+  },
+  "profit_loss": {
+    "title": "Profit & Loss",
+    "revenue": "Revenue",
+    "cost_of_goods": "Cost of Goods Sold",
+    "gross_profit": "Gross Profit",
+    "gross_margin": "Gross Margin",
+    "expenses": "Expenses",
+    "net_profit": "Net Profit"
+  },
+  "expenses": {
+    "search_placeholder": "Search by number, description, or vendor..."
+  },
+  "stock_movement": {
+    "title": "Stock Movement Report",
+    "product": "Product",
+    "type": "Type",
+    "quantity": "Quantity",
+    "date": "Date",
+    "user": "User"
+  },
+  "customer_report": {
+    "title": "Customer Report",
+    "total_customers": "Total Customers",
+    "total_spent": "Total Spent",
+    "avg_purchase": "Average Purchase",
+    "top_customers": "Top Customers"
+  },
+  "expense_report": {
+    "title": "Expense Report",
+    "description": "Track and manage business expenses",
+    "total_expenses": "Total Expenses",
+    "by_category": "By Category",
+    "by_month": "By Month"
+  },
+  "filters": {
+    "date_range": "Date Range",
+    "start_date": "Start Date",
+    "end_date": "End Date",
+    "outlet": "Outlet",
+    "all_outlets": "All Outlets",
+    "category": "Category",
+    "payment_method": "Payment Method"
+  },
+  "actions": {
+    "generate": "Generate Report",
+    "export_pdf": "Export PDF",
+    "export_excel": "Export Excel",
+    "print": "Print Report",
+    "refresh": "Refresh"
+  },
+  "messages": {
+    "generating": "Generating report...",
+    "no_data": "No data for selected period",
+    "exported": "Report exported successfully"
+  }
+}
+

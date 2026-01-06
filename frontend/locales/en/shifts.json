@@ -1,0 +1,82 @@
+{
+  "title": "Shifts",
+  "shift": "Shift",
+  "menu": {
+    "management": "Shift Management",
+    "active": "Active Shifts",
+    "history": "Shift History",
+    "start": "Start Shift",
+    "reports": "Shift Reports"
+  },
+  "description": "Manage shifts, view history, and start new shifts",
+  "current": {
+    "title": "Current Shift",
+    "no_active": "No Active Shift",
+    "start_prompt": "Start a shift to begin selling"
+  },
+  "start": {
+    "title": "Start Shift",
+    "select_till": "Select Till",
+    "opening_cash": "Opening Cash",
+    "float": "Float Amount",
+    "notes": "Notes",
+    "start_button": "Start Shift"
+  },
+  "close": {
+    "title": "Close Shift",
+    "closing_cash": "Closing Cash",
+    "count_cash": "Count Cash",
+    "expected": "Expected",
+    "actual": "Actual",
+    "difference": "Difference",
+    "notes": "Closing Notes",
+    "close_button": "Close Shift"
+  },
+  "summary": {
+    "title": "Shift Summary",
+    "outlet": "Outlet",
+    "till": "Till",
+    "cashier": "Cashier",
+    "date": "Date",
+    "start_time": "Start Time",
+    "end_time": "End Time",
+    "duration": "Duration",
+    "total_sales": "Total Sales",
+    "cash_sales": "Cash Sales",
+    "card_sales": "Card Sales",
+    "credit_sales": "Credit Sales",
+    "refunds": "Refunds",
+    "net_sales": "Net Sales"
+  },
+  "history": {
+    "title": "Shift History",
+    "view": "View Shift",
+    "date": "Date",
+    "cashier": "Cashier",
+    "status": "Status",
+    "sales": "Sales"
+  },
+  "cash": {
+    "title": "Cash Management",
+    "add": "Add Cash",
+    "drop": "Drop Cash",
+    "payout": "Petty Cash Payout",
+    "movements": "Cash Movements",
+    "in_drawer": "Cash in Drawer",
+    "reason": "Reason",
+    "amount": "Amount"
+  },
+  "status": {
+    "open": "Open",
+    "closed": "Closed"
+  },
+  "messages": {
+    "started": "Shift started successfully",
+    "closed": "Shift closed successfully",
+    "cash_added": "Cash added to drawer",
+    "cash_dropped": "Cash dropped from drawer",
+    "already_open": "A shift is already open on this till",
+    "close_required": "Please close the current shift first"
+  }
+}
+

@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -191,7 +192,7 @@ export default function OrdersPage() {
     if (order.kotStatus === 'served') {
       return "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-200"
     }
-    return "bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-200"
+    return "bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-350"
   }
 
   const getStatusLabel = (order: any) => {
@@ -262,13 +263,10 @@ export default function OrdersPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Restaurant Orders</h1>
-            <p className="text-muted-foreground">Manage orders, track service, and process payments</p>
-          </div>
-        </div>
+      <PageLayout
+        title="Restaurant Orders"
+        description="Manage orders, track service, and process payments"
+      >
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-4">
@@ -556,6 +554,7 @@ export default function OrdersPage() {
       </Dialog>
 
       {/* Payment Modal removed - new payment system will be implemented */}
+      </PageLayout>
     </DashboardLayout>
   )
 }

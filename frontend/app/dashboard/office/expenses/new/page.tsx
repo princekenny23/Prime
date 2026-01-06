@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -86,7 +87,7 @@ export default function NewExpensePage() {
         payment_method: formData.payment_method,
         payment_reference: formData.payment_reference.trim() || undefined,
         expense_date: formData.expense_date,
-        outlet_id: formData.outlet_id ? parseInt(formData.outlet_id) : undefined,
+        outlet_id: formData.outlet_id || undefined,
       })
 
       toast({
@@ -107,19 +108,11 @@ export default function NewExpensePage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          <Link href="/dashboard/office/expenses">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-3xl font-bold">Add New Expense</h1>
-            <p className="text-muted-foreground">Record a new business expense</p>
-          </div>
-        </div>
+      <PageLayout
+        title="Add New Expense"
+        description="Record a new business expense"
+        
+      >
 
         <form onSubmit={handleSubmit}>
           <div className="grid gap-6 md:grid-cols-2">
@@ -216,7 +209,7 @@ export default function NewExpensePage() {
                         </SelectTrigger>
                         <SelectContent>
                           {outlets.map(outlet => (
-                            <SelectItem key={outlet.id} value={outlet.id}>
+                            <SelectItem key={outlet.id} value={String(outlet.id)}>
                               {outlet.name}
                             </SelectItem>
                           ))}
@@ -228,8 +221,8 @@ export default function NewExpensePage() {
               </Card>
             </div>
 
-         
-
+            {/* Right Column */}
+            <div className="space-y-6">
               <Card>
                 <CardHeader>
                   <CardTitle>Payment Information</CardTitle>
@@ -263,8 +256,9 @@ export default function NewExpensePage() {
                       onChange={(e) => handleInputChange("payment_reference", e.target.value)}
                     />
                   </div>
-                       {/* Right Column */}
-            <div className="space-y-6">
+                </CardContent>
+              </Card>
+
               <div className="flex gap-4">
                 <Link href="/dashboard/office/expenses" className="flex-1">
                   <Button type="button" variant="outline" className="w-full">
@@ -276,13 +270,9 @@ export default function NewExpensePage() {
                 </Button>
               </div>
             </div>
-                </CardContent>
-              </Card>
-
-            
           </div>
         </form>
-      </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

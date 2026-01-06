@@ -5,8 +5,15 @@
   "exclude": [
     "**/__pycache__",
     "**/node_modules",
+    "**/frontend",
+    "**/.next",
+    "**/templates",
+    "**/*.md",
     "env",
-    ".venv"
+    ".venv",
+    "../frontend",
+    "../node_modules",
+    "../templates"
   ],
   "reportMissingImports": false,
   "reportMissingModuleSource": false,

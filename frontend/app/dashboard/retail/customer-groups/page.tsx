@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -67,20 +68,16 @@ export default function CustomerGroupsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Customer Groups</h1>
-            <p className="text-muted-foreground mt-1">
-              Manage customer groups and pricing tiers
-            </p>
-          </div>
+      <PageLayout
+        title="Customer Groups"
+        description="Manage customer groups and pricing tiers"
+        actions={
           <Button>
             <Plus className="mr-2 h-4 w-4" />
             Create Group
           </Button>
-        </div>
+        }
+      >
 
         {/* Search */}
         <Card>
@@ -154,7 +151,7 @@ export default function CustomerGroupsPage() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

@@ -1,7 +1,12 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Table,
   TableBody,
@@ -10,171 +15,283 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { ReportFilters } from "@/components/reports/report-filters"
-import { TrendingDown, DollarSign, Receipt, AlertCircle } from "lucide-react"
-import { useState } from "react"
+import { Badge } from "@/components/ui/badge"
+import { RefreshCw, FileSpreadsheet, Printer, Search, PieChart } from "lucide-react"
 import { ExportReportModal } from "@/components/modals/export-report-modal"
 import { PrintReportModal } from "@/components/modals/print-report-modal"
 import { ReportSettingsModal } from "@/components/modals/report-settings-modal"
+import { useI18n } from "@/contexts/i18n-context"
+import { useBusinessStore } from "@/stores/businessStore"
+import { useTenant } from "@/contexts/tenant-context"
+import { expenseService } from "@/lib/services/expenseService"
+import { useToast } from "@/components/ui/use-toast"
+import { format } from "date-fns"
 
 export default function ExpensesReportsPage() {
+  const { t } = useI18n()
+  const { currentBusiness } = useBusinessStore()
+  const { currentOutlet } = useTenant()
+  const { toast } = useToast()
+  
   const [showExport, setShowExport] = useState(false)
   const [showPrint, setShowPrint] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState("")
+  
+  const [startDate, setStartDate] = useState(() => {
+    const now = new Date()
+    return format(new Date(now.getFullYear(), now.getMonth(), 1), 'yyyy-MM-dd')
+  })
+  const [endDate, setEndDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
+  
+  const [expenses, setExpenses] = useState<any[]>([])
+  const [categoryBreakdown, setCategoryBreakdown] = useState<any[]>([])
 
-  // Mock expense data
-  const expenses = [
-    { category: "Rent", amount: 5000, date: "2024-01-01", vendor: "Property Management" },
-    { category: "Utilities", amount: 1200, date: "2024-01-05", vendor: "Electric Company" },
-    { category: "Inventory", amount: 15000, date: "2024-01-10", vendor: "Supplier A" },
-    { category: "Salaries", amount: 25000, date: "2024-01-15", vendor: "Payroll" },
-    { category: "Marketing", amount: 3000, date: "2024-01-12", vendor: "Ad Agency" },
-  ]
+  const loadReportData = async () => {
+    if (!currentBusiness || !currentOutlet) return
+    
+    setIsLoading(true)
+    try {
+      const response = await expenseService.list({
+        outlet: currentOutlet.id,
+        status: 'approved',
+      })
+      const expenseList = Array.isArray(response) ? response : (response.results || [])
+      
+      setExpenses(expenseList)
+      
+      // Calculate category breakdown
+      const totalExpenses = expenseList.reduce((sum: number, e: any) => sum + (e.amount || 0), 0)
+      const categoryTotals: Record<string, { total: number; count: number }> = {}
+      expenseList.forEach((e: any) => {
+        const category = e.category?.name || e.category || "Uncategorized"
+        if (!categoryTotals[category]) {
+          categoryTotals[category] = { total: 0, count: 0 }
+        }
+        categoryTotals[category].total += e.amount || 0
+        categoryTotals[category].count += 1
+      })
+      
+      const breakdown = Object.entries(categoryTotals).map(([category, data]) => ({
+        category,
+        total: data.total,
+        count: data.count,
+        percentage: totalExpenses > 0 ? (data.total / totalExpenses) * 100 : 0,
+      })).sort((a, b) => b.total - a.total)
+      
+      setCategoryBreakdown(breakdown)
+    } catch (error) {
+      console.error("Failed to load expense report:", error)
+      toast({
+        title: t("common.messages.error"),
+        description: "Failed to load expense data",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
-  const categoryBreakdown = [
-    { category: "Salaries", total: 25000, percentage: 55.6 },
-    { category: "Inventory", total: 15000, percentage: 33.3 },
-    { category: "Rent", total: 5000, percentage: 11.1 },
-    { category: "Utilities", total: 1200, percentage: 2.7 },
-    { category: "Marketing", total: 3000, percentage: 6.7 },
-  ]
+  useEffect(() => {
+    loadReportData()
+  }, [currentBusiness, currentOutlet])
 
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0)
+  const handleApplyFilters = () => {
+    loadReportData()
+  }
+
+  const filteredExpenses = expenses.filter(expense => {
+    if (!searchTerm) return true
+    const search = searchTerm.toLowerCase()
+    return (
+      expense.description?.toLowerCase().includes(search) ||
+      expense.vendor?.toLowerCase().includes(search) ||
+      expense.expense_number?.toLowerCase().includes(search)
+    )
+  })
+
+  const formatCurrency = (value: number) => {
+    return `${currentBusiness?.currencySymbol || "MK"} ${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Expense Reports</h1>
-          <p className="text-muted-foreground">Track and analyze your business expenses</p>
-        </div>
-
-        <ReportFilters
-          onExport={() => setShowExport(true)}
-          onPrint={() => setShowPrint(true)}
-          onSettings={() => setShowSettings(true)}
-        />
-
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-              <TrendingDown className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">MWK {totalExpenses.toLocaleString('en-US')}</div>
-              <p className="text-xs text-muted-foreground">This period</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Transactions</CardTitle>
-              <Receipt className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{expenses.length}</div>
-              <p className="text-xs text-muted-foreground">Expense entries</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Categories</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{categoryBreakdown.length}</div>
-              <p className="text-xs text-muted-foreground">Expense categories</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Avg Expense</CardTitle>
-              <AlertCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${(totalExpenses / expenses.length).toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">Per transaction</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Expense List */}
-        <Card>
+      <PageLayout
+        title={t("reports.menu.expenses")}
+        description={t("reports.expense_report.description")}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowExport(true)}>
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              {t("reports.actions.export_excel")}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowPrint(true)}>
+              <Printer className="mr-2 h-4 w-4" />
+              {t("reports.actions.print")}
+            </Button>
+          </div>
+        }
+      >
+        {/* Filters */}
+        <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Recent Expenses</CardTitle>
-            <CardDescription>Detailed expense transactions</CardDescription>
+            <CardTitle className="text-lg">{t("common.filters")}</CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Vendor</TableHead>
-                  <TableHead>Amount</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {expenses.map((expense, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell>{new Date(expense.date).toLocaleDateString()}</TableCell>
-                    <TableCell className="font-medium">{expense.category}</TableCell>
-                    <TableCell>{expense.vendor}</TableCell>
-                    <TableCell className="font-semibold text-red-600">
-                      MWK {expense.amount.toLocaleString('en-US')}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div className="space-y-2">
+                <Label>{t("common.time.from")}</Label>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("common.time.to")}</Label>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("common.search")}</Label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder={t("reports.expenses.search_placeholder")}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+              </div>
+              <div className="flex items-end">
+                <Button onClick={handleApplyFilters} disabled={isLoading}>
+                  <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+                  {t("common.actions.apply")}
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
         {/* Category Breakdown */}
-        <Card>
+        <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Category Breakdown</CardTitle>
-            <CardDescription>Expenses by category</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <PieChart className="h-5 w-5" />
+              {t("reports.expense_report.by_category")}
+            </CardTitle>
+            <CardDescription>Expenses breakdown by category</CardDescription>
           </CardHeader>
           <CardContent>
+            {isLoading ? (
+              <div className="flex items-center justify-center h-32">
+                <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : categoryBreakdown.length === 0 ? (
+              <div className="flex items-center justify-center h-32 text-muted-foreground">
+                {t("reports.messages.no_data")}
+          </div>
+            ) : (
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Percentage</TableHead>
+                  <TableRow>
+                    <TableHead>{t("common.category")}</TableHead>
+                    <TableHead className="text-right">{t("expenses.count")}</TableHead>
+                    <TableHead className="text-right">{t("expenses.amount")}</TableHead>
+                    <TableHead className="text-right">{t("expenses.percentage")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {categoryBreakdown.map((item, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell className="font-medium">{item.category}</TableCell>
-                    <TableCell className="font-semibold text-red-600">
-                      MWK {item.total.toLocaleString('en-US')}
+                  {categoryBreakdown.map((item, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell className="font-medium">{item.category}</TableCell>
+                      <TableCell className="text-right">{item.count}</TableCell>
+                      <TableCell className="text-right font-semibold text-red-600">
+                        {formatCurrency(item.total)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant="outline">{item.percentage.toFixed(1)}%</Badge>
                     </TableCell>
-                    <TableCell>{item.percentage.toFixed(1)}%</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            )}
           </CardContent>
         </Card>
-      </div>
+
+        {/* Expense List */}
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("expenses.recent_expenses")}</CardTitle>
+            <CardDescription>Detailed expense transactions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex items-center justify-center h-32">
+                <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+            ) : filteredExpenses.length === 0 ? (
+              <div className="flex items-center justify-center h-32 text-muted-foreground">
+                {t("reports.messages.no_data")}
+        </div>
+            ) : (
+            <Table>
+              <TableHeader>
+                  <TableRow>
+                    <TableHead>{t("expenses.date")}</TableHead>
+                    <TableHead>{t("expenses.expense_number")}</TableHead>
+                    <TableHead>{t("expenses.category")}</TableHead>
+                    <TableHead>{t("expenses.vendor")}</TableHead>
+                    <TableHead>{t("expenses.description")}</TableHead>
+                    <TableHead className="text-right">{t("expenses.amount")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                  {filteredExpenses.slice(0, 50).map((expense) => (
+                    <TableRow key={expense.id}>
+                      <TableCell>
+                        {expense.expense_date ? format(new Date(expense.expense_date), 'MMM dd, yyyy') : "-"}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {expense.expense_number || "-"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {expense.category?.name || expense.category || "Uncategorized"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{expense.vendor || "-"}</TableCell>
+                      <TableCell className="max-w-xs truncate">
+                        {expense.description || "-"}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-red-600">
+                        {formatCurrency(expense.amount || 0)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            )}
+          </CardContent>
+        </Card>
+      </PageLayout>
 
       {/* Modals */}
       <ExportReportModal
         open={showExport}
         onOpenChange={setShowExport}
-        reportType="Expense Report"
+        reportType={t("reports.menu.expenses")}
       />
       <PrintReportModal
         open={showPrint}
         onOpenChange={setShowPrint}
-        reportType="Expense Report"
+        reportType={t("reports.menu.expenses")}
       />
       <ReportSettingsModal
         open={showSettings}
@@ -183,4 +300,3 @@ export default function ExpensesReportsPage() {
     </DashboardLayout>
   )
 }
-

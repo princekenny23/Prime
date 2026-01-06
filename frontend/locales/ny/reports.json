@@ -1,0 +1,121 @@
+{
+  "title": "Malipoti",
+  "description": "Zambiri za bizinesi yanu",
+  "available_reports": "Malipoti Opezeka",
+  "saved_reports": "Malipoti Osungidwa",
+  "menu": {
+    "sales": "Lipoti la Malonda",
+    "products": "Malipoti a Zinthu",
+    "inventory": "Katundu ndi Stock",
+    "customers": "Lipoti la Makasitomala",
+    "expenses": "Malipoti a Zogwiritsidwa",
+    "financial": "Lipoti la Ndalama",
+    "tax": "Lipoti la Msonkho",
+    "multi_outlet": "Lipoti la Ma Outlet Onse",
+    "staff": "Malipoti a Antchito",
+    "profit_loss": "Phindu ndi Kutaya",
+    "stock_movement": "Kusunthika kwa Katundu",
+    "stock_valuation": "Mtengo wa Katundu",
+    "shift_reports": "Malipoti a Shift"
+  },
+  "stats": {
+    "total_revenue": "Ndalama Zonse",
+    "total_transactions": "Malonda Onse",
+    "active_customers": "Makasitomala Ogwira",
+    "products_sold": "Zinthu Zogulitsidwa",
+    "from_last_month": "kuyambira mwezi watha"
+  },
+  "daily_sales": {
+    "title": "Malipoti a Malonda a Tsiku",
+    "date": "Tsiku",
+    "total_sales": "Malonda Onse",
+    "total_revenue": "Ndalama Zonse",
+    "total_tax": "Msonkho Wonse",
+    "total_discount": "Kuchepetsa Konse",
+    "by_payment": "Mwa Njira ya Kulipira",
+    "by_shift": "Mwa Ntchito"
+  },
+  "top_products": {
+    "title": "Zinthu Zambiri Zogulitsidwa",
+    "product": "Chinthu",
+    "quantity_sold": "Zogulitsidwa",
+    "revenue": "Ndalama",
+    "rank": "Nambala"
+  },
+  "cash_summary": {
+    "title": "Chidule cha Ndalama",
+    "date": "Tsiku",
+    "opening_cash": "Ndalama Zoyamba",
+    "closing_cash": "Ndalama Zomaliza",
+    "cash_sales": "Malonda a Ndalama",
+    "cash_received": "Ndalama Zolandidwa",
+    "change_given": "Chenjiyo Yopatsidwa",
+    "difference": "Kusiyana"
+  },
+  "shift_summary": {
+    "title": "Chidule cha Ntchito",
+    "shift": "Ntchito",
+    "cashier": "Wogulitsa",
+    "start_time": "Nthawi Yoyamba",
+    "end_time": "Nthawi Yomaliza",
+    "total_sales": "Malonda Onse",
+    "cash_sales": "Malonda a Ndalama",
+    "difference": "Kusiyana"
+  },
+  "profit_loss": {
+    "title": "Phindu ndi Kutaya",
+    "revenue": "Ndalama Zolowa",
+    "cost_of_goods": "Mtengo wa Zinthu",
+    "gross_profit": "Phindu Lalikulu",
+    "gross_margin": "Peresenti ya Phindu",
+    "expenses": "Zogwiritsidwa",
+    "net_profit": "Phindu Lenileni"
+  },
+  "expenses": {
+    "search_placeholder": "Sakani ndi nambala, zofotokoza, kapena wogulitsa..."
+  },
+  "stock_movement": {
+    "title": "Malipoti a Kusunthika kwa Katundu",
+    "product": "Chinthu",
+    "type": "Mtundu",
+    "quantity": "Kuchuluka",
+    "date": "Tsiku",
+    "user": "Wogwira"
+  },
+  "customer_report": {
+    "title": "Malipoti a Makasitomala",
+    "total_customers": "Makasitomala Onse",
+    "total_spent": "Ndalama Zonse Zogwiritsidwa",
+    "avg_purchase": "Kugula Pakatikati",
+    "top_customers": "Makasitomala Ambiri"
+  },
+  "expense_report": {
+    "title": "Malipoti a Zogwiritsidwa",
+    "description": "Yang'anirani ndi kutsatira ndalama zogwiritsidwa",
+    "total_expenses": "Zogwiritsidwa Zonse",
+    "by_category": "Mwa Gulu",
+    "by_month": "Mwa Mwezi"
+  },
+  "filters": {
+    "date_range": "Masiku",
+    "start_date": "Tsiku Loyamba",
+    "end_date": "Tsiku Lomaliza",
+    "outlet": "Outlet",
+    "all_outlets": "Ma Outlet Onse",
+    "category": "Gulu",
+    "payment_method": "Njira ya Kulipira"
+  },
+  "actions": {
+    "generate": "Pangani Lipoti",
+    "export_pdf": "Tulutsani PDF",
+    "export_excel": "Tulutsani Excel",
+    "print": "Sindikizani Lipoti",
+    "refresh": "Tsitsani"
+  },
+  "messages": {
+    "generating": "Kupanga lipoti...",
+    "no_data": "Palibe zambiri pa masiku awa",
+    "exported": "Lipoti yatulutsidwa bwino"
+  }
+}
+

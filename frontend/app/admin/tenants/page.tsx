@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -134,13 +135,10 @@ export default function AdminTenantsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Tenant Management</h1>
-            <p className="text-muted-foreground">Manage all registered businesses</p>
-          </div>
-        </div>
+      <PageLayout
+        title="Tenant Management"
+        description="Manage all registered businesses"
+      >
 
         {error && (
           <Card className="border-destructive">
@@ -283,7 +281,7 @@ export default function AdminTenantsPage() {
                             <TableCell>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon">
+                                  <Button variant="outline" size="sm">
                                     <MoreVertical className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
@@ -348,7 +346,6 @@ export default function AdminTenantsPage() {
             )}
           </CardContent>
         </Card>
-      </div>
 
       {/* Modals */}
       {selectedTenant && (
@@ -378,6 +375,7 @@ export default function AdminTenantsPage() {
           />
         </>
       )}
+      </PageLayout>
     </DashboardLayout>
   )
 }

@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -105,12 +106,10 @@ export default function MenuPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Menu Management</h1>
-            <p className="text-muted-foreground">Manage your restaurant menu items</p>
-          </div>
+      <PageLayout
+        title="Menu Management"
+        description="Manage your restaurant menu items"
+        actions={
           <Button onClick={() => {
             setSelectedMenuItem(null)
             setShowAddMenuItem(true)
@@ -118,7 +117,8 @@ export default function MenuPage() {
             <Plus className="mr-2 h-4 w-4" />
             Add Menu Item
           </Button>
-        </div>
+        }
+      >
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-3">
@@ -245,7 +245,7 @@ export default function MenuPage() {
             </Table>
           </CardContent>
         </Card>
-      </div>
+      </PageLayout>
 
       {/* Modals */}
       <AddEditMenuItemModal

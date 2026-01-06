@@ -16,18 +16,16 @@ import { LowStockAlerts } from "@/components/dashboard/low-stock-alerts"
 import { TopSellingItems } from "@/components/dashboard/top-selling-items"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Store, Settings2, Plus } from "lucide-react"
+import { Store, Settings2 } from "lucide-react"
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter"
 import { ViewSaleDetailsModal } from "@/components/modals/view-sale-details-modal"
-import { QuickAddSaleModal } from "@/components/modals/quick-add-sale-modal"
 import { CustomizeDashboardModal } from "@/components/modals/customize-dashboard-modal"
 
 export default function RestaurantDashboardPage() {
   const router = useRouter()
   const { currentBusiness, currentOutlet: businessOutlet } = useBusinessStore()
-  const { currentOutlet: tenantOutlet, isLoading: tenantLoading, currentTenant } = useTenant()
+  const { currentOutlet: tenantOutlet, isLoading: tenantLoading } = useTenant()
   const { isAuthenticated } = useAuthStore()
-  const [showQuickSale, setShowQuickSale] = useState(false)
   const [showCustomize, setShowCustomize] = useState(false)
   const [selectedSale, setSelectedSale] = useState<any>(null)
   const [showSaleDetails, setShowSaleDetails] = useState(false)
@@ -238,6 +236,11 @@ export default function RestaurantDashboardPage() {
     products: { value: 0, change: 0 },
     expenses: { value: 0, change: 0 },
     profit: { value: 0, change: 0 },
+    transactions: { value: 0, change: 0 },
+    avgOrderValue: { value: 0, change: 0 },
+    lowStockItems: { value: 0, change: 0 },
+    outstandingCredit: { value: 0, change: 0 },
+    returns: { value: 0, change: 0 },
   }
 
   return (
@@ -255,21 +258,12 @@ export default function RestaurantDashboardPage() {
                 </div>
               )}
             </div>
-            {currentTenant && (
-              <p className="text-muted-foreground">
-                Welcome back! Here's what's happening at <span className="font-medium">{currentTenant.name}</span> today.
-              </p>
-            )}
           </div>
           <div className="flex items-center gap-2">
             <DateRangeFilter />
             <Button variant="outline" onClick={() => setShowCustomize(true)}>
               <Settings2 className="mr-2 h-4 w-4" />
               Customize
-            </Button>
-            <Button onClick={() => setShowQuickSale(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Quick Sale
             </Button>
           </div>
         </div>
@@ -333,7 +327,6 @@ export default function RestaurantDashboardPage() {
       </div>
 
       {/* Modals */}
-      <QuickAddSaleModal open={showQuickSale} onOpenChange={setShowQuickSale} />
       <CustomizeDashboardModal open={showCustomize} onOpenChange={setShowCustomize} />
       <ViewSaleDetailsModal
         open={showSaleDetails}

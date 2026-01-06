@@ -1,8 +1,6 @@
 "use client"
 
-
-
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { generateKPIData, generateChartData, generateActivityData, generateTopSellingItems } from "@/lib/utils/dashboard-stats"
@@ -17,18 +15,16 @@ import { LowStockAlerts } from "@/components/dashboard/low-stock-alerts"
 import { TopSellingItems } from "@/components/dashboard/top-selling-items"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Store, Settings2, Plus } from "lucide-react"
+import { Store, Settings2 } from "lucide-react"
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter"
 import { ViewSaleDetailsModal } from "@/components/modals/view-sale-details-modal"
-import { QuickAddSaleModal } from "@/components/modals/quick-add-sale-modal"
 import { CustomizeDashboardModal } from "@/components/modals/customize-dashboard-modal"
 import { PageRefreshButton } from "@/components/dashboard/page-refresh-button"
 
 export default function DashboardPage() {
   const router = useRouter()
   const { currentBusiness, currentOutlet } = useBusinessStore()
-  const { currentTenant, currentOutlet: tenantOutlet, isLoading } = useTenant()
-  const [showQuickSale, setShowQuickSale] = useState(false)
+  const { currentOutlet: tenantOutlet, isLoading } = useTenant()
   const [showCustomize, setShowCustomize] = useState(false)
   const [selectedSale, setSelectedSale] = useState<any>(null)
   const [showSaleDetails, setShowSaleDetails] = useState(false)
@@ -38,6 +34,11 @@ export default function DashboardPage() {
   const [topItems, setTopItems] = useState<any[]>([])
   const [lowStockItems, setLowStockItems] = useState<any[]>([])
   const [isLoadingData, setIsLoadingData] = useState(true)
+  const loadingRef = useRef(false)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Memoize outlet ID to prevent unnecessary re-renders
+  const outletId = useMemo(() => currentOutlet?.id || tenantOutlet?.id, [currentOutlet?.id, tenantOutlet?.id])
   
   // Redirect based on business type (only if on main dashboard, not if already on business-specific dashboard)
   useEffect(() => {
@@ -69,140 +70,134 @@ export default function DashboardPage() {
     }
   }, [currentBusiness, router])
   
-  // Load dashboard data
-  useEffect(() => {
-    const loadDashboardData = async () => {
-      if (!currentBusiness) return
+  // Load dashboard data with optimized callback
+  const loadDashboardData = useCallback(async () => {
+    if (!currentBusiness || loadingRef.current) return
+    
+    loadingRef.current = true
+    setIsLoadingData(true)
+    try {
+      const [kpi, chart, activity, top, lowStockData] = await Promise.all([
+        generateKPIData(currentBusiness.id, currentBusiness, outletId),
+        generateChartData(currentBusiness.id, outletId),
+        generateActivityData(currentBusiness.id, outletId),
+        generateTopSellingItems(currentBusiness.id, outletId),
+        // Use getLowStock instead of loading all products
+        productService.getLowStock(outletId).catch(() => []),
+      ])
       
-      setIsLoadingData(true)
-      try {
-        const outletId = currentOutlet?.id || tenantOutlet?.id
-        const [kpi, chart, activity, top, productsData] = await Promise.all([
-          generateKPIData(currentBusiness.id, currentBusiness, outletId),
-          generateChartData(currentBusiness.id, outletId),
-          generateActivityData(currentBusiness.id, outletId),
-          generateTopSellingItems(currentBusiness.id, outletId),
-          productService.list({ is_active: true }).catch(() => ({ results: [], count: 0 })),
-        ])
+      setKpiData(kpi)
+      setChartData(chart)
+      setActivities(activity)
+      setTopItems(top)
+      
+      // Process low stock items
+      const lowStock = Array.isArray(lowStockData) ? lowStockData : (lowStockData.results || [])
+      const processedLowStock = lowStock.map((p: any) => {
+        const lowVariation = p.variations?.find((v: any) => 
+          v.track_inventory && 
+          v.low_stock_threshold > 0 && 
+          (v.total_stock || v.stock || 0) <= v.low_stock_threshold
+        )
         
-        setKpiData(kpi)
-        setChartData(chart)
-        setActivities(activity)
-        setTopItems(top)
-        
-        const products = Array.isArray(productsData) ? productsData : (productsData.results || [])
-        // Check both product-level and variation-level low stock
-        const lowStock = products
-          .filter((p: any) => {
-            // Check product-level low stock
-            const productLow = p.low_stock_threshold && p.stock <= p.low_stock_threshold
-            
-            // Check variation-level low stock
-            const variationLow = p.variations?.some((v: any) => 
-              v.track_inventory && 
-              v.low_stock_threshold > 0 && 
-              (v.total_stock || v.stock || 0) <= v.low_stock_threshold
-            )
-            
-            // Also check is_low_stock flag from backend
-            return p.is_low_stock || productLow || variationLow
-          })
-          .map((p: any) => {
-            // Find the variation with lowest stock if any
-            const lowVariation = p.variations?.find((v: any) => 
-              v.track_inventory && 
-              v.low_stock_threshold > 0 && 
-              (v.total_stock || v.stock || 0) <= v.low_stock_threshold
-            )
-            
-            return {
-              id: p.id,
-              name: p.name,
-              sku: p.sku || lowVariation?.sku || "N/A",
-              currentStock: lowVariation ? (lowVariation.total_stock || lowVariation.stock || 0) : (p.stock || 0),
-              minStock: lowVariation ? (lowVariation.low_stock_threshold || 0) : (p.low_stock_threshold || 0),
-              category: p.category?.name || "General",
-            }
-          })
-        setLowStockItems(lowStock)
-      } catch (error) {
-        console.error("Failed to load dashboard data:", error)
-      } finally {
-        setIsLoadingData(false)
-      }
+        return {
+          id: p.id,
+          name: p.name,
+          sku: p.sku || lowVariation?.sku || "N/A",
+          currentStock: lowVariation ? (lowVariation.total_stock || lowVariation.stock || 0) : (p.stock || 0),
+          minStock: lowVariation ? (lowVariation.low_stock_threshold || 0) : (p.low_stock_threshold || 0),
+          category: p.category?.name || "General",
+        }
+      })
+      setLowStockItems(processedLowStock)
+    } catch (error) {
+      console.error("Failed to load dashboard data:", error)
+    } finally {
+      setIsLoadingData(false)
+      loadingRef.current = false
+    }
+  }, [currentBusiness, outletId])
+  
+  useEffect(() => {
+    if (!currentBusiness) return
+    
+    loadDashboardData()
+    
+    // Auto-refresh dashboard data every 30 seconds for real-time updates
+    intervalRef.current = setInterval(() => {
+      loadDashboardData()
+    }, 30000)
+    
+    // Listen for outlet changes
+    const handleOutletChange = () => {
+      loadDashboardData()
     }
     
-    if (currentBusiness) {
+    // Listen for sale completion events to refresh dashboard
+    const handleSaleCompleted = () => {
       loadDashboardData()
-      
-      // Auto-refresh dashboard data every 30 seconds for real-time updates
-      const interval = setInterval(() => {
-        loadDashboardData()
-      }, 30000)
-      
-      // Listen for outlet changes
-      const handleOutletChange = () => {
-        loadDashboardData()
-      }
-      
-      // Listen for sale completion events to refresh dashboard
-      const handleSaleCompleted = () => {
-        loadDashboardData()
-      }
-      
-      window.addEventListener("outlet-changed", handleOutletChange)
-      window.addEventListener("sale-completed", handleSaleCompleted)
-      
-      return () => {
-        clearInterval(interval)
-        window.removeEventListener("outlet-changed", handleOutletChange)
-        window.removeEventListener("sale-completed", handleSaleCompleted)
-      }
     }
-  }, [currentBusiness, currentOutlet, tenantOutlet])
+    
+    window.addEventListener("outlet-changed", handleOutletChange)
+    window.addEventListener("sale-completed", handleSaleCompleted)
+    
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+      window.removeEventListener("outlet-changed", handleOutletChange)
+      window.removeEventListener("sale-completed", handleSaleCompleted)
+    }
+  }, [currentBusiness?.id, outletId, loadDashboardData])
 
   const [recentSales, setRecentSales] = useState<any[]>([])
+  const recentSalesIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Optimized recent sales loader
+  const loadRecentSales = useCallback(async () => {
+    if (!currentBusiness) return
+    
+    try {
+      const salesData = await saleService.list({ 
+        outlet: outletId,
+        status: "completed",
+        page: 1,
+      })
+      setRecentSales(Array.isArray(salesData) ? salesData : (salesData.results || []).slice(0, 10))
+    } catch (error) {
+      console.error("Failed to load recent sales:", error)
+      setRecentSales([])
+    }
+  }, [currentBusiness, outletId])
 
   useEffect(() => {
-    const loadRecentSales = async () => {
-      if (!currentBusiness) return
-      
-      try {
-        const outletId = currentOutlet?.id || tenantOutlet?.id
-        const salesData = await saleService.list({ 
-          outlet: outletId,
-          status: "completed",
-        })
-        setRecentSales(Array.isArray(salesData) ? salesData : salesData.results || [])
-      } catch (error) {
-        console.error("Failed to load recent sales:", error)
-        setRecentSales([])
-      }
+    if (!currentBusiness) return
+    
+    loadRecentSales()
+    
+    // Auto-refresh recent sales every 30 seconds for real-time updates
+    recentSalesIntervalRef.current = setInterval(() => {
+      loadRecentSales()
+    }, 30000)
+    
+    // Listen for sale completion events to refresh recent sales immediately
+    const handleSaleCompleted = () => {
+      loadRecentSales()
     }
     
-    if (currentBusiness) {
-      loadRecentSales()
-      
-      // Auto-refresh recent sales every 30 seconds for real-time updates
-      const interval = setInterval(() => {
-        loadRecentSales()
-      }, 30000)
-      
-      // Listen for sale completion events to refresh recent sales immediately
-      const handleSaleCompleted = () => {
-        loadRecentSales()
+    window.addEventListener("sale-completed", handleSaleCompleted)
+    
+    return () => {
+      if (recentSalesIntervalRef.current) {
+        clearInterval(recentSalesIntervalRef.current)
+        recentSalesIntervalRef.current = null
       }
-      
-      window.addEventListener("sale-completed", handleSaleCompleted)
-      
-      return () => {
-        clearInterval(interval)
-        window.removeEventListener("sale-completed", handleSaleCompleted)
-      }
+      window.removeEventListener("sale-completed", handleSaleCompleted)
     }
-  }, [currentBusiness, currentOutlet, tenantOutlet])
+  }, [currentBusiness?.id, outletId, loadRecentSales])
 
-  const handleViewSale = async (saleId: string) => {
+  const handleViewSale = useCallback(async (saleId: string) => {
     try {
       const sale = await saleService.get(saleId)
       setSelectedSale(sale)
@@ -210,7 +205,24 @@ export default function DashboardPage() {
     } catch (error) {
       console.error("Failed to load sale:", error)
     }
-  }
+  }, [])
+  
+  // Memoize default KPI data to prevent recreation
+  const defaultKpiData = useMemo(() => ({
+    sales: { value: 0, change: 0 },
+    customers: { value: 0, change: 0 },
+    products: { value: 0, change: 0 },
+    expenses: { value: 0, change: 0 },
+    profit: { value: 0, change: 0 },
+    transactions: { value: 0, change: 0 },
+    avgOrderValue: { value: 0, change: 0 },
+    lowStockItems: { value: 0, change: 0 },
+    outstandingCredit: { value: 0, change: 0 },
+    returns: { value: 0, change: 0 },
+  }), [])
+  
+  // Initialize with default KPI data if not loaded
+  const displayKpiData = useMemo(() => kpiData || defaultKpiData, [kpiData, defaultKpiData])
   
   // Show loading or nothing while redirecting
   if (!currentBusiness) {
@@ -234,15 +246,6 @@ export default function DashboardPage() {
     )
   }
 
-  // Initialize with default KPI data if not loaded
-  const displayKpiData = kpiData || {
-    sales: { value: 0, change: 0 },
-    customers: { value: 0, change: 0 },
-    products: { value: 0, change: 0 },
-    expenses: { value: 0, change: 0 },
-    profit: { value: 0, change: 0 },
-  }
-
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -258,11 +261,6 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
-            {!isLoading && currentTenant && (
-              <p className="text-muted-foreground">
-                Welcome back! Here's what's happening at <span className="font-medium">{currentTenant.name}</span> today.
-              </p>
-            )}
           </div>
           <div className="flex items-center gap-2">
             <PageRefreshButton />
@@ -270,10 +268,6 @@ export default function DashboardPage() {
             <Button variant="outline" onClick={() => setShowCustomize(true)}>
               <Settings2 className="mr-2 h-4 w-4" />
               Customize
-            </Button>
-            <Button onClick={() => setShowQuickSale(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Quick Sale
             </Button>
           </div>
         </div>
@@ -337,7 +331,6 @@ export default function DashboardPage() {
       </div>
 
       {/* Modals */}
-      <QuickAddSaleModal open={showQuickSale} onOpenChange={setShowQuickSale} />
       <CustomizeDashboardModal open={showCustomize} onOpenChange={setShowCustomize} />
       <ViewSaleDetailsModal
         open={showSaleDetails}

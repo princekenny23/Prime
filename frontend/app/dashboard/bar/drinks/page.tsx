@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,7 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Plus, Search, Wine, TrendingUp, AlertTriangle, Edit, Trash2, Eye, MoreVertical, Package, RefreshCw } from "lucide-react"
+import { Plus, Search, Wine, TrendingUp, AlertTriangle, Edit, Trash2, Eye, MoreVertical, Package, RefreshCw, Menu } from "lucide-react"
 import { useState, useEffect } from "react"
 import { NewDrinkModal } from "@/components/modals/new-drink-modal"
 import { AddEditProductModal } from "@/components/modals/add-edit-product-modal"
@@ -172,17 +173,16 @@ export default function DrinksPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Drink Inventory</h1>
-            <p className="text-muted-foreground">Manage bar drinks and inventory</p>
-          </div>
+      <PageLayout
+        title="Drink Inventory"
+        description="Manage bar drinks and inventory"
+        actions={
           <Button onClick={() => setShowNewDrink(true)}>
             <Plus className="mr-2 h-4 w-4" />
             New Drink
           </Button>
-        </div>
+        }
+      >
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-4">
@@ -374,66 +374,51 @@ export default function DrinksPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Link href={`/dashboard/inventory/products/${drink.id}`}>
-                              <Button variant="ghost" size="sm" title="View Details">
-                                <Eye className="h-4 w-4" />
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                <Menu className="h-4 w-4" />
                               </Button>
-                            </Link>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEdit(drink)}
-                              title="Edit Drink"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-56">
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem asChild>
-                                  <Link href={`/dashboard/inventory/products/${drink.id}`} className="flex items-center">
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    View Details
-                                  </Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleEdit(drink)}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Edit Drink
-                                </DropdownMenuItem>
-                                <DropdownMenuItem asChild>
-                                  <Link href={`/dashboard/inventory/adjust?product=${drink.id}`} className="flex items-center">
-                                    <Package className="mr-2 h-4 w-4" />
-                                    Adjust Stock
-                                  </Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={() => handleDelete(drink)}
-                                  disabled={deletingDrinkId === drink.id}
-                                  className="text-destructive focus:text-destructive"
-                                >
-                                  {deletingDrinkId === drink.id ? (
-                                    <>
-                                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                                      Deleting...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Trash2 className="mr-2 h-4 w-4" />
-                                      Delete Drink
-                                    </>
-                                  )}
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem asChild>
+                                <Link href={`/dashboard/inventory/products/${drink.id}`} className="flex items-center">
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  View Details
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEdit(drink)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit Drink
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link href={`/dashboard/inventory/adjust?product=${drink.id}`} className="flex items-center">
+                                  <Package className="mr-2 h-4 w-4" />
+                                  Adjust Stock
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handleDelete(drink)}
+                                disabled={deletingDrinkId === drink.id}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                {deletingDrinkId === drink.id ? (
+                                  <>
+                                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                    Deleting...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete Drink
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     )
@@ -466,6 +451,7 @@ export default function DrinksPage() {
         }}
         product={selectedDrink}
       />
+      </PageLayout>
     </DashboardLayout>
   )
 }

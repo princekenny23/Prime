@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -119,13 +120,10 @@ export default function AdminSupportTicketsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Support Tickets</h1>
-            <p className="text-muted-foreground">Manage tenant support requests</p>
-          </div>
-        </div>
+      <PageLayout
+        title="Support Tickets"
+        description="Manage tenant support requests"
+      >
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-4">
@@ -259,6 +257,7 @@ export default function AdminSupportTicketsPage() {
       </div>
 
       {/* Modals */}
+      </PageLayout>
       <ReplyToSupportTicketModal
         open={showReplyModal}
         onOpenChange={setShowReplyModal}

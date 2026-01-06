@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Table,
@@ -71,11 +72,10 @@ export default function InventoryReportsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Inventory & Stock Report</h1>
-          <p className="text-muted-foreground">Monitor stock levels, movement, and product performance</p>
-        </div>
+      <PageLayout
+        title="Inventory & Stock Report"
+        description="Monitor stock levels, movement, and product performance"
+      >
 
         <ReportFilters
           onExport={() => setShowExport(true)}
@@ -257,6 +257,7 @@ export default function InventoryReportsPage() {
         open={showSettings}
         onOpenChange={setShowSettings}
       />
+      </PageLayout>
     </DashboardLayout>
   )
 }

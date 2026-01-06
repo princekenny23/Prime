@@ -1,0 +1,74 @@
+{
+  "required": {
+    "field": "Izi ndizofunikira",
+    "name": "Dzina ndilofunikira",
+    "email": "Imelo ndiyofunikira",
+    "password": "Mawu achinsinsi ndiwofunikira",
+    "phone": "Nambala ya foni ndiyofunikira",
+    "amount": "Ndalama ndizofunikira",
+    "quantity": "Kuchuluka ndikofunikira",
+    "product": "Chinthu ndichofunikira",
+    "customer": "Kasitomala ndiwofunikira",
+    "outlet": "Outlet ndiyofunikira",
+    "till": "Till ndiyofunikira",
+    "category": "Gulu ndilofunikira",
+    "supplier": "Wogulitsa ndiwofunikira",
+    "date": "Tsiku ndilofunikira",
+    "reason": "Chifukwa ndichofunikira"
+  },
+  "invalid": {
+    "email": "Chonde lembani imelo yolondola",
+    "phone": "Chonde lembani nambala ya foni yolondola",
+    "number": "Chonde lembani nambala yolondola",
+    "date": "Chonde lembani tsiku lolondola",
+    "amount": "Chonde lembani ndalama zolondola",
+    "quantity": "Chonde lembani kuchuluka kolondola",
+    "sku": "SKU yolakwika",
+    "barcode": "Barcode yolakwika"
+  },
+  "range": {
+    "min": "Nambala iyenera kukhala osachepera {min}",
+    "max": "Nambala iyenera kukhala osapitirira {max}",
+    "between": "Nambala iyenera kukhala pakati pa {min} ndi {max}",
+    "positive": "Nambala iyenera kukhala yabwino",
+    "quantity_min": "Kuchuluka kuyenera kukhala osachepera 1",
+    "amount_min": "Ndalama ziyenera kukhala zopitirira 0"
+  },
+  "length": {
+    "min": "Iyenera kukhala osachepera zilembo {min}",
+    "max": "Iyenera kukhala osapitirira zilembo {max}",
+    "exact": "Iyenera kukhala ndi zilembo {length}",
+    "password_min": "Mawu achinsinsi ayenera kukhala osachepera zilembo 8"
+  },
+  "match": {
+    "password": "Mawu achinsinsi sakugwirizana",
+    "email": "Ma imelo sakugwirizana"
+  },
+  "unique": {
+    "sku": "SKU iyi ikugwiritsidwa kale",
+    "barcode": "Barcode iyi ikugwiritsidwa kale",
+    "email": "Imelo iyi yalembetsedwa kale",
+    "name": "Dzina ili likugwiritsidwa kale"
+  },
+  "stock": {
+    "insufficient": "Katundu wopezeka sukwanira",
+    "negative": "Katundu sungakhale wochepa kuposa 0",
+    "exceeds_available": "Kuchuluka kupitirira katundu wopezeka"
+  },
+  "payment": {
+    "insufficient": "Ndalama zochepa kuposa zonse",
+    "credit_exceeded": "Ndalama izi zipitirira malire a ngongole",
+    "invalid_method": "Njira ya kulipira yolakwika"
+  },
+  "shift": {
+    "required": "Ntchito yokhala yatseguka ndiyofunikira",
+    "already_open": "Ntchito yatatseguka kale",
+    "not_found": "Palibe ntchito yokhala yatseguka",
+    "cash_mismatch": "Ndalama zotseka sizikugwirizana ndi zoyembekezeka"
+  },
+  "messages": {
+    "fix_errors": "Chonde konzani zolakwika musanapitirize",
+    "check_input": "Chonde onani zomwe mwalemba ndikuyesanso"
+  }
+}
+

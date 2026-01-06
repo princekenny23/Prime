@@ -1,0 +1,140 @@
+{
+  "title": "Point of Sale",
+  "new_sale": "New Sale",
+  "current_sale": "Current Sale",
+  "cart": {
+    "title": "Cart",
+    "empty": "Cart is empty",
+    "empty_hint": "Add products to start a sale",
+    "items": "Items",
+    "item": "Item",
+    "clear": "Clear Cart",
+    "clear_confirm": "Are you sure you want to clear the cart?"
+  },
+  "product": {
+    "search": "Search products...",
+    "search_by_name": "Search by name or barcode",
+    "scan_barcode": "Scan Barcode",
+    "no_products": "No products found",
+    "out_of_stock": "Out of Stock",
+    "low_stock": "Low Stock",
+    "select_variation": "Select Variation",
+    "select_unit": "Select Unit"
+  },
+  "search_placeholder": "Search by name, SKU, or barcode... (Click to view all items)",
+  "select_unit": "Select Unit",
+  "pricing": {
+    "retail": "Retail",
+    "wholesale": "Wholesale",
+    "price": "Price",
+    "unit_price": "Unit Price",
+    "quantity": "Quantity",
+    "subtotal": "Subtotal",
+    "discount": "Discount",
+    "tax": "Tax",
+    "total": "Total",
+    "change": "Change"
+  },
+  "payment": {
+    "title": "Payment",
+    "method": "Payment Method",
+    "cash": "Cash",
+    "card": "Card",
+    "mobile": "Mobile Money",
+    "credit": "Credit",
+    "split": "Split Payment",
+    "amount": "Amount",
+    "received": "Amount Received",
+    "due": "Amount Due",
+    "balance": "Balance",
+    "tender": "Tender",
+    "complete": "Complete Sale",
+    "processing": "Processing Payment...",
+    "insufficient": "Insufficient payment amount"
+  },
+  "customer": {
+    "select": "Select Customer",
+    "add": "Add Customer",
+    "walk_in": "Walk-in Customer",
+    "search": "Search customers...",
+    "credit_sale": "Credit Sale",
+    "credit_limit": "Credit Limit",
+    "available_credit": "Available Credit",
+    "outstanding": "Outstanding Balance"
+  },
+  "shift": {
+    "title": "Shift",
+    "current": "Current Shift",
+    "select": "Select Shift",
+    "no_active": "No active shift",
+    "start": "Start Shift",
+    "end": "End Shift",
+    "opening_cash": "Opening Cash",
+    "closing_cash": "Closing Cash",
+    "cash_in_drawer": "Cash in Drawer",
+    "required": "An active shift is required to make sales"
+  },
+  "receipt": {
+    "title": "Receipt",
+    "number": "Receipt No.",
+    "print": "Print Receipt",
+    "email": "Email Receipt",
+    "new_sale": "New Sale",
+    "thank_you": "Thank you for your purchase!",
+    "visit_again": "Please visit again",
+    "date": "Date",
+    "time": "Time",
+    "cashier": "Cashier",
+    "items_sold": "Items Sold"
+  },
+  "hold": {
+    "title": "Hold Sale",
+    "save": "Hold",
+    "retrieve": "Retrieve",
+    "held_sales": "Held Sales",
+    "no_held": "No held sales",
+    "note": "Note (optional)"
+  },
+  "refund": {
+    "title": "Refund",
+    "process": "Process Refund",
+    "reason": "Reason for Refund",
+    "amount": "Refund Amount",
+    "confirm": "Confirm Refund"
+  },
+  "messages": {
+    "sale_complete": "Sale completed successfully",
+    "sale_failed": "Failed to complete sale",
+    "cart_cleared": "Cart cleared",
+    "product_added": "Product added to cart",
+    "product_removed": "Product removed from cart",
+    "quantity_updated": "Quantity updated",
+    "payment_received": "Payment received",
+    "refund_processed": "Refund processed successfully",
+    "shift_required": "Please start a shift to begin selling",
+    "stock_insufficient": "Insufficient stock for this product",
+    "credit_exceeded": "Customer credit limit exceeded"
+  },
+  "quick_actions": {
+    "open_drawer": "Open Drawer",
+    "add_discount": "Add Discount",
+    "add_note": "Add Note",
+    "void_item": "Void Item",
+    "void_sale": "Void Sale",
+    "reprint": "Reprint Last"
+  },
+  "restaurant": {
+    "tables": "Tables",
+    "kitchen": "Kitchen",
+    "orders": "Orders",
+    "menu": "Menu Builder",
+    "recipes": "Recipes",
+    "reservations": "Reservations"
+  },
+  "bar": {
+    "drinks": "Drinks Menu",
+    "tabs": "Bar Tabs",
+    "recipes": "Mix Recipes"
+  }
+}
+

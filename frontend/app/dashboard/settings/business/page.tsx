@@ -1,21 +1,21 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { BusinessInfoTab } from "@/components/settings/business-info-tab"
+import { useI18n } from "@/contexts/i18n-context"
 
 export default function BusinessSettingsPage() {
+  const { t } = useI18n()
+  
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Business Information</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your business information and details
-          </p>
-        </div>
+      <PageLayout
+        title={t("settings.business.title")}
+        description={t("settings.business.description")}
+      >
         <BusinessInfoTab />
-      </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }
-

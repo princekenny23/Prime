@@ -7,16 +7,14 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db import transaction
 from django.utils import timezone
 from .models import (
-    Supplier, PurchaseOrder, PurchaseOrderItem, SupplierInvoice,
-    PurchaseReturn, PurchaseReturnItem, ProductSupplier, AutoPurchaseOrderSettings,
-    AutoPOAuditLog
+    Supplier, PurchaseOrder, SupplierInvoice,
+    PurchaseReturn, ProductSupplier
 )
 from .serializers import (
-    SupplierSerializer, PurchaseOrderSerializer, PurchaseOrderItemSerializer,
-    SupplierInvoiceSerializer, PurchaseReturnSerializer, PurchaseReturnItemSerializer,
-    ProductSupplierSerializer, AutoPurchaseOrderSettingsSerializer
+    SupplierSerializer, PurchaseOrderSerializer,
+    SupplierInvoiceSerializer, PurchaseReturnSerializer,
+    ProductSupplierSerializer
 )
-from .services import check_low_stock_and_create_po, get_or_create_auto_po_settings
 from apps.tenants.permissions import TenantFilterMixin, is_admin_user
 import logging
 
@@ -197,78 +195,6 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         serializer = self.get_serializer(po)
         return Response(serializer.data)
     
-    @action(detail=False, methods=['get'])
-    def items_needing_supplier(self, request):
-        """Get all purchase order items that need supplier assignment"""
-        tenant = getattr(request, 'tenant', None) or request.user.tenant
-        if not tenant:
-            return Response(
-                {"detail": "Tenant is required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        items = PurchaseOrderItem.objects.filter(
-            purchase_order__tenant=tenant,
-            supplier__isnull=True,
-            purchase_order__status__in=['draft', 'pending_supplier']
-        ).select_related('purchase_order', 'product', 'variation', 'variation__product')
-        
-        serializer = PurchaseOrderItemSerializer(items, many=True)
-        return Response(serializer.data)
-    
-    @action(detail=True, methods=['post'])
-    def assign_supplier_to_item(self, request, pk=None):
-        """Assign supplier to a specific purchase order item"""
-        po = self.get_object()
-        item_id = request.data.get('item_id')
-        supplier_id = request.data.get('supplier_id')
-        
-        if not item_id or not supplier_id:
-            return Response(
-                {"detail": "item_id and supplier_id are required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        try:
-            item = PurchaseOrderItem.objects.get(id=item_id, purchase_order=po)
-            supplier = Supplier.objects.get(id=supplier_id, tenant=po.tenant)
-            
-            # Assign supplier to item
-            item.supplier = supplier
-            item.save()  # This will update supplier_status automatically
-            
-            # Log audit event
-            from .services import log_auto_po_action
-            log_auto_po_action(
-                tenant=po.tenant,
-                action_type='item_updated',
-                description=f"Supplier {supplier.name} assigned to item {item.product.name if item.product else 'Unknown'} in PO {po.po_number}",
-                context_data={
-                    'po_number': po.po_number,
-                    'item_id': item.id,
-                    'supplier_id': supplier.id,
-                    'supplier_name': supplier.name
-                },
-                purchase_order=po,
-                product=item.product,
-                variation=item.variation,
-                supplier=supplier,
-                user=request.user
-            )
-            
-            serializer = PurchaseOrderItemSerializer(item)
-            return Response(serializer.data)
-        except PurchaseOrderItem.DoesNotExist:
-            return Response(
-                {"detail": "Purchase order item not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        except Supplier.DoesNotExist:
-            return Response(
-                {"detail": "Supplier not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-    
     @action(detail=True, methods=['post'])
     def receive(self, request, pk=None):
         """Mark purchase order as received"""
@@ -279,48 +205,9 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Update received quantities from request
-        received_items = request.data.get('items', [])
-        for item_data in received_items:
-            item_id = item_data.get('item_id')
-            received_qty = item_data.get('received_quantity', 0)
-            
-            try:
-                item = PurchaseOrderItem.objects.get(id=item_id, purchase_order=po)
-                item.received_quantity = received_qty
-                item.save()
-            except PurchaseOrderItem.DoesNotExist:
-                continue
-        
-        # Update PO status
-        total_received = sum(item.received_quantity for item in po.items.all())
-        total_ordered = sum(item.quantity for item in po.items.all())
-        
-        if total_received >= total_ordered:
-            po.status = 'received'
-            po.received_at = timezone.now()
-        elif total_received > 0:
-            po.status = 'partial'
-        else:
-            po.status = 'ordered'
-        
+        po.status = 'received'
+        po.received_at = timezone.now()
         po.save()
-        
-        # Update stock if received
-        if po.status in ['received', 'partial']:
-            from apps.inventory.models import StockMovement
-            for item in po.items.all():
-                if item.received_quantity > 0:
-                    StockMovement.objects.create(
-                        tenant=po.tenant,
-                        product=item.product,
-                        outlet=po.outlet,
-                        user=request.user,
-                        movement_type='purchase',
-                        quantity=item.received_quantity,
-                        reason=f"Received from PO {po.po_number}",
-                        reference_id=str(po.id)
-                    )
         
         serializer = self.get_serializer(po)
         return Response(serializer.data)
@@ -505,19 +392,6 @@ class PurchaseReturnViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         purchase_return.returned_at = timezone.now()
         purchase_return.save()
         
-        # Update stock (reduce inventory)
-        from apps.inventory.models import StockMovement
-        for item in purchase_return.items.all():
-            StockMovement.objects.create(
-                tenant=purchase_return.tenant,
-                product=item.product,
-                outlet=purchase_return.outlet,
-                user=request.user,
-                movement_type='return',
-                quantity=item.quantity,
-                reason=f"Return to supplier: {purchase_return.return_number}",
-                reference_id=str(purchase_return.id)
-            )
         
         serializer = self.get_serializer(purchase_return)
         return Response(serializer.data)
@@ -546,117 +420,4 @@ class ProductSupplierViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         serializer.save(tenant=tenant)
 
 
-class AutoPurchaseOrderSettingsViewSet(viewsets.ModelViewSet, TenantFilterMixin):
-    """Auto Purchase Order Settings ViewSet"""
-    queryset = AutoPurchaseOrderSettings.objects.select_related('tenant')
-    serializer_class = AutoPurchaseOrderSettingsSerializer
-    permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['tenant']
-    
-    def get_queryset(self):
-        """Users can only see their own tenant's settings"""
-        queryset = super().get_queryset()
-        user = self.request.user
-        is_saas_admin = getattr(user, 'is_saas_admin', False)
-        
-        if not is_saas_admin:
-            request_tenant = getattr(self.request, 'tenant', None)
-            user_tenant = getattr(user, 'tenant', None)
-            tenant = request_tenant or user_tenant
-            
-            if tenant:
-                queryset = queryset.filter(tenant=tenant)
-            else:
-                queryset = queryset.none()
-        
-        return queryset
-    
-    def get_object(self):
-        """Get or create settings for current tenant"""
-        tenant = getattr(self.request, 'tenant', None) or self.request.user.tenant
-        if not tenant:
-            from rest_framework.exceptions import NotFound
-            raise NotFound("Tenant not found")
-        
-        settings, created = AutoPurchaseOrderSettings.objects.get_or_create(
-            tenant=tenant,
-            defaults={
-                'auto_po_enabled': False,
-                'default_reorder_quantity': 10,
-                'auto_approve_po': False,
-                'notify_on_auto_po': True,
-                'group_by_supplier': True,
-            }
-        )
-        return settings
-    
-    def list(self, request, *args, **kwargs):
-        """Return current tenant's settings"""
-        settings = self.get_object()
-        serializer = self.get_serializer(settings)
-        return Response(serializer.data)
-    
-    def retrieve(self, request, *args, **kwargs):
-        """Return current tenant's settings"""
-        settings = self.get_object()
-        serializer = self.get_serializer(settings)
-        return Response(serializer.data)
-    
-    def update(self, request, *args, **kwargs):
-        """Update current tenant's settings"""
-        settings = self.get_object()
-        serializer = self.get_serializer(settings, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
-    
-    @action(detail=False, methods=['post'])
-    def check_low_stock(self, request):
-        """
-        Manually trigger low stock check and auto-PO creation
-        POST /auto-po-settings/check_low_stock/
-        """
-        tenant = getattr(request, 'tenant', None) or request.user.tenant
-        if not tenant:
-            return Response(
-                {"detail": "Tenant not found"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        outlet_id = request.data.get('outlet_id')
-        outlet = None
-        if outlet_id:
-            from apps.outlets.models import Outlet
-            try:
-                outlet = Outlet.objects.get(id=outlet_id, tenant=tenant)
-            except Outlet.DoesNotExist:
-                return Response(
-                    {"detail": "Outlet not found"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        
-        try:
-            result = check_low_stock_and_create_po(tenant, outlet, request.user)
-            return Response({
-                'success': True,
-                'purchase_orders_created': result['purchase_orders_created'],
-                'items_ordered': result['items_ordered'],
-                'purchase_orders': [
-                    {
-                        'id': po.id,
-                        'po_number': po.po_number,
-                        'supplier': po.supplier.name,
-                        'status': po.status,
-                        'total': str(po.total),
-                    }
-                    for po in result['purchase_orders']
-                ]
-            })
-        except Exception as e:
-            logger.error(f"Error in check_low_stock: {e}", exc_info=True)
-            return Response(
-                {"detail": f"Error checking low stock: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
 

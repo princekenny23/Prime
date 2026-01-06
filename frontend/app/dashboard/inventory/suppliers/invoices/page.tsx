@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -62,63 +63,67 @@ export default function SupplierInvoicesPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Supplier Invoices</h1>
-            <p className="text-muted-foreground">Record and track supplier invoices</p>
-          </div>
+      <PageLayout
+        title="Supplier Invoices"
+        description="Record and track supplier invoices"
+        actions={
           <Link href="/dashboard/inventory/suppliers/invoices/new">
-            <Button>
+            <Button className="bg-white border-white text-[#1e3a8a] hover:bg-blue-50 hover:border-blue-50">
               <Plus className="mr-2 h-4 w-4" />
               New Invoice
             </Button>
           </Link>
+        }
+      >
+        {/* Filters */}
+        <div className="mb-6 pb-4 border-b border-gray-300">
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+              <Input
+                placeholder="Search invoices..."
+                className="pl-10 bg-white border-gray-300"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>All Supplier Invoices</CardTitle>
-            <CardDescription>
+        {/* Invoices Table */}
+        <div>
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">All Supplier Invoices</h3>
+            <p className="text-sm text-gray-600">
               {invoices.length} invoice{invoices.length !== 1 ? "s" : ""} found
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4 mb-4">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search invoices..."
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
+            </p>
+          </div>
+          {loading ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600">Loading...</p>
             </div>
-
-            {loading ? (
-              <div className="text-center py-8">Loading...</div>
-            ) : invoices.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No invoices found. Record your first supplier invoice to get started.
-              </div>
-            ) : (
+          ) : invoices.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600">No invoices found. Record your first supplier invoice to get started.</p>
+            </div>
+          ) : (
+            <div className="rounded-md border border-gray-300 bg-white">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Invoice Number</TableHead>
-                    <TableHead>Supplier</TableHead>
-                    <TableHead>Invoice Date</TableHead>
-                    <TableHead>Due Date</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Balance</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="text-gray-900 font-semibold">Invoice Number</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Supplier</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Invoice Date</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Due Date</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Total</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Balance</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Status</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {invoices.map((invoice) => (
-                    <TableRow key={invoice.id}>
+                    <TableRow key={invoice.id} className="border-gray-300">
                       <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
                       <TableCell>{invoice.supplier?.name || "N/A"}</TableCell>
                       <TableCell>{new Date(invoice.invoice_date).toLocaleDateString()}</TableCell>
@@ -128,17 +133,17 @@ export default function SupplierInvoicesPage() {
                       <TableCell>{getStatusBadge(invoice.status)}</TableCell>
                       <TableCell>
                         <Link href={`/dashboard/inventory/suppliers/invoices/${invoice.id}`}>
-                          <Button variant="ghost" size="sm">View</Button>
+                          <Button variant="ghost" size="sm" className="border-gray-300">View</Button>
                         </Link>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+          )}
+        </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

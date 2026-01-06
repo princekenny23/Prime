@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Table,
@@ -41,11 +42,10 @@ export default function StockMovementReportsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Stock Movement Report</h1>
-          <p className="text-muted-foreground">Track inventory movements and changes</p>
-        </div>
+      <PageLayout
+        title="Stock Movement Report"
+        description="Track inventory movements and changes"
+      >
 
         <ReportFilters
           onExport={() => setShowExport(true)}
@@ -184,6 +184,7 @@ export default function StockMovementReportsPage() {
         open={showSettings}
         onOpenChange={setShowSettings}
       />
+      </PageLayout>
     </DashboardLayout>
   )
 }

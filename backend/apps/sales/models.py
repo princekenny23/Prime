@@ -385,3 +385,62 @@ class DeliveryStatusHistory(models.Model):
     def __str__(self):
         return f"{self.delivery.delivery_number} - {self.status} at {self.created_at}"
 
+
+class Receipt(models.Model):
+    """Digital receipt stored in database"""
+    FORMAT_CHOICES = [
+        ('html', 'HTML'),
+        ('pdf', 'PDF'),
+        ('json', 'JSON'),
+    ]
+    
+    SENT_VIA_CHOICES = [
+        ('email', 'Email'),
+        ('sms', 'SMS'),
+        ('print', 'Print'),
+        ('none', 'Not Sent'),
+    ]
+    
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='receipts')
+    sale = models.OneToOneField(Sale, on_delete=models.CASCADE, related_name='receipt', help_text="The sale this receipt belongs to")
+    receipt_number = models.CharField(max_length=50, unique=True, db_index=True, help_text="Receipt number for quick lookup")
+    
+    # Receipt content
+    format = models.CharField(max_length=10, choices=FORMAT_CHOICES, default='html', help_text="Format of stored receipt")
+    content = models.TextField(help_text="Receipt content (HTML/JSON)")
+    pdf_file = models.FileField(upload_to='receipts/pdf/', null=True, blank=True, help_text="PDF file if format is PDF")
+    
+    # Metadata
+    generated_at = models.DateTimeField(auto_now_add=True, help_text="When receipt was generated")
+    generated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='generated_receipts', help_text="User who created the sale")
+    
+    # Delivery tracking
+    is_sent = models.BooleanField(default=False, help_text="Whether receipt was sent to customer")
+    sent_at = models.DateTimeField(null=True, blank=True, help_text="When receipt was sent")
+    sent_via = models.CharField(max_length=20, choices=SENT_VIA_CHOICES, default='none', help_text="Method used to send receipt")
+    
+    # Access tracking
+    access_count = models.IntegerField(default=0, help_text="Number of times receipt was accessed")
+    last_accessed_at = models.DateTimeField(null=True, blank=True, help_text="Last time receipt was accessed")
+    
+    class Meta:
+        db_table = 'sales_receipt'
+        verbose_name = 'Receipt'
+        verbose_name_plural = 'Receipts'
+        ordering = ['-generated_at']
+        indexes = [
+            models.Index(fields=['tenant']),
+            models.Index(fields=['sale']),
+            models.Index(fields=['receipt_number']),
+            models.Index(fields=['generated_at']),
+        ]
+    
+    def __str__(self):
+        return f"Receipt {self.receipt_number}"
+    
+    def increment_access(self):
+        """Increment access count and update last accessed time"""
+        self.access_count += 1
+        self.last_accessed_at = timezone.now()
+        self.save(update_fields=['access_count', 'last_accessed_at'])
+

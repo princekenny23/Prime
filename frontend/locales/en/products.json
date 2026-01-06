@@ -1,0 +1,94 @@
+{
+  "title": "Products",
+  "list": {
+    "title": "All Products",
+    "empty": "No products found",
+    "add": "Add Product",
+    "import": "Import Products",
+    "export": "Export Products"
+  },
+  "product": {
+    "name": "Product Name",
+    "description": "Description",
+    "category": "Category",
+    "sku": "SKU",
+    "barcode": "Barcode",
+    "unit": "Unit",
+    "image": "Image"
+  },
+  "pricing": {
+    "title": "Pricing",
+    "cost": "Cost Price",
+    "retail_price": "Retail Price",
+    "wholesale_price": "Wholesale Price",
+    "wholesale_enabled": "Enable Wholesale",
+    "min_wholesale_qty": "Minimum Wholesale Quantity"
+  },
+  "stock": {
+    "title": "Stock",
+    "current": "Current Stock",
+    "available": "Available",
+    "reserved": "Reserved",
+    "low_threshold": "Low Stock Threshold",
+    "track_inventory": "Track Inventory"
+  },
+  "variations": {
+    "title": "Variations",
+    "add": "Add Variation",
+    "name": "Variation Name",
+    "size": "Size",
+    "color": "Color",
+    "pack_size": "Pack Size",
+    "none": "No variations"
+  },
+  "categories": {
+    "title": "Categories",
+    "add": "Add Category",
+    "edit": "Edit Category",
+    "name": "Category Name",
+    "description": "Description",
+    "no_category": "Uncategorized"
+  },
+  "filters": {
+    "all": "All Products",
+    "in_stock": "In Stock",
+    "low_stock": "Low Stock",
+    "out_of_stock": "Out of Stock",
+    "active": "Active",
+    "inactive": "Inactive",
+    "by_category": "By Category"
+  },
+  "import": {
+    "title": "Import Products",
+    "download_template": "Download Template",
+    "upload_file": "Upload File",
+    "select_file": "Select File",
+    "preview": "Preview Import",
+    "importing": "Importing...",
+    "success": "Products imported successfully",
+    "failed": "Import failed"
+  },
+  "export": {
+    "title": "Export Products",
+    "format": "Format",
+    "excel": "Excel",
+    "csv": "CSV",
+    "exporting": "Exporting...",
+    "success": "Products exported successfully"
+  },
+  "messages": {
+    "created": "Product created successfully",
+    "updated": "Product updated successfully",
+    "deleted": "Product deleted successfully",
+    "delete_confirm": "Are you sure you want to delete this product?",
+    "not_found": "Product not found"
+  },
+  "expiry": {
+    "title": "Expiry",
+    "manufacturing_date": "Manufacturing Date",
+    "expiry_date": "Expiry Date",
+    "expired": "Expired",
+    "expiring_soon": "Expiring Soon"
+  }
+}
+

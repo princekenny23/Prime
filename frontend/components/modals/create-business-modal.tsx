@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import type { BusinessType } from "@/lib/types"
+import type { BusinessType, POSType } from "@/lib/types"
 import { useAuthStore } from "@/stores/authStore"
 import { tenantService } from "@/lib/services/tenantService"
 import { outletService } from "@/lib/services/outletService"
@@ -37,6 +37,7 @@ export function CreateBusinessModal({
   const [formData, setFormData] = useState({
     businessName: "",
     businessType: "" as BusinessType | "",
+    posType: "standard" as POSType,
     currency: "MWK",
     currencySymbol: "MK",
     phone: "",
@@ -62,6 +63,7 @@ export function CreateBusinessModal({
       business = await tenantService.create({
         name: formData.businessName,
         type: formData.businessType as BusinessType,
+        posType: formData.posType,
         currency: formData.currency,
         currencySymbol: formData.currencySymbol,
         phone: formData.phone || "",
@@ -110,6 +112,7 @@ export function CreateBusinessModal({
       setFormData({
         businessName: "",
         businessType: "" as BusinessType | "",
+        posType: "standard" as POSType,
         currency: "MWK",
         currencySymbol: "MK",
         phone: "",
@@ -186,6 +189,26 @@ export function CreateBusinessModal({
                     <SelectItem value="bar">Bar</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="posType">POS Type *</Label>
+                <Select
+                  value={formData.posType}
+                  onValueChange={(value) => setFormData({ ...formData, posType: value as POSType })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select POS type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="standard">Standard POS</SelectItem>
+                    <SelectItem value="single_product">Single-Product POS</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Standard POS: Multiple products with cart-based checkout.
+                  <br />
+                  Single-Product POS: One product with fast quantity-first checkout.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="currency">Currency *</Label>
@@ -329,7 +352,7 @@ export function CreateBusinessModal({
                 type="button"
                 onClick={handleNext}
                 disabled={
-                  (step === 1 && (!formData.businessName || !formData.businessType))
+                  (step === 1 && (!formData.businessName || !formData.businessType || !formData.posType))
                 }
               >
                 Next

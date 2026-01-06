@@ -1,0 +1,103 @@
+{
+  "title": "Customers",
+  "select_customer": "Select Customer",
+  "search_or_create": "Search for an existing customer or create a new one",
+  "new_customer": "New Customer",
+  "no_customers_found": "No customers found",
+  "no_customers_yet": "No customers yet",
+  "try_different_search": "Try a different search term or create a new customer",
+  "create_first_customer": "Create your first customer to get started",
+  "loyalty_points": "loyalty points",
+  "menu": {
+    "all_customers": "All Customers",
+    "add_customer": "Add Customer",
+    "customer_groups": "Customer Groups",
+    "management": "Customer Management",
+    "credit_accounts": "Credit Accounts",
+    "loyalty": "Loyalty Program"
+  },
+  "management": {
+    "title": "Customer Management",
+    "description": "Manage your customer relationships, loyalty programs, and credit accounts"
+  },
+  "list": {
+    "title": "Customer List",
+    "empty": "No customers found",
+    "add": "Add Customer",
+    "search": "Search customers..."
+  },
+  "search_placeholder": "Search by name, email, or phone...",
+  "modal": {
+    "name_placeholder": "Enter customer name",
+    "email_placeholder": "customer@example.com",
+    "phone_placeholder": "Phone number",
+    "outlet_placeholder": "Select outlet (optional)",
+    "address_placeholder": "Customer address",
+    "credit_notes_placeholder": "Additional notes about customer's credit account"
+  },
+  "customer": {
+    "name": "Name",
+    "email": "Email",
+    "phone": "Phone",
+    "address": "Address",
+    "notes": "Notes"
+  },
+  "credit": {
+    "title": "Credit Account",
+    "enabled": "Credit Enabled",
+    "limit": "Credit Limit",
+    "available": "Available Credit",
+    "outstanding": "Outstanding Balance",
+    "payment_terms": "Payment Terms (Days)",
+    "status": "Credit Status",
+    "active": "Active",
+    "suspended": "Suspended",
+    "closed": "Closed"
+  },
+  "loyalty": {
+    "title": "Loyalty",
+    "points": "Loyalty Points",
+    "total_spent": "Total Spent",
+    "last_visit": "Last Visit",
+    "earn_points": "Earn Points",
+    "redeem_points": "Redeem Points"
+  },
+  "history": {
+    "title": "Purchase History",
+    "transactions": "Transactions",
+    "total_purchases": "Total Purchases",
+    "last_purchase": "Last Purchase",
+    "view_all": "View All"
+  },
+  "groups": {
+    "title": "Customer Groups",
+    "add": "Add Group",
+    "name": "Group Name",
+    "discount": "Group Discount",
+    "members": "Members"
+  },
+  "payments": {
+    "title": "Payments",
+    "record": "Record Payment",
+    "amount": "Amount",
+    "method": "Method",
+    "reference": "Reference",
+    "date": "Date",
+    "history": "Payment History"
+  },
+  "messages": {
+    "created": "Customer created successfully",
+    "updated": "Customer updated successfully",
+    "deleted": "Customer deleted successfully",
+    "payment_recorded": "Payment recorded successfully",
+    "credit_exceeded": "Credit limit would be exceeded"
+  },
+  "filters": {
+    "all": "All Customers",
+    "with_credit": "With Credit",
+    "with_balance": "With Outstanding Balance",
+    "active": "Active",
+    "inactive": "Inactive"
+  }
+}
+

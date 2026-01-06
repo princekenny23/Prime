@@ -44,6 +44,7 @@ urlpatterns = [
     path('api/v1/', include('apps.notifications.urls')),
     path('api/v1/', include('apps.expenses.urls')),
     path('api/v1/', include('apps.admin.urls')),
+    path('api/v1/', include('apps.quotations.urls')),
 ]
 
 if settings.DEBUG:

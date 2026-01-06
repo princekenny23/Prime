@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,7 +32,16 @@ import {
   MapPin,
   Calendar,
   Plus,
+  Menu,
 } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { deliveryService, type Delivery, type DeliveryFilters } from "@/lib/services/deliveryService"
 import { useBusinessStore } from "@/stores/businessStore"
@@ -39,6 +49,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { format } from "date-fns"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useTenant } from "@/contexts/tenant-context"
 import {
   Dialog,
   DialogContent,
@@ -54,6 +65,7 @@ export default function DeliveriesPage() {
   const { currentBusiness } = useBusinessStore()
   const { toast } = useToast()
   const router = useRouter()
+  const { currentOutlet } = useTenant()
   
   const [deliveries, setDeliveries] = useState<Delivery[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -85,6 +97,10 @@ export default function DeliveriesPage() {
       if (searchTerm) {
         filters.search = searchTerm
       }
+      // Filter by current outlet
+      if (currentOutlet?.id) {
+        filters.outlet = String(currentOutlet.id)
+      }
 
       const response = await deliveryService.list(filters)
       setDeliveries(response.results || [])
@@ -99,10 +115,23 @@ export default function DeliveriesPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [currentBusiness, statusFilter, searchTerm, toast])
+  }, [currentBusiness, statusFilter, searchTerm, currentOutlet, toast])
 
   useEffect(() => {
     loadDeliveries()
+  }, [loadDeliveries])
+
+  // Listen for delivery creation events
+  useEffect(() => {
+    const handleDeliveryCreated = () => {
+      // Refresh deliveries when a new one is created
+      loadDeliveries()
+    }
+
+    window.addEventListener("delivery-created", handleDeliveryCreated)
+    return () => {
+      window.removeEventListener("delivery-created", handleDeliveryCreated)
+    }
   }, [loadDeliveries])
 
   const formatCurrency = (amount: number) => {
@@ -178,16 +207,10 @@ export default function DeliveriesPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Deliveries</h1>
-            <p className="text-muted-foreground mt-1">
-              Manage wholesale deliveries and fulfillment
-            </p>
-          </div>
-        </div>
+      <PageLayout
+        title="Deliveries"
+        description="Manage wholesale deliveries and fulfillment"
+      >
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -341,16 +364,26 @@ export default function DeliveriesPage() {
                           {delivery.delivery_method.replace('_', ' ')}
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedDelivery(delivery)
-                              setShowDetailDialog(true)
-                            }}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                <Menu className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedDelivery(delivery)
+                                  setShowDetailDialog(true)
+                                }}
+                              >
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Details
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -360,9 +393,8 @@ export default function DeliveriesPage() {
             )}
           </CardContent>
         </Card>
-      </div>
 
-      {/* Delivery Detail Dialog */}
+        {/* Delivery Detail Dialog */}
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -522,7 +554,9 @@ export default function DeliveriesPage() {
           )}
         </DialogContent>
       </Dialog>
+      </PageLayout>
     </DashboardLayout>
+  )
   )
 }
 

@@ -18,6 +18,12 @@ export default function RetailPOSPage() {
       return
     }
 
+    // Redirect single-product POS types to their specific POS
+    if (currentBusiness.posType === "single_product") {
+      router.push("/pos/single-product")
+      return
+    }
+
     // Redirect non-retail/wholesale businesses to their specific POS
     if (currentBusiness.type !== "wholesale and retail") {
       router.push(`/pos/${currentBusiness.type}`)
@@ -31,8 +37,8 @@ export default function RetailPOSPage() {
     }
   }, [currentBusiness, router, activeShift, isLoading])
 
-  // Only allow "wholesale and retail" type to use this POS
-  if (!currentBusiness || currentBusiness.type !== "wholesale and retail") {
+  // Only allow standard POS with "wholesale and retail" type to use this POS
+  if (!currentBusiness || currentBusiness.posType !== "standard" || currentBusiness.type !== "wholesale and retail") {
     return null
   }
 

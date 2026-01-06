@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from decimal import Decimal, InvalidOperation
-from .models import Sale, SaleItem, Delivery, DeliveryItem, DeliveryStatusHistory
+from .models import Sale, SaleItem, Delivery, DeliveryItem, DeliveryStatusHistory, Receipt
 from apps.products.serializers import ProductSerializer
 
 
@@ -342,4 +342,51 @@ class DeliverySerializer(serializers.ModelSerializer):
             return sale.id
         except Sale.DoesNotExist:
             raise serializers.ValidationError(f"Sale {value} not found or does not belong to your tenant")
+
+
+class ReceiptSerializer(serializers.ModelSerializer):
+    """Receipt serializer"""
+    sale_detail = serializers.SerializerMethodField()
+    generated_by_email = serializers.SerializerMethodField()
+    pdf_url = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Receipt
+        fields = (
+            'id', 'tenant', 'sale', 'sale_detail', 'receipt_number',
+            'format', 'content', 'pdf_file', 'pdf_url',
+            'generated_at', 'generated_by', 'generated_by_email',
+            'is_sent', 'sent_at', 'sent_via',
+            'access_count', 'last_accessed_at'
+        )
+        read_only_fields = (
+            'id', 'tenant', 'sale', 'receipt_number', 'generated_at',
+            'generated_by', 'access_count', 'last_accessed_at'
+        )
+    
+    def get_sale_detail(self, obj):
+        """Return minimal sale information"""
+        if not obj.sale:
+            return None
+        return {
+            'id': obj.sale.id,
+            'receipt_number': obj.sale.receipt_number,
+            'total': str(obj.sale.total),
+            'created_at': obj.sale.created_at.isoformat(),
+            'outlet': {
+                'id': str(obj.sale.outlet.id) if obj.sale.outlet else None,
+                'name': obj.sale.outlet.name if obj.sale.outlet else None,
+            } if obj.sale.outlet else None,
+        }
+    
+    def get_generated_by_email(self, obj):
+        return obj.generated_by.email if obj.generated_by else None
+    
+    def get_pdf_url(self, obj):
+        if obj.pdf_file:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.pdf_file.url)
+            return obj.pdf_file.url
+        return None
 

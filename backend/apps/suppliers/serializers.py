@@ -1,8 +1,7 @@
 from rest_framework import serializers
 from .models import (
-    Supplier, PurchaseOrder, PurchaseOrderItem, SupplierInvoice,
-    PurchaseReturn, PurchaseReturnItem, ProductSupplier, AutoPurchaseOrderSettings,
-    AutoPOAuditLog
+    Supplier, PurchaseOrder, SupplierInvoice,
+    PurchaseReturn, ProductSupplier
 )
 from apps.outlets.serializers import OutletSerializer
 from apps.products.serializers import ProductSerializer, ItemVariationSerializer
@@ -71,39 +70,19 @@ class SupplierSerializer(serializers.ModelSerializer):
         return instance
 
 
-class PurchaseOrderItemSerializer(serializers.ModelSerializer):
-    """Purchase Order Item serializer with variation and supplier support"""
-    product = ProductSerializer(read_only=True)
-    product_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
-    variation = ItemVariationSerializer(read_only=True)
-    variation_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
-    supplier = SupplierSerializer(read_only=True)
-    supplier_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
-    
-    class Meta:
-        model = PurchaseOrderItem
-        fields = (
-            'id', 'purchase_order', 'product', 'product_id', 'variation', 'variation_id',
-            'supplier', 'supplier_id', 'quantity', 'unit_price', 'total', 'received_quantity',
-            'supplier_status', 'notes', 'created_at', 'updated_at'
-        )
-        read_only_fields = ('id', 'purchase_order', 'total', 'supplier_status', 'created_at', 'updated_at')
-
-
 class PurchaseOrderSerializer(serializers.ModelSerializer):
     """Purchase Order serializer"""
     supplier = SupplierSerializer(read_only=True)
-    supplier_id = serializers.IntegerField(write_only=True)
+    supplier_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     outlet = OutletSerializer(read_only=True)
     outlet_id = serializers.IntegerField(write_only=True)
-    items = PurchaseOrderItemSerializer(many=True, read_only=True)
+    created_by = serializers.StringRelatedField(read_only=True)
     items_data = serializers.ListField(
         child=serializers.DictField(),
         write_only=True,
         required=False,
-        help_text="List of items: [{'product_id': 1, 'quantity': 10, 'unit_price': '5.00'}]"
+        help_text="List of items to create for this purchase order"
     )
-    created_by = serializers.StringRelatedField(read_only=True)
     
     class Meta:
         model = PurchaseOrder
@@ -111,70 +90,83 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             'id', 'tenant', 'supplier', 'supplier_id', 'outlet', 'outlet_id',
             'po_number', 'order_date', 'expected_delivery_date', 'status',
             'subtotal', 'tax', 'discount', 'total', 'notes', 'terms',
-            'created_by', 'items', 'items_data', 'created_at', 'updated_at',
-            'approved_at', 'received_at'
+            'created_by', 'created_at', 'updated_at',
+            'approved_at', 'received_at', 'items_data'
         )
-        read_only_fields = ('id', 'tenant', 'po_number', 'subtotal', 'total', 'created_by', 'created_at', 'updated_at', 'approved_at', 'received_at')
-    
-    def validate_items_data(self, value):
-        """Validate items data"""
-        if not value:
-            raise serializers.ValidationError("At least one item is required")
-        for item in value:
-            if 'product_id' not in item or 'quantity' not in item or 'unit_price' not in item:
-                raise serializers.ValidationError("Each item must have product_id, quantity, and unit_price")
-        return value
+        read_only_fields = ('id', 'tenant', 'po_number', 'created_by', 'created_at', 'updated_at', 'approved_at', 'received_at')
     
     def create(self, validated_data):
-        """Create purchase order with items - supports supplier-optional POs"""
-        items_data = validated_data.pop('items_data', [])
+        """Create purchase order"""
         supplier_id = validated_data.pop('supplier_id', None)
         outlet_id = validated_data.pop('outlet_id')
+        items_data = validated_data.pop('items_data', [])
         
         from apps.outlets.models import Outlet
         outlet = Outlet.objects.get(id=outlet_id)
+        tenant = outlet.tenant  # Get tenant from outlet instead of validated_data
+        
         supplier = None
         if supplier_id:
             supplier = Supplier.objects.get(id=supplier_id)
         
         # Generate PO number
-        from django.utils import timezone
         from datetime import date
         today = date.today()
-        po_count = PurchaseOrder.objects.filter(tenant=validated_data['tenant'], order_date__year=today.year).count() + 1
+        po_count = PurchaseOrder.objects.filter(tenant=tenant, order_date__year=today.year).count() + 1
         po_number = f"PO-{today.strftime('%Y%m%d')}-{po_count:04d}"
         
         # Determine initial status based on supplier
         initial_status = validated_data.get('status', 'pending_supplier' if supplier is None else 'draft')
         
         purchase_order = PurchaseOrder.objects.create(
-            **validated_data,
+            tenant=tenant,
             supplier=supplier,
             outlet=outlet,
             po_number=po_number,
             status=initial_status,
-            created_by=self.context['request'].user
+            created_by=self.context['request'].user,
+            **validated_data
         )
         
-        # Create items
-        for item_data in items_data:
+        # Create purchase order items if provided
+        if items_data:
             from apps.products.models import Product
-            product = Product.objects.get(id=item_data['product_id'])
-            item_supplier_id = item_data.get('supplier_id')
-            item_supplier = None
-            if item_supplier_id:
-                item_supplier = Supplier.objects.get(id=item_supplier_id)
+            from decimal import Decimal
+            from django.apps import apps
             
-            PurchaseOrderItem.objects.create(
-                purchase_order=purchase_order,
-                product=product,
-                supplier=item_supplier,
-                quantity=item_data['quantity'],
-                unit_price=item_data['unit_price'],
-                notes=item_data.get('notes', '')
-            )
+            # Try to get PurchaseOrderItem model
+            try:
+                PurchaseOrderItem = apps.get_model('suppliers', 'PurchaseOrderItem')
+            except LookupError:
+                # If model doesn't exist, skip item creation
+                PurchaseOrderItem = None
+            
+            if PurchaseOrderItem:
+                for item_data in items_data:
+                    product_id = item_data.get('product_id')
+                    quantity = item_data.get('quantity', 1)
+                    unit_price = Decimal(str(item_data.get('unit_price', '0')))
+                    notes = item_data.get('notes', '')
+                    
+                    if product_id:
+                        try:
+                            product = Product.objects.get(id=product_id)
+                            total = unit_price * Decimal(str(quantity))
+                            
+                            # Create PurchaseOrderItem
+                            PurchaseOrderItem.objects.create(
+                                purchase_order=purchase_order,
+                                product=product,
+                                quantity=quantity,
+                                unit_price=unit_price,
+                                total=total,
+                                notes=notes,
+                                received_quantity=0
+                            )
+                        except Product.DoesNotExist:
+                            # Skip if product doesn't exist
+                            pass
         
-        purchase_order.calculate_totals()
         return purchase_order
 
 
@@ -229,22 +221,6 @@ class SupplierInvoiceSerializer(serializers.ModelSerializer):
         return invoice
 
 
-class PurchaseReturnItemSerializer(serializers.ModelSerializer):
-    """Purchase Return Item serializer"""
-    product = ProductSerializer(read_only=True)
-    product_id = serializers.IntegerField(write_only=True)
-    purchase_order_item_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
-    
-    class Meta:
-        model = PurchaseReturnItem
-        fields = (
-            'id', 'purchase_return', 'product', 'product_id', 'purchase_order_item',
-            'purchase_order_item_id', 'quantity', 'unit_price', 'total',
-            'reason', 'notes', 'created_at', 'updated_at'
-        )
-        read_only_fields = ('id', 'purchase_return', 'total', 'created_at', 'updated_at')
-
-
 class PurchaseReturnSerializer(serializers.ModelSerializer):
     """Purchase Return serializer"""
     supplier = SupplierSerializer(read_only=True)
@@ -253,13 +229,6 @@ class PurchaseReturnSerializer(serializers.ModelSerializer):
     purchase_order_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     outlet = OutletSerializer(read_only=True)
     outlet_id = serializers.IntegerField(write_only=True)
-    items = PurchaseReturnItemSerializer(many=True, read_only=True)
-    items_data = serializers.ListField(
-        child=serializers.DictField(),
-        write_only=True,
-        required=False,
-        help_text="List of items: [{'product_id': 1, 'quantity': 5, 'unit_price': '5.00', 'reason': 'Defective'}]"
-    )
     created_by = serializers.StringRelatedField(read_only=True)
     
     class Meta:
@@ -267,23 +236,13 @@ class PurchaseReturnSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'tenant', 'supplier', 'supplier_id', 'purchase_order', 'purchase_order_id',
             'outlet', 'outlet_id', 'return_number', 'return_date', 'status',
-            'reason', 'total', 'notes', 'items', 'items_data', 'created_by',
+            'reason', 'total', 'notes', 'created_by',
             'created_at', 'updated_at', 'returned_at'
         )
-        read_only_fields = ('id', 'tenant', 'return_number', 'total', 'created_by', 'created_at', 'updated_at', 'returned_at')
-    
-    def validate_items_data(self, value):
-        """Validate items data"""
-        if not value:
-            raise serializers.ValidationError("At least one item is required")
-        for item in value:
-            if 'product_id' not in item or 'quantity' not in item or 'unit_price' not in item:
-                raise serializers.ValidationError("Each item must have product_id, quantity, and unit_price")
-        return value
+        read_only_fields = ('id', 'tenant', 'return_number', 'created_by', 'created_at', 'updated_at', 'returned_at')
     
     def create(self, validated_data):
-        """Create purchase return with items"""
-        items_data = validated_data.pop('items_data', [])
+        """Create purchase return"""
         supplier_id = validated_data.pop('supplier_id')
         outlet_id = validated_data.pop('outlet_id')
         purchase_order_id = validated_data.pop('purchase_order_id', None)
@@ -310,25 +269,6 @@ class PurchaseReturnSerializer(serializers.ModelSerializer):
             created_by=self.context['request'].user
         )
         
-        # Create items
-        for item_data in items_data:
-            from apps.products.models import Product
-            product = Product.objects.get(id=item_data['product_id'])
-            purchase_order_item = None
-            if item_data.get('purchase_order_item_id'):
-                purchase_order_item = PurchaseOrderItem.objects.get(id=item_data['purchase_order_item_id'])
-            
-            PurchaseReturnItem.objects.create(
-                purchase_return=purchase_return,
-                product=product,
-                purchase_order_item=purchase_order_item,
-                quantity=item_data['quantity'],
-                unit_price=item_data['unit_price'],
-                reason=item_data.get('reason', ''),
-                notes=item_data.get('notes', '')
-            )
-        
-        purchase_return.calculate_total()
         return purchase_return
 
 
@@ -343,7 +283,7 @@ class ProductSupplierSerializer(serializers.ModelSerializer):
         model = ProductSupplier
         fields = (
             'id', 'tenant', 'product', 'product_id', 'supplier', 'supplier_id',
-            'reorder_quantity', 'reorder_point', 'unit_cost', 'is_preferred',
+            'unit_cost', 'is_preferred',
             'is_active', 'notes', 'created_at', 'updated_at'
         )
         read_only_fields = ('id', 'tenant', 'created_at', 'updated_at')
@@ -378,16 +318,4 @@ class ProductSupplierSerializer(serializers.ModelSerializer):
         return instance
 
 
-class AutoPurchaseOrderSettingsSerializer(serializers.ModelSerializer):
-    """Auto Purchase Order Settings serializer"""
-    tenant = serializers.StringRelatedField(read_only=True)
-    
-    class Meta:
-        model = AutoPurchaseOrderSettings
-        fields = (
-            'id', 'tenant', 'auto_po_enabled', 'default_reorder_quantity',
-            'auto_approve_po', 'notify_on_auto_po', 'notification_emails',
-            'minimum_order_value', 'group_by_supplier', 'created_at', 'updated_at'
-        )
-        read_only_fields = ('id', 'tenant', 'created_at', 'updated_at')
 

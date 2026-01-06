@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -62,12 +63,10 @@ export default function AdminPlansPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Subscription Plans</h1>
-            <p className="text-muted-foreground">Manage subscription plans and pricing</p>
-          </div>
+      <PageLayout
+        title="Subscription Plans"
+        description="Manage subscription plans and pricing"
+        actions={
           <Button onClick={() => {
             setSelectedPlan(null)
             setShowEditPlan(true)
@@ -75,7 +74,8 @@ export default function AdminPlansPage() {
             <Plus className="mr-2 h-4 w-4" />
             Add Plan
           </Button>
-        </div>
+        }
+      >
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-3">
@@ -169,6 +169,7 @@ export default function AdminPlansPage() {
       </div>
 
       {/* Modals */}
+      </PageLayout>
       <EditPlanModal
         open={showEditPlan}
         onOpenChange={setShowEditPlan}

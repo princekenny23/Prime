@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { MapPin, Phone, Mail, Edit, Trash2, Settings, BarChart3, Store, MoreVertical, 
-  Power, PowerOff, Monitor, Eye, Copy, CheckCircle2, XCircle, RefreshCw } from "lucide-react"
+  Power, PowerOff, Monitor, Eye, Copy, CheckCircle2, XCircle, RefreshCw, Menu } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -287,7 +287,7 @@ export function OutletList(props: OutletListProps = {}) {
                         className={
                           outlet.isActive
                             ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200"
-                            : "bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-200"
+                            : "bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-350"
                         }
                       >
                         {outlet.isActive ? (
@@ -360,8 +360,8 @@ export function OutletList(props: OutletListProps = {}) {
                         {/* More Actions Dropdown */}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <MoreVertical className="h-4 w-4" />
+                            <Button variant="outline" size="sm">
+                              <Menu className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-56">

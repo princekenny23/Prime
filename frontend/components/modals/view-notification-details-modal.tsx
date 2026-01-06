@@ -60,7 +60,7 @@ export function ViewNotificationDetailsModal({
       case "normal":
         return "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200"
       case "low":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-200"
+        return "bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-350"
       default:
         return ""
     }

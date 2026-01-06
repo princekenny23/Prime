@@ -1,0 +1,82 @@
+{
+  "title": "Ntchito",
+  "shift": "Ntchito",
+  "menu": {
+    "management": "Kuyang'anira Ntchito",
+    "active": "Ntchito Zomwe Zikugwira",
+    "history": "Mbiri ya Ntchito",
+    "start": "Yambani Ntchito",
+    "reports": "Malipoti a Ntchito"
+  },
+  "description": "Yang'anirani ntchito, onani mbiri, ndi kuyambitsa ntchito",
+  "current": {
+    "title": "Ntchito Yapano",
+    "no_active": "Palibe Ntchito Yapano",
+    "start_prompt": "Yambani ntchito kuti muyambe kugulitsa"
+  },
+  "start": {
+    "title": "Yambani Ntchito",
+    "select_till": "Sankhani Till",
+    "opening_cash": "Ndalama Zoyamba",
+    "float": "Ndalama za Float",
+    "notes": "Mawu",
+    "start_button": "Yambani Ntchito"
+  },
+  "close": {
+    "title": "Tsekani Ntchito",
+    "closing_cash": "Ndalama Zomaliza",
+    "count_cash": "Werengerani Ndalama",
+    "expected": "Zoyembekezeka",
+    "actual": "Zenizeni",
+    "difference": "Kusiyana",
+    "notes": "Mawu a Kutseka",
+    "close_button": "Tsekani Ntchito"
+  },
+  "summary": {
+    "title": "Chidule cha Ntchito",
+    "outlet": "Outlet",
+    "till": "Till",
+    "cashier": "Wogulitsa",
+    "date": "Tsiku",
+    "start_time": "Nthawi Yoyamba",
+    "end_time": "Nthawi Yomaliza",
+    "duration": "Nthawi Yonse",
+    "total_sales": "Malonda Onse",
+    "cash_sales": "Malonda a Ndalama",
+    "card_sales": "Malonda a Khadi",
+    "credit_sales": "Malonda a Ngongole",
+    "refunds": "Zobwezedwa",
+    "net_sales": "Malonda Enieni"
+  },
+  "history": {
+    "title": "Mbiri ya Ntchito",
+    "view": "Onani Ntchito",
+    "date": "Tsiku",
+    "cashier": "Wogulitsa",
+    "status": "Mkhalidwe",
+    "sales": "Malonda"
+  },
+  "cash": {
+    "title": "Kuyang'anira Ndalama",
+    "add": "Onjezani Ndalama",
+    "drop": "Chotsani Ndalama",
+    "payout": "Ndalama za Zinthu Zazing'ono",
+    "movements": "Kusunthika kwa Ndalama",
+    "in_drawer": "Ndalama M'bokosi",
+    "reason": "Chifukwa",
+    "amount": "Ndalama"
+  },
+  "status": {
+    "open": "Yatseguka",
+    "closed": "Yatsekedwa"
+  },
+  "messages": {
+    "started": "Ntchito yayamba bwino",
+    "closed": "Ntchito yatsekedwa bwino",
+    "cash_added": "Ndalama zaonjezedwa",
+    "cash_dropped": "Ndalama zachotsedwa",
+    "already_open": "Ntchito yatatseguka kale pa till iyi",
+    "close_required": "Chonde tsekani ntchito yapano kaye"
+  }
+}
+

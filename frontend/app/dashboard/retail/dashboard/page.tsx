@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { generateKPIData, generateChartData, generateActivityData, generateTopSellingItems } from "@/lib/utils/dashboard-stats"
@@ -16,18 +16,16 @@ import { LowStockAlerts } from "@/components/dashboard/low-stock-alerts"
 import { TopSellingItems } from "@/components/dashboard/top-selling-items"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Store, Settings2, Plus } from "lucide-react"
+import { Store, Settings2 } from "lucide-react"
 import { DateRangeFilter } from "@/components/dashboard/date-range-filter"
 import { ViewSaleDetailsModal } from "@/components/modals/view-sale-details-modal"
-import { QuickAddSaleModal } from "@/components/modals/quick-add-sale-modal"
 import { CustomizeDashboardModal } from "@/components/modals/customize-dashboard-modal"
 
 export default function RetailDashboardPage() {
   const router = useRouter()
   const { currentBusiness, currentOutlet: businessOutlet } = useBusinessStore()
-  const { currentOutlet: tenantOutlet, isLoading: tenantLoading, currentTenant } = useTenant()
+  const { currentOutlet: tenantOutlet, isLoading: tenantLoading } = useTenant()
   const { isAuthenticated } = useAuthStore()
-  const [showQuickSale, setShowQuickSale] = useState(false)
   const [showCustomize, setShowCustomize] = useState(false)
   const [selectedSale, setSelectedSale] = useState<any>(null)
   const [showSaleDetails, setShowSaleDetails] = useState(false)
@@ -41,6 +39,11 @@ export default function RetailDashboardPage() {
   
   // Use tenant outlet if available, otherwise fall back to business store outlet
   const currentOutlet = tenantOutlet || businessOutlet
+  const outletId = currentOutlet?.id
+  
+  // Refs for loading state and interval
+  const loadingRef = useRef(false)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -80,97 +83,82 @@ export default function RetailDashboardPage() {
     }
   }, [currentBusiness, isAuthenticated, router])
 
-  // Load dashboard data
-  useEffect(() => {
-    const loadDashboardData = async () => {
-      if (!currentBusiness) return
+  // Load dashboard data with optimization
+  const loadDashboardData = useCallback(async () => {
+    if (!currentBusiness || loadingRef.current) return
+    
+    loadingRef.current = true
+    setIsLoadingData(true)
+    try {
+      const [kpi, chart, activity, top, lowStockData] = await Promise.all([
+        generateKPIData(currentBusiness.id, currentBusiness, outletId),
+        generateChartData(currentBusiness.id, outletId),
+        generateActivityData(currentBusiness.id, outletId),
+        generateTopSellingItems(currentBusiness.id, outletId),
+        productService.getLowStock(outletId).catch(() => []),
+      ])
       
-      setIsLoadingData(true)
-      try {
-        const outletId = currentOutlet?.id
-        const [kpi, chart, activity, top, productsData] = await Promise.all([
-          generateKPIData(currentBusiness.id, currentBusiness, outletId),
-          generateChartData(currentBusiness.id, outletId),
-          generateActivityData(currentBusiness.id, outletId),
-          generateTopSellingItems(currentBusiness.id, outletId),
-          productService.list({ is_active: true }).catch(() => ({ results: [], count: 0 })),
-        ])
+      setKpiData(kpi)
+      setChartData(chart)
+      setActivities(activity)
+      setTopItems(top)
+      
+      const lowStockResult = lowStockData as any
+      const lowStock = Array.isArray(lowStockResult) ? lowStockResult : (lowStockResult?.results || [])
+      const processedLowStock = lowStock.map((p: any) => {
+        const lowVariation = p.variations?.find((v: any) => 
+          v.track_inventory && 
+          v.low_stock_threshold > 0 && 
+          (v.total_stock || v.stock || 0) <= v.low_stock_threshold
+        )
         
-        setKpiData(kpi)
-        setChartData(chart)
-        setActivities(activity)
-        setTopItems(top)
-        
-        const products = Array.isArray(productsData) ? productsData : (productsData.results || [])
-        // Check both product-level and variation-level low stock
-        const lowStock = products
-          .filter((p: any) => {
-            // Check product-level low stock
-            const productLow = p.low_stock_threshold && p.stock <= p.low_stock_threshold
-            
-            // Check variation-level low stock
-            const variationLow = p.variations?.some((v: any) => 
-              v.track_inventory && 
-              v.low_stock_threshold > 0 && 
-              (v.total_stock || v.stock || 0) <= v.low_stock_threshold
-            )
-            
-            // Also check is_low_stock flag from backend
-            return p.is_low_stock || productLow || variationLow
-          })
-          .map((p: any) => {
-            // Find the variation with lowest stock if any
-            const lowVariation = p.variations?.find((v: any) => 
-              v.track_inventory && 
-              v.low_stock_threshold > 0 && 
-              (v.total_stock || v.stock || 0) <= v.low_stock_threshold
-            )
-            
-            return {
-              id: p.id,
-              name: p.name,
-              sku: p.sku || lowVariation?.sku || "N/A",
-              currentStock: lowVariation ? (lowVariation.total_stock || lowVariation.stock || 0) : (p.stock || 0),
-              minStock: lowVariation ? (lowVariation.low_stock_threshold || 0) : (p.low_stock_threshold || 0),
-              category: p.category?.name || "General",
-            }
-          })
-        setLowStockItems(lowStock)
-      } catch (error) {
-        console.error("Failed to load dashboard data:", error)
-      } finally {
-        setIsLoadingData(false)
-      }
+        return {
+          id: p.id,
+          name: p.name,
+          sku: p.sku || lowVariation?.sku || "N/A",
+          currentStock: lowVariation ? (lowVariation.total_stock || lowVariation.stock || 0) : (p.stock || 0),
+          minStock: lowVariation ? (lowVariation.low_stock_threshold || 0) : (p.low_stock_threshold || 0),
+          category: p.category?.name || "General",
+        }
+      })
+      setLowStockItems(processedLowStock)
+    } catch (error) {
+      console.error("Failed to load dashboard data:", error)
+    } finally {
+      setIsLoadingData(false)
+      loadingRef.current = false
+    }
+  }, [currentBusiness, outletId])
+  
+  useEffect(() => {
+    if (!currentBusiness) return
+    
+    loadDashboardData()
+    
+    intervalRef.current = setInterval(() => {
+      loadDashboardData()
+    }, 30000)
+    
+    const handleOutletChange = () => {
+      loadDashboardData()
     }
     
-    if (currentBusiness) {
+    const handleSaleCompleted = () => {
       loadDashboardData()
-      
-      // Auto-refresh every 30 seconds for real-time updates
-      const interval = setInterval(() => {
-        loadDashboardData()
-      }, 30000)
-      
-      // Listen for outlet changes
-      const handleOutletChange = () => {
-        loadDashboardData()
-      }
-      
-      // Listen for sale completion events to refresh dashboard
-      const handleSaleCompleted = () => {
-        loadDashboardData()
-      }
-      
-      window.addEventListener("outlet-changed", handleOutletChange)
-      window.addEventListener("sale-completed", handleSaleCompleted)
-      
-      return () => {
-        clearInterval(interval)
-        window.removeEventListener("outlet-changed", handleOutletChange)
-        window.removeEventListener("sale-completed", handleSaleCompleted)
-      }
     }
-  }, [currentBusiness, currentOutlet])
+    
+    window.addEventListener("outlet-changed", handleOutletChange)
+    window.addEventListener("sale-completed", handleSaleCompleted)
+    
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+      window.removeEventListener("outlet-changed", handleOutletChange)
+      window.removeEventListener("sale-completed", handleSaleCompleted)
+    }
+  }, [currentBusiness?.id, outletId, loadDashboardData])
 
   useEffect(() => {
     const loadRecentSales = async () => {
@@ -221,6 +209,22 @@ export default function RetailDashboardPage() {
     }
   }
 
+  // Memoize default KPI data - MUST be before any early returns
+  const defaultKpiData = useMemo(() => ({
+    sales: { value: 0, change: 0 },
+    customers: { value: 0, change: 0 },
+    products: { value: 0, change: 0 },
+    expenses: { value: 0, change: 0 },
+    profit: { value: 0, change: 0 },
+    transactions: { value: 0, change: 0 },
+    avgOrderValue: { value: 0, change: 0 },
+    lowStockItems: { value: 0, change: 0 },
+    outstandingCredit: { value: 0, change: 0 },
+    returns: { value: 0, change: 0 },
+  }), [])
+  
+  const displayKpiData = useMemo(() => kpiData || defaultKpiData, [kpiData, defaultKpiData])
+
   if (!currentBusiness || currentBusiness.type !== "wholesale and retail" || isLoadingData || tenantLoading || !kpiData) {
     return (
       <DashboardLayout>
@@ -229,15 +233,6 @@ export default function RetailDashboardPage() {
         </div>
       </DashboardLayout>
     )
-  }
-
-  // Initialize with default KPI data if not loaded
-  const displayKpiData = kpiData || {
-    sales: { value: 0, change: 0 },
-    customers: { value: 0, change: 0 },
-    products: { value: 0, change: 0 },
-    expenses: { value: 0, change: 0 },
-    profit: { value: 0, change: 0 },
   }
 
   return (
@@ -255,21 +250,12 @@ export default function RetailDashboardPage() {
                 </div>
               )}
             </div>
-            {currentTenant && (
-              <p className="text-muted-foreground">
-                Welcome back! Here's what's happening at <span className="font-medium">{currentTenant.name}</span> today.
-              </p>
-            )}
           </div>
           <div className="flex items-center gap-2">
             <DateRangeFilter />
             <Button variant="outline" onClick={() => setShowCustomize(true)}>
               <Settings2 className="mr-2 h-4 w-4" />
               Customize
-            </Button>
-            <Button onClick={() => setShowQuickSale(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Quick Sale
             </Button>
           </div>
         </div>
@@ -333,7 +319,6 @@ export default function RetailDashboardPage() {
       </div>
 
       {/* Modals */}
-      <QuickAddSaleModal open={showQuickSale} onOpenChange={setShowQuickSale} />
       <CustomizeDashboardModal open={showCustomize} onOpenChange={setShowCustomize} />
       <ViewSaleDetailsModal
         open={showSaleDetails}

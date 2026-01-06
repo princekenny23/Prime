@@ -24,6 +24,8 @@ export interface CreateSaleData {
   subtotal: number
   tax?: number
   discount?: number
+  discount_type?: "percentage" | "amount"
+  discount_reason?: string
   total: number
   payment_method: "cash" | "card" | "mobile" | "tab"
   notes?: string
@@ -121,6 +123,16 @@ export const saleService = {
       total: String(data.total), // Backend expects string for DecimalField
       payment_method: data.payment_method,
       notes: data.notes || "",
+    }
+    
+    // Add discount metadata if discount is applied
+    if (data.discount && data.discount > 0) {
+      if (data.discount_type) {
+        backendData.discount_type = data.discount_type
+      }
+      if (data.discount_reason) {
+        backendData.discount_reason = data.discount_reason
+      }
     }
     
     // Remove undefined fields

@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -56,20 +57,16 @@ export default function ReturnsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Returns & Refunds</h1>
-            <p className="text-muted-foreground mt-1">
-              Manage returns and refunds for all sales
-            </p>
-          </div>
+      <PageLayout
+        title="Returns & Refunds"
+        description="Manage returns and refunds for all sales"
+        actions={
           <Button>
             <Plus className="mr-2 h-4 w-4" />
             Process Return
           </Button>
-        </div>
+        }
+      >
 
         {/* Search */}
         <Card>
@@ -143,7 +140,7 @@ export default function ReturnsPage() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

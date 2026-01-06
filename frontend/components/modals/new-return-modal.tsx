@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -18,241 +19,521 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { ArrowLeft, Search } from "lucide-react"
-import { useState } from "react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useState, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
+import { returnService, type ReturnType, type ReturnItem, type CreateReturnData } from "@/lib/services/returnService"
+import { productService } from "@/lib/services/productService"
+import { saleService } from "@/lib/services/saleService"
+import { customerService } from "@/lib/services/customerService"
+import { supplierService } from "@/lib/services/supplierService"
+import { useBusinessStore } from "@/stores/businessStore"
+import { useTenant } from "@/contexts/tenant-context"
+import { Plus, Trash2, Search, Package } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 
 interface NewReturnModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onReturnCreated?: () => void
 }
 
-export function NewReturnModal({ open, onOpenChange }: NewReturnModalProps) {
+export function NewReturnModal({ open, onOpenChange, onReturnCreated }: NewReturnModalProps) {
   const { toast } = useToast()
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [saleId, setSaleId] = useState("")
-  const [selectedSale, setSelectedSale] = useState<any>(null)
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
+  const { currentBusiness, currentOutlet } = useBusinessStore()
+  const { outlets } = useTenant()
+  const [isLoading, setIsLoading] = useState(false)
+  const [returnType, setReturnType] = useState<ReturnType>("customer")
+  const [products, setProducts] = useState<any[]>([])
+  const [sales, setSales] = useState<any[]>([])
+  const [customers, setCustomers] = useState<any[]>([])
+  const [suppliers, setSuppliers] = useState<any[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedSale, setSelectedSale] = useState<string>("")
+  const [selectedCustomer, setSelectedCustomer] = useState<string>("")
+  const [selectedSupplier, setSelectedSupplier] = useState<string>("")
+  const [fromOutlet, setFromOutlet] = useState<string>("")
+  const [toOutlet, setToOutlet] = useState<string>("")
   const [reason, setReason] = useState("")
+  const [notes, setNotes] = useState("")
+  const [items, setItems] = useState<ReturnItem[]>([])
+  const [showProductSearch, setShowProductSearch] = useState(false)
 
-  // Mock sale data
-  const sales = [
-    {
-      id: "1",
-      saleId: "#1001",
-      date: "2024-01-15",
-      customer: "John Doe",
-      total: 125.50,
-      items: [
-        { id: "item-1", name: "Product A", quantity: 2, price: 29.99, total: 59.98 },
-        { id: "item-2", name: "Product B", quantity: 1, price: 49.99, total: 49.99 },
-        { id: "item-3", name: "Product C", quantity: 1, price: 15.53, total: 15.53 },
-      ],
-    },
-    {
-      id: "2",
-      saleId: "#1002",
-      date: "2024-01-14",
-      customer: "Jane Smith",
-      total: 89.99,
-      items: [
-        { id: "item-4", name: "Product D", quantity: 1, price: 89.99, total: 89.99 },
-      ],
-    },
-  ]
+  // Load data based on return type
+  useEffect(() => {
+    if (!open) return
 
-  const handleSearchSale = () => {
-    const sale = sales.find(s => s.saleId === saleId)
-    if (sale) {
-      setSelectedSale(sale)
-    } else {
-      toast({
-        title: "Sale Not Found",
-        description: "Please enter a valid sale ID.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleToggleItem = (itemId: string) => {
-    const newSelected = new Set(selectedItems)
-    if (newSelected.has(itemId)) {
-      newSelected.delete(itemId)
-    } else {
-      newSelected.add(itemId)
-    }
-    setSelectedItems(newSelected)
-  }
-
-  const handleProcessReturn = async () => {
-    if (!selectedSale || selectedItems.size === 0) {
-      toast({
-        title: "Selection Required",
-        description: "Please select a sale and at least one item to return.",
-        variant: "destructive",
-      })
-      return
+    const loadData = async () => {
+      try {
+        if (returnType === "customer") {
+          // Load recent sales for customer returns
+          const salesData = await saleService.list({
+            outlet: currentOutlet?.id,
+            status: "completed",
+          })
+          setSales(Array.isArray(salesData) ? salesData : salesData.results || [])
+          
+          // Load customers
+          const customersData = await customerService.list()
+          setCustomers(Array.isArray(customersData) ? customersData : customersData.results || [])
+        } else if (returnType === "supplier") {
+          // Load suppliers
+          const suppliersData = await supplierService.list()
+          setSuppliers(Array.isArray(suppliersData) ? suppliersData : suppliersData.results || [])
+        }
+        
+        // Always load products
+        const productsData = await productService.list({ is_active: true })
+        setProducts(Array.isArray(productsData) ? productsData : productsData.results || [])
+      } catch (error) {
+        console.error("Failed to load data:", error)
+      }
     }
 
-    if (!reason) {
-      toast({
-        title: "Reason Required",
-        description: "Please provide a reason for the return.",
-        variant: "destructive",
-      })
-      return
-    }
+    loadData()
+  }, [open, returnType, currentOutlet])
 
-    setIsProcessing(true)
-
-    // In production, this would call API
-    setTimeout(() => {
-      setIsProcessing(false)
-      toast({
-        title: "Return Processed",
-        description: "Return has been processed successfully.",
-      })
-      setSaleId("")
-      setSelectedSale(null)
-      setSelectedItems(new Set())
+  // Reset form when modal opens/closes
+  useEffect(() => {
+    if (!open) {
+      setReturnType("customer")
+      setSelectedSale("")
+      setSelectedCustomer("")
+      setSelectedSupplier("")
+      setFromOutlet("")
+      setToOutlet("")
       setReason("")
-      onOpenChange(false)
-    }, 1500)
+      setNotes("")
+      setItems([])
+      setSearchTerm("")
+      setShowProductSearch(false)
+    }
+  }, [open])
+
+  const handleAddItem = () => {
+    setShowProductSearch(true)
   }
 
-  const returnTotal = selectedSale
-    ? selectedSale.items
-        .filter((item: any) => selectedItems.has(item.id))
-        .reduce((sum: number, item: any) => sum + item.total, 0)
-    : 0
+  const handleSelectProduct = (product: any) => {
+    const newItem: ReturnItem = {
+      product_id: String(product.id),
+      product_name: product.name,
+      quantity: 1,
+      unit_price: product.price || product.retail_price || "0",
+    }
+    setItems([...items, newItem])
+    setShowProductSearch(false)
+    setSearchTerm("")
+  }
+
+  const handleRemoveItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index))
+  }
+
+  const handleItemChange = (index: number, field: keyof ReturnItem, value: any) => {
+    const updatedItems = [...items]
+    updatedItems[index] = { ...updatedItems[index], [field]: value }
+    setItems(updatedItems)
+  }
+
+  const filteredProducts = products.filter(p =>
+    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (items.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please add at least one item to return",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!reason.trim()) {
+      toast({
+        title: "Error",
+        description: "Please provide a reason for the return",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!currentOutlet?.id) {
+      toast({
+        title: "Error",
+        description: "Please select an outlet",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const returnData: CreateReturnData = {
+        return_type: returnType,
+        outlet_id: String(currentOutlet.id),
+        reason: reason.trim(),
+        notes: notes.trim() || undefined,
+        items: items,
+      }
+
+      if (returnType === "customer") {
+        if (!selectedSale) {
+          toast({
+            title: "Error",
+            description: "Please select a sale for customer return",
+            variant: "destructive",
+          })
+          setIsLoading(false)
+          return
+        }
+        returnData.sale_id = selectedSale
+        if (selectedCustomer) {
+          returnData.customer_id = selectedCustomer
+        }
+      } else if (returnType === "supplier") {
+        if (!selectedSupplier) {
+          toast({
+            title: "Error",
+            description: "Please select a supplier",
+            variant: "destructive",
+          })
+          setIsLoading(false)
+          return
+        }
+        returnData.supplier_id = selectedSupplier
+        returnData.return_date = new Date().toISOString().split('T')[0]
+      } else {
+        if (!fromOutlet || !toOutlet) {
+          toast({
+            title: "Error",
+            description: "Please select both from and to outlets",
+            variant: "destructive",
+          })
+          setIsLoading(false)
+          return
+        }
+        returnData.from_outlet_id = fromOutlet
+        returnData.to_outlet_id = toOutlet
+      }
+
+      await returnService.create(returnData)
+      
+      toast({
+        title: "Success",
+        description: "Return created successfully",
+      })
+      
+      onReturnCreated?.()
+      onOpenChange(false)
+    } catch (error: any) {
+      console.error("Failed to create return:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create return. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Get sale items when sale is selected (for customer returns)
+  const selectedSaleData = sales.find(s => String(s.id) === selectedSale)
+  const saleItems = selectedSaleData?.items || []
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <ArrowLeft className="h-5 w-5" />
-            New Return
-          </DialogTitle>
+          <DialogTitle>New Return</DialogTitle>
           <DialogDescription>
-            Process a product return by selecting the original sale
+            Create a new return - customer, supplier, or outlet return
           </DialogDescription>
         </DialogHeader>
-        
-        <div className="space-y-4 py-4">
-          {/* Sale Search */}
-          <div className="space-y-2">
-            <Label htmlFor="sale-id">Sale ID *</Label>
-            <div className="flex gap-2">
-              <Input
-                id="sale-id"
-                placeholder="Enter sale ID (e.g., #1001)"
-                value={saleId}
-                onChange={(e) => setSaleId(e.target.value)}
+
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-6 py-4">
+            {/* Return Type Selection */}
+            <Tabs value={returnType} onValueChange={(v) => setReturnType(v as ReturnType)}>
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="customer">Customer Return</TabsTrigger>
+                <TabsTrigger value="supplier">Supplier Return</TabsTrigger>
+                <TabsTrigger value="outlet">Outlet Return</TabsTrigger>
+              </TabsList>
+
+              {/* Customer Return Tab */}
+              <TabsContent value="customer" className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label>Sale *</Label>
+                  <Select value={selectedSale} onValueChange={setSelectedSale}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a sale" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sales.map((sale) => (
+                        <SelectItem key={sale.id} value={String(sale.id)}>
+                          {sale._raw?.receipt_number || `Sale #${sale.id}`} - {currentBusiness?.currencySymbol || "MWK"} {sale.total?.toFixed(2)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {selectedSaleData && (
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-sm font-medium mb-2">Sale Items:</p>
+                    <div className="space-y-1">
+                      {saleItems.map((item: any, idx: number) => (
+                        <div key={idx} className="text-sm text-muted-foreground">
+                          {item.productName} x{item.quantity}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Customer (Optional)</Label>
+                  <Select 
+                    value={selectedCustomer || undefined} 
+                    onValueChange={(value) => setSelectedCustomer(value || "")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select customer (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customers.map((customer) => (
+                        <SelectItem key={customer.id} value={String(customer.id)}>
+                          {customer.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedCustomer && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedCustomer("")}
+                      className="h-6 text-xs"
+                    >
+                      Clear selection
+                    </Button>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* Supplier Return Tab */}
+              <TabsContent value="supplier" className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label>Supplier *</Label>
+                  <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a supplier" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {suppliers.map((supplier) => (
+                        <SelectItem key={supplier.id} value={String(supplier.id)}>
+                          {supplier.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </TabsContent>
+
+              {/* Outlet Return Tab */}
+              <TabsContent value="outlet" className="space-y-4 mt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>From Outlet *</Label>
+                    <Select value={fromOutlet} onValueChange={setFromOutlet}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select source outlet" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {outlets.map((outlet) => (
+                          <SelectItem key={outlet.id} value={String(outlet.id)}>
+                            {outlet.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>To Outlet *</Label>
+                    <Select value={toOutlet} onValueChange={setToOutlet}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select destination outlet" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {outlets.map((outlet) => (
+                          <SelectItem key={outlet.id} value={String(outlet.id)}>
+                            {outlet.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            {/* Reason */}
+            <div className="space-y-2">
+              <Label htmlFor="reason">Reason *</Label>
+              <Textarea
+                id="reason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Enter reason for return"
+                required
+                rows={3}
               />
-              <Button onClick={handleSearchSale}>
-                <Search className="mr-2 h-4 w-4" />
-                Search
-              </Button>
             </div>
-          </div>
 
-          {/* Sale Details */}
-          {selectedSale && (
-            <>
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground">Sale Details</p>
-                <p className="font-medium">{selectedSale.saleId}</p>
-                <p className="text-sm text-muted-foreground">
-                  Customer: {selectedSale.customer} • Date: {new Date(selectedSale.date).toLocaleDateString()}
-                </p>
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes (Optional)</Label>
+              <Textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Additional notes"
+                rows={2}
+              />
+            </div>
+
+            {/* Items */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label>Items to Return</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddItem}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Item
+                </Button>
               </div>
 
-              {/* Items Table */}
-              <div className="space-y-2">
-                <Label>Select Items to Return</Label>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12"></TableHead>
-                      <TableHead>Product</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead>Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {selectedSale.items.map((item: any) => (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          <input
-                            type="checkbox"
-                            checked={selectedItems.has(item.id)}
-                            onChange={() => handleToggleItem(item.id)}
-                            className="h-4 w-4"
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">{item.name}</TableCell>
-                        <TableCell>{item.quantity}</TableCell>
-                        <TableCell>${item.price.toFixed(2)}</TableCell>
-                        <TableCell className="font-semibold">
-                          ${item.total.toFixed(2)}
-                        </TableCell>
-                      </TableRow>
+              {/* Product Search */}
+              {showProductSearch && (
+                <div className="border rounded-lg p-4 space-y-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search products..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {filteredProducts.slice(0, 10).map((product) => (
+                      <button
+                        key={product.id}
+                        type="button"
+                        onClick={() => handleSelectProduct(product)}
+                        className="w-full text-left p-2 hover:bg-muted rounded flex items-center gap-2"
+                      >
+                        <Package className="h-4 w-4" />
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{product.name}</p>
+                          <p className="text-xs text-muted-foreground">SKU: {product.sku || "N/A"}</p>
+                        </div>
+                      </button>
                     ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {selectedItems.size > 0 && (
-                <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
-                  <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                    Return Total: ${returnTotal.toFixed(2)}
-                  </p>
+                  </div>
                 </div>
               )}
 
-              {/* Reason */}
-              <div className="space-y-2">
-                <Label htmlFor="reason">Return Reason *</Label>
-                <Select value={reason} onValueChange={setReason} required>
-                  <SelectTrigger id="reason">
-                    <SelectValue placeholder="Select reason" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="defective">Defective Product</SelectItem>
-                    <SelectItem value="wrong-item">Wrong Item</SelectItem>
-                    <SelectItem value="not-satisfied">Not Satisfied</SelectItem>
-                    <SelectItem value="customer-request">Customer Request</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </>
-          )}
-        </div>
+              {/* Items List */}
+              {items.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground border rounded-lg">
+                  <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No items added. Click "Add Item" to add products.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {items.map((item, index) => (
+                    <div key={index} className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium">{item.product_name || "Product"}</p>
+                          <p className="text-xs text-muted-foreground">SKU: {item.product_id}</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveItem(index)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Quantity *</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => handleItemChange(index, "quantity", parseInt(e.target.value) || 1)}
+                            required
+                          />
+                        </div>
+                        {returnType === "supplier" && (
+                          <div className="space-y-2">
+                            <Label>Unit Price</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={item.unit_price || ""}
+                              onChange={(e) => handleItemChange(index, "unit_price", e.target.value)}
+                              placeholder="0.00"
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Item Reason (Optional)</Label>
+                        <Input
+                          value={item.reason || ""}
+                          onChange={(e) => handleItemChange(index, "reason", e.target.value)}
+                          placeholder="Reason for this item"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleProcessReturn}
-            disabled={isProcessing || !selectedSale || selectedItems.size === 0 || !reason}
-          >
-            {isProcessing ? "Processing..." : "Process Return"}
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Creating..." : "Create Return"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )
 }
-

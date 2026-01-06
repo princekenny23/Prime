@@ -1,0 +1,74 @@
+{
+  "required": {
+    "field": "This field is required",
+    "name": "Name is required",
+    "email": "Email is required",
+    "password": "Password is required",
+    "phone": "Phone number is required",
+    "amount": "Amount is required",
+    "quantity": "Quantity is required",
+    "product": "Product is required",
+    "customer": "Customer is required",
+    "outlet": "Outlet is required",
+    "till": "Till is required",
+    "category": "Category is required",
+    "supplier": "Supplier is required",
+    "date": "Date is required",
+    "reason": "Reason is required"
+  },
+  "invalid": {
+    "email": "Please enter a valid email address",
+    "phone": "Please enter a valid phone number",
+    "number": "Please enter a valid number",
+    "date": "Please enter a valid date",
+    "amount": "Please enter a valid amount",
+    "quantity": "Please enter a valid quantity",
+    "sku": "Invalid SKU format",
+    "barcode": "Invalid barcode format"
+  },
+  "range": {
+    "min": "Value must be at least {min}",
+    "max": "Value must not exceed {max}",
+    "between": "Value must be between {min} and {max}",
+    "positive": "Value must be a positive number",
+    "quantity_min": "Quantity must be at least 1",
+    "amount_min": "Amount must be greater than 0"
+  },
+  "length": {
+    "min": "Must be at least {min} characters",
+    "max": "Must not exceed {max} characters",
+    "exact": "Must be exactly {length} characters",
+    "password_min": "Password must be at least 8 characters"
+  },
+  "match": {
+    "password": "Passwords do not match",
+    "email": "Emails do not match"
+  },
+  "unique": {
+    "sku": "This SKU is already in use",
+    "barcode": "This barcode is already in use",
+    "email": "This email is already registered",
+    "name": "This name is already in use"
+  },
+  "stock": {
+    "insufficient": "Insufficient stock available",
+    "negative": "Stock cannot be negative",
+    "exceeds_available": "Quantity exceeds available stock"
+  },
+  "payment": {
+    "insufficient": "Payment amount is less than total",
+    "credit_exceeded": "This amount exceeds customer credit limit",
+    "invalid_method": "Invalid payment method"
+  },
+  "shift": {
+    "required": "An active shift is required",
+    "already_open": "A shift is already open",
+    "not_found": "No active shift found",
+    "cash_mismatch": "Closing cash does not match expected amount"
+  },
+  "messages": {
+    "fix_errors": "Please fix the errors before continuing",
+    "check_input": "Please check your input and try again"
+  }
+}
+

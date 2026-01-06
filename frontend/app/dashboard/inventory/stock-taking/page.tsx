@@ -1,6 +1,7 @@
-"use client"
+"use client";
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -29,8 +30,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Plus, MoreVertical, AlertCircle, CheckCircle2, Eye, Users, Upload } from "lucide-react"
-import { useState } from "react"
+import { Plus, MoreVertical, AlertCircle, CheckCircle2, Eye, Users, Upload, Menu } from "lucide-react"
+import { useState, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
 import { StartStockTakeModal } from "@/components/modals/start-stock-take-modal"
@@ -39,8 +40,8 @@ import { cn } from "@/lib/utils"
 import { inventoryService } from "@/lib/services/inventoryService"
 import { useBusinessStore } from "@/stores/businessStore"
 import { useRealAPI } from "@/lib/utils/api-config"
-import { useEffect } from "react"
 import Link from "next/link"
+import { useI18n } from "@/contexts/i18n-context"
 
 interface StockTake {
   id: string
@@ -64,6 +65,7 @@ export default function StockTakingHistoryPage() {
   const router = useRouter()
   const { toast } = useToast()
   const { currentBusiness, currentOutlet, outlets } = useBusinessStore()
+  const { t } = useI18n()
   const [showStartModal, setShowStartModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
@@ -208,36 +210,38 @@ export default function StockTakingHistoryPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Stock Taking</h1>
-            <p className="text-muted-foreground mt-1">
-              Manage and track inventory stock taking sessions
-            </p>
-          </div>
+      <PageLayout
+        title={t("inventory.menu.stock_taking")}
+        description={t("inventory.stock_take.description")}
+        actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setShowImportModal(true)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowImportModal(true)}
+              className="bg-white border-white text-[#1e3a8a] hover:bg-blue-50 hover:border-blue-50"
+            >
               <Upload className="mr-2 h-4 w-4" />
               Import Stock Take
             </Button>
-            <Button onClick={() => setShowStartModal(true)}>
+            <Button 
+              onClick={() => setShowStartModal(true)}
+              className="bg-white border-white text-[#1e3a8a] hover:bg-blue-50 hover:border-blue-50"
+            >
               <Plus className="mr-2 h-4 w-4" />
               Start New Stock Take
             </Button>
           </div>
-        </div>
-
+        }
+      >
         {/* Unified Stock Takes Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Stock Taking Sessions</CardTitle>
-            <CardDescription>
+        <div>
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Stock Taking Sessions</h3>
+            <p className="text-sm text-gray-600">
               View all stock taking sessions, both running and completed
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </p>
+          </div>
+          <div className="rounded-md border border-gray-300 bg-white">
             {isLoading ? (
               <div className="text-center py-8 text-muted-foreground">
                 <p>Loading stock takes...</p>
@@ -247,24 +251,23 @@ export default function StockTakingHistoryPage() {
                 <p>No stock taking sessions found</p>
               </div>
             ) : (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12"></TableHead>
-                      <TableHead>STARTS</TableHead>
-                      <TableHead>CLOSED</TableHead>
-                      <TableHead>OPERATING DATE</TableHead>
-                      <TableHead>OUTLET</TableHead>
-                      <TableHead>USER(S)</TableHead>
-                      <TableHead>ITEMS</TableHead>
-                      <TableHead>PERCENTAGE</TableHead>
-                      <TableHead className="text-right">ACTION</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {allStockTakes.map((stockTake) => (
-                      <TableRow key={stockTake.id}>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="w-12"></TableHead>
+                    <TableHead className="text-gray-900 font-semibold">STARTS</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">CLOSED</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">OPERATING DATE</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">OUTLET</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">USER(S)</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">ITEMS</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">PERCENTAGE</TableHead>
+                    <TableHead className="text-right text-gray-900 font-semibold">ACTION</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allStockTakes.map((stockTake) => (
+                    <TableRow key={stockTake.id} className="border-gray-300">
                         {/* Status Icon */}
                         <TableCell>
                           <div className={cn(
@@ -337,8 +340,8 @@ export default function StockTakingHistoryPage() {
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreVertical className="h-4 w-4" />
+                              <Button variant="outline" size="sm">
+                                <Menu className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
@@ -362,11 +365,11 @@ export default function StockTakingHistoryPage() {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              )
+            }
+          </div>
+        </div>
+      </PageLayout>
 
       {/* Start New Stock Take Modal */}
       <StartStockTakeModal

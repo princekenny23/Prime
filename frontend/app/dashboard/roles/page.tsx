@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -83,17 +84,16 @@ export default function RolesPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Roles & Permissions</h1>
-            <p className="text-muted-foreground">Manage user roles and their permissions</p>
-          </div>
+      <PageLayout
+        title="Roles & Permissions"
+        description="Manage user roles and their permissions"
+        actions={
           <Button onClick={() => setShowAddRole(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Add Role
           </Button>
-        </div>
+        }
+      >
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-3">
@@ -233,6 +233,7 @@ export default function RolesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </PageLayout>
     </DashboardLayout>
   )
 }

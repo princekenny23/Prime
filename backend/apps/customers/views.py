@@ -63,11 +63,18 @@ class CustomerViewSet(viewsets.ModelViewSet, TenantFilterMixin):
     
     def perform_create(self, serializer):
         """Always set tenant from request context (frontend doesn't send it)"""
-        tenant = getattr(self.request, 'tenant', None) or self.request.user.tenant
-        if not tenant:
+        # SaaS admins can provide tenant_id in request data
+        tenant = self.get_tenant_for_request(self.request)
+        if not tenant and not self.request.user.is_saas_admin:
             from rest_framework.exceptions import ValidationError
             raise ValidationError("Tenant is required. Please ensure you are authenticated and have a tenant assigned.")
-        customer = serializer.save(tenant=tenant)
+        # For SaaS admins, tenant can be None or from request data
+        if tenant:
+            customer = serializer.save(tenant=tenant)
+        else:
+            # SaaS admin creating without tenant - should not happen, but handle gracefully
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("Tenant is required. Please provide tenant_id in request data.")
         
         # Create notification for new customer (Square POS-like)
         try:

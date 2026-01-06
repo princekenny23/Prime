@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ReportFilters } from "@/components/reports/report-filters"
 import { SalesChart } from "@/components/dashboard/sales-chart"
@@ -116,11 +117,10 @@ export default function ProfitLossReportsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Profit & Loss Report</h1>
-          <p className="text-muted-foreground">Analyze your business profitability</p>
-        </div>
+      <PageLayout
+        title="Profit & Loss Report"
+        description="Analyze your business profitability"
+      >
 
         <ReportFilters
           onExport={() => setShowExport(true)}
@@ -268,6 +268,7 @@ export default function ProfitLossReportsPage() {
         open={showSettings}
         onOpenChange={setShowSettings}
       />
+      </PageLayout>
     </DashboardLayout>
   )
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -73,7 +74,7 @@ export default function AdminUsersPage() {
       case "Active":
         return "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200"
       case "Inactive":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-200"
+        return "bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-350"
       default:
         return ""
     }
@@ -96,17 +97,16 @@ export default function AdminUsersPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Admin Users</h1>
-            <p className="text-muted-foreground">Manage system administrators</p>
-          </div>
+      <PageLayout
+        title="Admin Users"
+        description="Manage system administrators"
+        actions={
           <Button>
             <Users className="mr-2 h-4 w-4" />
             Add Admin User
           </Button>
-        </div>
+        }
+      >
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-4">
@@ -219,7 +219,7 @@ export default function AdminUsersPage() {
             </Table>
           </CardContent>
         </Card>
-      </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

@@ -11,7 +11,7 @@ class TenantSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Tenant
-        fields = ('id', 'name', 'type', 'currency', 'currency_symbol', 'phone', 'email', 
+        fields = ('id', 'name', 'type', 'pos_type', 'currency', 'currency_symbol', 'phone', 'email', 
                   'address', 'settings', 'is_active', 'created_at', 'updated_at', 
                   'outlets', 'users')
         read_only_fields = ('id', 'created_at', 'updated_at')
@@ -31,12 +31,29 @@ class TenantSerializer(serializers.ModelSerializer):
             )
         return value
     
+    def validate_pos_type(self, value):
+        """Validate pos_type field"""
+        valid_pos_types = [choice[0] for choice in Tenant.POS_TYPES]
+        if value not in valid_pos_types:
+            raise serializers.ValidationError(
+                f"POS type must be one of: {', '.join(valid_pos_types)}"
+            )
+        return value
+    
     def validate_settings(self, value):
         """Validate settings field"""
         if value is None:
             return {}
         if not isinstance(value, dict):
             raise serializers.ValidationError("Settings must be a valid JSON object.")
+        
+        # Validate language if provided
+        language = value.get('language')
+        if language and language not in ['en', 'ny']:
+            raise serializers.ValidationError(
+                "Language must be 'en' (English) or 'ny' (Chichewa)."
+            )
+        
         return value
     
     def get_users(self, obj):

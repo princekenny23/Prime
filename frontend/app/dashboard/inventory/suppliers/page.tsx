@@ -1,58 +1,48 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { 
   Building2,
   ShoppingCart,
   FileText,
-  RotateCcw
 } from "lucide-react"
 import { OptionCard, type OptionCardProps } from "@/components/shared/option-card"
+import { useI18n } from "@/contexts/i18n-context"
 
-const supplierOptions: Omit<OptionCardProps, "iconSize">[] = [
+const supplierOptions: (Omit<OptionCardProps, "iconSize">)[] = [
   {
     id: "suppliers",
     title: "Suppliers",
+    titleKey: "inventory.suppliers.list",
     href: "/dashboard/inventory/suppliers/list",
     icon: Building2,
-    description: "Manage supplier relationships"
   },
   {
-    id: "purchase-orders",
-    title: "Purchase Orders",
-    href: "/dashboard/inventory/suppliers/purchase-orders",
+    id: "purchases",
+    title: "Purchases",
+    titleKey: "inventory.purchase_orders.title",
+    href: "/dashboard/inventory/suppliers/purchases",
     icon: ShoppingCart,
-    description: "Create and manage purchase orders"
   },
   {
     id: "supplier-invoices",
     title: "Supplier Invoices",
+    titleKey: "inventory.suppliers.invoices",
     href: "/dashboard/inventory/suppliers/invoices",
     icon: FileText,
-    description: "Record and track supplier invoices"
-  },
-  {
-    id: "purchase-returns",
-    title: "Purchase Returns",
-    href: "/dashboard/inventory/suppliers/returns",
-    icon: RotateCcw,
-    description: "Handle returns to suppliers"
   },
 ]
 
 export default function SuppliersPage() {
+  const { t } = useI18n()
+  
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold">Procurement & Suppliers</h1>
-          <p className="text-muted-foreground mt-1">
-            Select an option to manage your procurement operations
-          </p>
-        </div>
-
-        {/* Option Cards Grid */}
+      <PageLayout
+        title={t("inventory.suppliers.title")}
+        description={t("inventory.suppliers.description")}
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {supplierOptions.map((option) => (
             <OptionCard
@@ -62,8 +52,7 @@ export default function SuppliersPage() {
             />
           ))}
         </div>
-      </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }
-

@@ -17,6 +17,7 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
+    "tsBuildInfoFile": ".next/cache/.tsbuildinfo",
     "plugins": [
       {
         "name": "next"
@@ -30,11 +31,26 @@
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "lib/**/*.ts",
+    "hooks/**/*.ts",
+    "contexts/**/*.ts",
+    "stores/**/*.ts",
+    "middleware.ts",
     ".next/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    ".next",
+    "out",
+    "build",
+    "**/__pycache__",
+    "../backend",
+    "../node_modules",
+    "../*.md",
+    "../templates"
   ]
 }

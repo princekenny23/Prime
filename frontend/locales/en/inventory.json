@@ -1,0 +1,180 @@
+{
+  "title": "Inventory",
+  "menu": {
+    "stock_items": "Stock & Items",
+    "stock_control": "Stock Control",
+    "stock_taking": "Stock Taking",
+    "suppliers": "Suppliers",
+    "low_stock": "Low Stock",
+    "expiry": "Expiring Items",
+    "products": "Products",
+    "categories": "Categories"
+  },
+  "stock_control_description": "Manage stock adjustments, transfers, receiving, and returns",
+  "overview": {
+    "title": "Inventory Overview",
+    "total_products": "Total Products",
+    "total_value": "Total Value",
+    "low_stock_items": "Low Stock Items",
+    "out_of_stock": "Out of Stock"
+  },
+  "stock": {
+    "title": "Stock",
+    "current": "Current Stock",
+    "available": "Available",
+    "quantity": "Quantity",
+    "location": "Location",
+    "outlet": "Outlet"
+  },
+  "movements": {
+    "title": "Stock Movements",
+    "type": "Movement Type",
+    "sale": "Sale",
+    "purchase": "Purchase",
+    "adjustment": "Adjustment",
+    "transfer_in": "Transfer In",
+    "transfer_out": "Transfer Out",
+    "return": "Return",
+    "damage": "Damage",
+    "expiry": "Expiry",
+    "reason": "Reason",
+    "reference": "Reference",
+    "date": "Date"
+  },
+  "total_movements": "Total Movements",
+  "stock_in": "Stock In",
+  "stock_out": "Stock Out",
+  "net_movement": "Net Movement",
+  "recent_movements": "Recent Movements",
+  "total_stock_value": "Total Stock Value",
+  "low_stock_label": "Low Stock",
+  "out_of_stock_label": "Out of Stock",
+  "movement_types": {
+    "sale": "Sale",
+    "purchase": "Purchase",
+    "adjustment": "Adjustment",
+    "transfer_in": "Transfer In",
+    "transfer_out": "Transfer Out",
+    "return": "Return",
+    "damage": "Damage",
+    "expiry": "Expiry"
+  },
+  "stock_status": {
+    "in_stock": "In Stock",
+    "low_stock": "Low Stock",
+    "out_of_stock": "Out of Stock"
+  },
+  "stock_adjustment": {
+    "select_reason": "Select reason"
+  },
+  "adjustments": {
+    "title": "Stock Adjustments",
+    "new": "New Adjustment",
+    "product": "Product",
+    "current_qty": "Current Qty",
+    "new_qty": "New Qty",
+    "change": "Change",
+    "reason": "Reason",
+    "add": "Add Stock",
+    "remove": "Remove Stock",
+    "set": "Set Stock",
+    "notes": "Notes"
+  },
+  "transfers": {
+    "title": "Stock Transfers",
+    "new": "New Transfer",
+    "from_outlet": "From Outlet",
+    "to_outlet": "To Outlet",
+    "quantity": "Quantity",
+    "status": "Status",
+    "pending": "Pending",
+    "in_transit": "In Transit",
+    "completed": "Completed",
+    "cancelled": "Cancelled"
+  },
+  "receiving": {
+    "title": "Stock Receiving",
+    "new": "Receive Stock",
+    "supplier": "Supplier",
+    "purchase_order": "Purchase Order",
+    "received_date": "Received Date",
+    "received_by": "Received By",
+    "items": "Items Received"
+  },
+  "stock_take": {
+    "title": "Stock Taking",
+    "description": "Manage and track inventory stock taking sessions",
+    "new": "New Stock Take",
+    "date": "Stock Take Date",
+    "status": "Status",
+    "running": "Running",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+    "expected": "Expected",
+    "counted": "Counted",
+    "difference": "Difference",
+    "start": "Start Stock Take",
+    "complete": "Complete Stock Take",
+    "cancel": "Cancel Stock Take"
+  },
+  "low_stock": {
+    "title": "Low Stock Alerts",
+    "description": "View and reorder items that are running low on stock",
+    "items": "Low Stock Items",
+    "threshold": "Threshold",
+    "current": "Current",
+    "reorder": "Reorder"
+  },
+  "expiry": {
+    "title": "Expiry Management",
+    "description": "Track and manage product expiration dates"
+  },
+  "suppliers": {
+    "title": "Procurement & Suppliers",
+    "description": "Manage your suppliers and procurement operations",
+    "list": "Supplier List",
+    "add": "Add Supplier",
+    "name": "Supplier Name",
+    "contact": "Contact",
+    "email": "Email",
+    "phone": "Phone",
+    "address": "Address",
+    "invoices": "Supplier Invoices"
+  },
+  "purchase_orders": {
+    "title": "Purchase Orders",
+    "new": "New PO",
+    "number": "PO Number",
+    "supplier": "Supplier",
+    "status": "Status",
+    "draft": "Draft",
+    "pending": "Pending",
+    "approved": "Approved",
+    "ordered": "Ordered",
+    "received": "Received",
+    "cancelled": "Cancelled",
+    "expected_date": "Expected Date",
+    "total": "Total"
+  },
+  "returns": {
+    "title": "Stock Returns",
+    "new": "New Return",
+    "type": "Return Type",
+    "customer_return": "Customer Return",
+    "supplier_return": "Supplier Return",
+    "reason": "Reason",
+    "quantity": "Quantity",
+    "refund": "Refund"
+  },
+  "messages": {
+    "adjustment_saved": "Stock adjustment saved",
+    "transfer_created": "Transfer created successfully",
+    "transfer_completed": "Transfer completed",
+    "stock_received": "Stock received successfully",
+    "stock_take_started": "Stock take started",
+    "stock_take_completed": "Stock take completed",
+    "po_created": "Purchase order created",
+    "po_sent": "Purchase order sent to supplier"
+  }
+}
+

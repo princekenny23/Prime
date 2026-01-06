@@ -10,10 +10,14 @@ import { useBusinessStore } from "@/stores/businessStore"
 import { productService } from "@/lib/services/productService"
 import { formatCurrency } from "@/lib/utils/currency"
 import type { Product } from "@/lib/types"
-import { Search, Wine, Receipt, Plus, Minus, X, CreditCard, Smartphone, DollarSign, Lock } from "lucide-react"
+import { Search, Wine, Receipt, Plus, Minus, X, CreditCard, Smartphone, DollarSign, Lock, RefreshCw } from "lucide-react"
 import { CloseRegisterModal } from "@/components/modals/close-register-modal"
 import { ReceiptPreviewModal } from "@/components/modals/receipt-preview-modal"
+import { SaleDiscountModal, type SaleDiscount } from "@/components/modals/sale-discount-modal"
 import { useShift } from "@/contexts/shift-context"
+import { useTenant } from "@/contexts/tenant-context"
+import { saleService } from "@/lib/services/saleService"
+import { useToast } from "@/components/ui/use-toast"
 import { cn } from "@/lib/utils"
 
 const drinkCategories = [
@@ -27,17 +31,21 @@ const quickAmounts = [5, 10, 20, 50, 100]
 
 export function BarPOS() {
   const { currentBusiness, currentOutlet } = useBusinessStore()
+  const { currentOutlet: tenantOutlet } = useTenant()
   const { cart, addToCart, updateCartItem, removeFromCart, clearCart } = usePOSStore()
   const { activeShift } = useShift()
+  const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
-  const [showPayment, setShowPayment] = useState(false)
   const [showCloseRegister, setShowCloseRegister] = useState(false)
   const [showReceipt, setShowReceipt] = useState(false)
   const [receiptData, setReceiptData] = useState<any>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [isLoadingProducts, setIsLoadingProducts] = useState(true)
   const [productsError, setProductsError] = useState<string | null>(null)
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
+  const [showSaleDiscount, setShowSaleDiscount] = useState(false)
+  const [saleDiscount, setSaleDiscount] = useState<SaleDiscount | null>(null)
 
   useEffect(() => {
     const loadData = async () => {
@@ -72,8 +80,17 @@ export function BarPOS() {
     return matchesSearch && product.isActive
   })
 
-  const cartTotal = cart.reduce((sum, item) => sum + item.total, 0)
+  const cartSubtotal = cart.reduce((sum, item) => sum + item.total, 0)
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0)
+  
+  // Calculate discount amount
+  const discountAmount = saleDiscount
+    ? saleDiscount.type === "percentage"
+      ? (cartSubtotal * saleDiscount.value) / 100
+      : saleDiscount.value
+    : 0
+  
+  const cartTotal = cartSubtotal - discountAmount
 
   const handleAddToCart = (product: typeof products[0]) => {
     addToCart({
@@ -103,7 +120,126 @@ export function BarPOS() {
     }
   }
 
-  // Quick payment removed - all payments go through PaymentModal for proper recording
+  const handleProcessPayment = async () => {
+    // Validation
+    if (cart.length === 0) {
+      toast({
+        title: "Cart is empty",
+        description: "Please add items to cart before processing payment.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const outlet = tenantOutlet || currentOutlet
+    if (!outlet) {
+      toast({
+        title: "Outlet not selected",
+        description: "Please select an outlet before processing payment.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!activeShift) {
+      toast({
+        title: "No active shift",
+        description: "Please start a shift before processing payments.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsProcessingPayment(true)
+
+    try {
+      // Calculate totals - round to 2 decimal places to avoid floating point precision issues
+      const subtotal = Math.round(cartSubtotal * 100) / 100
+      const discount = Math.round(discountAmount * 100) / 100
+      const tax = 0 // TODO: Calculate tax if needed
+      const total = Math.round((subtotal - discount + tax) * 100) / 100
+
+      // Transform cart items to backend format
+      const items_data = cart.map((item) => {
+        return {
+          product_id: item.productId,
+          variation_id: (item as any).variationId || undefined,
+          unit_id: (item as any).unitId || undefined,
+          quantity: item.quantity,
+          price: Math.round(item.price * 100) / 100, // Round price to 2 decimal places
+          notes: item.notes || "",
+        }
+      })
+
+      // Create sale data - ensure all decimal values are rounded to 2 decimal places
+      const saleData = {
+        outlet: outlet.id,
+        shift: activeShift.id,
+        customer: undefined,
+        items_data: items_data,
+        subtotal: Math.round(subtotal * 100) / 100,
+        tax: Math.round(tax * 100) / 100,
+        discount: Math.round(discount * 100) / 100,
+        discount_type: saleDiscount?.type,
+        discount_reason: saleDiscount?.reason,
+        total: Math.round(total * 100) / 100,
+        payment_method: "cash" as const,
+        notes: "",
+      }
+
+      // Call backend API
+      const sale = await saleService.create(saleData)
+
+      // Show success message
+      toast({
+        title: "Sale completed successfully",
+        description: `Receipt #${sale._raw?.receipt_number || sale.id}`,
+      })
+
+      // Dispatch event to notify other components (e.g., sales history page)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sale-completed', { 
+          detail: { saleId: sale.id, receiptNumber: sale._raw?.receipt_number || sale.id }
+        }))
+      }
+
+      // Prepare receipt data for modal
+      const receiptCartItems = cart.map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        discount: 0, // TODO: Calculate from item discounts if implemented
+        total: item.total,
+      }))
+
+      setReceiptData({
+        cart: receiptCartItems,
+        subtotal: subtotal,
+        discount: discount,
+        tax: tax,
+        total: total,
+        sale: sale,
+        discountReason: saleDiscount?.reason,
+      })
+
+      // Clear cart and discount
+      clearCart()
+      setSaleDiscount(null)
+
+      // Show receipt modal
+      setShowReceipt(true)
+    } catch (error: any) {
+      console.error("Checkout error:", error)
+      toast({
+        title: "Payment failed",
+        description: error.message || "An error occurred while processing the payment. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsProcessingPayment(false)
+    }
+  }
 
   if (!currentBusiness) {
     return (
@@ -127,6 +263,14 @@ export function BarPOS() {
               <Button variant="outline" onClick={clearCart}>
                 <X className="h-4 w-4 mr-2" />
                 Clear
+              </Button>
+            )}
+            {cart.length > 0 && (
+              <Button 
+                variant={saleDiscount ? "default" : "outline"} 
+                onClick={() => setShowSaleDiscount(true)}
+              >
+                {saleDiscount ? "Discount Applied" : "Apply Discount"}
               </Button>
             )}
             {activeShift && (
@@ -332,9 +476,30 @@ export function BarPOS() {
           {/* Payment Section */}
           {cart.length > 0 && (
             <div className="border-t p-4 space-y-3">
-              <div className="flex items-center justify-between text-lg font-bold mb-4">
-                <span>Total:</span>
-                <span>{formatCurrency(cartTotal, currentBusiness)}</span>
+              <div className="space-y-2 mb-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal:</span>
+                  <span>{formatCurrency(cartSubtotal, currentBusiness)}</span>
+                </div>
+                {saleDiscount && discountAmount > 0 && (
+                  <>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Discount:</span>
+                      <span className="text-green-600 dark:text-green-400 font-medium">
+                        -{formatCurrency(discountAmount, currentBusiness)}
+                      </span>
+                    </div>
+                    {saleDiscount.reason && (
+                      <div className="text-xs text-muted-foreground italic">
+                        Reason: {saleDiscount.reason}
+                      </div>
+                    )}
+                  </>
+                )}
+                <div className="border-t pt-2 flex items-center justify-between text-lg font-bold">
+                  <span>Total:</span>
+                  <span>{formatCurrency(cartTotal, currentBusiness)}</span>
+                </div>
               </div>
 
               {/* Quick payment buttons removed - all payments go through PaymentModal for proper recording */}
@@ -342,17 +507,40 @@ export function BarPOS() {
               <Button
                 className="w-full"
                 size="lg"
-                onClick={() => setShowPayment(true)}
+                onClick={handleProcessPayment}
+                disabled={isProcessingPayment || cart.length === 0}
               >
-                <Receipt className="mr-2 h-5 w-5" />
-                Process Payment
+                {isProcessingPayment ? (
+                  <>
+                    <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Receipt className="mr-2 h-5 w-5" />
+                    Process Payment
+                  </>
+                )}
               </Button>
             </div>
           )}
         </div>
       </div>
 
-      {/* PaymentModal removed - new payment system will be implemented */}
+      {/* Modals */}
+      <SaleDiscountModal
+        open={showSaleDiscount}
+        onOpenChange={setShowSaleDiscount}
+        subtotal={cartSubtotal}
+        currentDiscount={saleDiscount}
+        business={currentBusiness}
+        onApply={(discount) => {
+          setSaleDiscount(discount)
+        }}
+        onRemove={() => {
+          setSaleDiscount(null)
+        }}
+      />
       <CloseRegisterModal
         open={showCloseRegister}
         onOpenChange={setShowCloseRegister}
@@ -366,6 +554,7 @@ export function BarPOS() {
           discount={receiptData.discount}
           tax={receiptData.tax}
           total={receiptData.total}
+          discountReason={receiptData.discountReason}
           onPrint={() => {
             setShowReceipt(false)
             setReceiptData(null)

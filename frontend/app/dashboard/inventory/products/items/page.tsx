@@ -190,12 +190,10 @@ export default function ProductsItemsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Stock & Items</h1>
-            <p className="text-muted-foreground">Manage your product catalog</p>
-          </div>
+      <PageLayout
+        title="Stock & Items"
+        description="Manage your product catalog"
+        actions={
           <div className="flex gap-2">
             <Link href="/dashboard/inventory/products/categories">
               <Button variant="outline">
@@ -215,7 +213,8 @@ export default function ProductsItemsPage() {
               Add Product
             </Button>
           </div>
-        </div>
+        }
+      >
 
         {/* Filters */}
         <Card>
@@ -381,6 +380,7 @@ export default function ProductsItemsPage() {
           loadData() // Reload products after successful import
         }}
       />
+      </PageLayout>
     </DashboardLayout>
   )
 }

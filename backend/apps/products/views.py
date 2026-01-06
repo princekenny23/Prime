@@ -13,6 +13,7 @@ import logging
 import pandas as pd
 import io
 import csv
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -63,10 +64,14 @@ class CategoryViewSet(viewsets.ModelViewSet, TenantFilterMixin):
     
     def perform_create(self, serializer):
         # Tenant is read-only, so always set it from request context
-        tenant = getattr(self.request, 'tenant', None) or self.request.user.tenant
-        if not tenant:
+        # SaaS admins can provide tenant_id in request data
+        tenant = self.get_tenant_for_request(self.request)
+        if not tenant and not self.request.user.is_saas_admin:
             from rest_framework.exceptions import ValidationError
             raise ValidationError("Tenant is required. Please ensure you are authenticated and have a tenant assigned.")
+        if not tenant:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("Tenant is required. Please provide tenant_id in request data.")
         serializer.save(tenant=tenant)
     
     def update(self, request, *args, **kwargs):
@@ -154,14 +159,22 @@ class ProductViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                 return queryset.none()
         
         # Apply outlet filter - Products are outlet-specific
-        outlet = self.get_outlet_for_request(self.request)
-        if outlet:
-            queryset = queryset.filter(outlet=outlet)
-            logger.info(f"Applied outlet filter: {outlet.id} ({outlet.name}) - {queryset.count()} products found")
+        # SaaS admins can see all products, regular users need outlet filter
+        if not is_saas_admin:
+            outlet = self.get_outlet_for_request(self.request)
+            if outlet:
+                queryset = queryset.filter(outlet=outlet)
+                logger.info(f"Applied outlet filter: {outlet.id} ({outlet.name}) - {queryset.count()} products found")
+            else:
+                # If no outlet specified, return empty queryset (products require outlet)
+                logger.warning(f"No outlet specified in request - returning empty queryset")
+                return queryset.none()
         else:
-            # If no outlet specified, return empty queryset (products require outlet)
-            logger.warning(f"No outlet specified in request - returning empty queryset")
-            return queryset.none()
+            # SaaS admin can optionally filter by outlet if provided
+            outlet = self.get_outlet_for_request(self.request)
+            if outlet:
+                queryset = queryset.filter(outlet=outlet)
+                logger.info(f"SaaS admin - Applied outlet filter: {outlet.id} ({outlet.name}) - {queryset.count()} products found")
         
         return queryset
     
@@ -1264,10 +1277,11 @@ class ProductViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                     'Description': product.description or '',
                     'SKU': product.sku or '',
                     'Barcode': product.barcode or '',
+                    'Category': product.category.name if product.category else '',
+                    'Outlet': product.outlet.name if product.outlet else '',
                     'Retail Price': float(product.retail_price),
                     'Wholesale Price': float(product.wholesale_price) if product.wholesale_price else '',
                     'Cost Price': float(product.cost) if product.cost else '',
-                    'Category': product.category.name if product.category else '',
                     'Stock': product.stock,
                     'Low Stock Threshold': product.low_stock_threshold,
                     'Unit': product.unit,
@@ -1289,7 +1303,7 @@ class ProductViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                 
                 from django.http import HttpResponse
                 response = HttpResponse(output.getvalue(), content_type='text/csv')
-                response['Content-Disposition'] = f'attachment; filename="products_export_{tenant.id}_{pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+                response['Content-Disposition'] = f'attachment; filename="products_export_{tenant.id}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'
                 return response
             else:
                 # Excel export
@@ -1304,7 +1318,7 @@ class ProductViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                     output.getvalue(),
                     content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                 )
-                response['Content-Disposition'] = f'attachment; filename="products_export_{tenant.id}_{pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
+                response['Content-Disposition'] = f'attachment; filename="products_export_{tenant.id}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
                 return response
         
         except Exception as e:

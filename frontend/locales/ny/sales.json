@@ -1,0 +1,108 @@
+{
+  "title": "Malonda",
+  "menu": {
+    "all_sales": "Malonda Onse",
+    "new_sale": "Kugulitsa Kwatsopano",
+    "returns": "Zobwezedwa",
+    "credits": "Malonda a Ngongole",
+    "discounts": "Zochepetsa Mtengo",
+    "receipts": "Marisiti",
+    "wholesale": "Ogula Ochuluka",
+    "price_lists": "Mndandanda wa Mitengo",
+    "deliveries": "Zotumizidwa",
+    "quotations": "Mndandanda wa Mitengo"
+  },
+  "wholesale": {
+    "title": "Mitengo ya Ogula Ochuluka",
+    "description": "Yang'anirani mitengo ya ogula ochuluka ndi kuchuluka kochepa"
+  },
+  "list": {
+    "title": "Mbiri ya Malonda",
+    "empty": "Palibe malonda opezeka",
+    "search": "Sakani malonda...",
+    "filter_by_date": "Sankhani ndi tsiku",
+    "filter_by_status": "Sankhani ndi mkhalidwe",
+    "filter_by_payment": "Sankhani ndi njira ya kulipira"
+  },
+  "search_receipt_placeholder": "Sakani ndi nambala ya risiti...",
+  "sale": {
+    "receipt_number": "Nambala ya Risiti",
+    "date": "Tsiku",
+    "time": "Nthawi",
+    "customer": "Kasitomala",
+    "cashier": "Wogulitsa",
+    "outlet": "Outlet",
+    "shift": "Ntchito",
+    "items": "Zinthu",
+    "subtotal": "Chiwerengero",
+    "discount": "Kuchepetsa Mtengo",
+    "tax": "Msonkho",
+    "total": "Zonse",
+    "payment_method": "Njira ya Kulipira",
+    "status": "Mkhalidwe"
+  },
+  "status": {
+    "completed": "Yatheka",
+    "pending": "Ikudikirira",
+    "refunded": "Yabwezedwa",
+    "cancelled": "Yakanidiwa"
+  },
+  "payment": {
+    "cash": "Ndalama",
+    "card": "Khadi",
+    "mobile": "Mobile Money",
+    "credit": "Ngongole",
+    "tab": "Tab",
+    "split": "Kulipira Kosiyanasiyana"
+  },
+  "credit": {
+    "title": "Malonda a Ngongole",
+    "customer": "Kasitomala",
+    "total": "Zonse",
+    "paid": "Zalipidwa",
+    "balance": "Zotsala",
+    "due_date": "Tsiku Loyenera Kulipira",
+    "status": "Mkhalidwe wa Kulipira",
+    "unpaid": "Siinalipidwe",
+    "partial": "Pang'ono Palipidwa",
+    "paid_status": "Yalipidwa",
+    "overdue": "Yatha Nthawi",
+    "record_payment": "Lembani Kulipira"
+  },
+  "refund": {
+    "title": "Kubweza Ndalama",
+    "process": "Bwezerani Ndalama",
+    "reason": "Chifukwa",
+    "amount": "Ndalama",
+    "full": "Kubweza Zonse",
+    "partial": "Kubweza Pang'ono",
+    "items": "Zinthu Zobwezedwa",
+    "confirm": "Tsimikizani Kubweza"
+  },
+  "reports": {
+    "daily": "Malonda a Tsiku",
+    "weekly": "Malonda a Sabata",
+    "monthly": "Malonda a Mwezi",
+    "by_product": "Malonda mwa Chinthu",
+    "by_category": "Malonda mwa Gulu",
+    "by_cashier": "Malonda mwa Wogulitsa",
+    "by_payment": "Malonda mwa Njira ya Kulipira"
+  },
+  "summary": {
+    "total_sales": "Malonda Onse",
+    "total_revenue": "Ndalama Zonse",
+    "total_items": "Zinthu Zonse Zogulitsidwa",
+    "average_sale": "Malonda Pakatikati",
+    "total_cash": "Ndalama za Cash Zonse",
+    "total_card": "Ndalama za Khadi Zonse",
+    "total_credit": "Ngongole Yonse"
+  },
+  "messages": {
+    "sale_completed": "Kugulitsa kwatheka bwino",
+    "refund_processed": "Ndalama zabwezedwa bwino",
+    "payment_recorded": "Kulipira kwalembedwa bwino",
+    "sale_not_found": "Malonda sanapezeke",
+    "cannot_refund": "Malonda awa sangathe kubwezedwa"
+  }
+}
+

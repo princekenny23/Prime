@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -106,23 +107,23 @@ export default function ProductDetailPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      <PageLayout
+        title={product.name}
+        description={`SKU: ${product.sku}`}
+        actions={
+          <div className="flex items-center gap-2">
             <Link href="/dashboard/inventory/products">
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             </Link>
-            <div>
-              <h1 className="text-3xl font-bold">{product.name}</h1>
-              <p className="text-muted-foreground">SKU: {product.sku}</p>
-            </div>
+            <Button onClick={() => setShowEditModal(true)}>
+              <Edit className="mr-2 h-4 w-4" />
+              Edit Product
+            </Button>
           </div>
-          <Button onClick={() => setShowEditModal(true)}>
-            <Edit className="mr-2 h-4 w-4" />
-            Edit Product
-          </Button>
-        </div>
+        }
+      >
 
         <Tabs defaultValue="details" className="space-y-4">
           <TabsList>
@@ -453,6 +454,7 @@ export default function ProductDetailPage() {
           }
         }}
       />
+      </PageLayout>
     </DashboardLayout>
   )
 }

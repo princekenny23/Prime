@@ -1,0 +1,108 @@
+{
+  "title": "Sales",
+  "menu": {
+    "all_sales": "All Sales",
+    "new_sale": "New Sale",
+    "returns": "Returns & Refunds",
+    "credits": "Credit Sales",
+    "discounts": "Discounts",
+    "receipts": "Receipts",
+    "wholesale": "Wholesale",
+    "price_lists": "Price Lists",
+    "deliveries": "Deliveries",
+    "quotations": "Quotations"
+  },
+  "wholesale": {
+    "title": "Wholesale Pricing",
+    "description": "Manage wholesale pricing and minimum order quantities"
+  },
+  "list": {
+    "title": "Sales History",
+    "empty": "No sales found",
+    "search": "Search sales...",
+    "filter_by_date": "Filter by date",
+    "filter_by_status": "Filter by status",
+    "filter_by_payment": "Filter by payment method"
+  },
+  "search_receipt_placeholder": "Search by receipt number...",
+  "sale": {
+    "receipt_number": "Receipt No.",
+    "date": "Date",
+    "time": "Time",
+    "customer": "Customer",
+    "cashier": "Cashier",
+    "outlet": "Outlet",
+    "shift": "Shift",
+    "items": "Items",
+    "subtotal": "Subtotal",
+    "discount": "Discount",
+    "tax": "Tax",
+    "total": "Total",
+    "payment_method": "Payment Method",
+    "status": "Status"
+  },
+  "status": {
+    "completed": "Completed",
+    "pending": "Pending",
+    "refunded": "Refunded",
+    "cancelled": "Cancelled"
+  },
+  "payment": {
+    "cash": "Cash",
+    "card": "Card",
+    "mobile": "Mobile Money",
+    "credit": "Credit",
+    "tab": "Tab",
+    "split": "Split Payment"
+  },
+  "credit": {
+    "title": "Credit Sales",
+    "customer": "Customer",
+    "total": "Total",
+    "paid": "Paid",
+    "balance": "Balance",
+    "due_date": "Due Date",
+    "status": "Payment Status",
+    "unpaid": "Unpaid",
+    "partial": "Partially Paid",
+    "paid": "Paid",
+    "overdue": "Overdue",
+    "record_payment": "Record Payment"
+  },
+  "refund": {
+    "title": "Refund",
+    "process": "Process Refund",
+    "reason": "Reason",
+    "amount": "Amount",
+    "full": "Full Refund",
+    "partial": "Partial Refund",
+    "items": "Items to Refund",
+    "confirm": "Confirm Refund"
+  },
+  "reports": {
+    "daily": "Daily Sales",
+    "weekly": "Weekly Sales",
+    "monthly": "Monthly Sales",
+    "by_product": "Sales by Product",
+    "by_category": "Sales by Category",
+    "by_cashier": "Sales by Cashier",
+    "by_payment": "Sales by Payment Method"
+  },
+  "summary": {
+    "total_sales": "Total Sales",
+    "total_revenue": "Total Revenue",
+    "total_items": "Total Items Sold",
+    "average_sale": "Average Sale",
+    "total_cash": "Total Cash",
+    "total_card": "Total Card",
+    "total_credit": "Total Credit"
+  },
+  "messages": {
+    "sale_completed": "Sale completed successfully",
+    "refund_processed": "Refund processed successfully",
+    "payment_recorded": "Payment recorded successfully",
+    "sale_not_found": "Sale not found",
+    "cannot_refund": "This sale cannot be refunded"
+  }
+}
+

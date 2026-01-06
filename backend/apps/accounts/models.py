@@ -6,11 +6,10 @@ class User(AbstractUser):
     """Custom User model extending Django's AbstractUser"""
     email = models.EmailField(unique=True)
     name = models.CharField(max_length=255, blank=True)
-    phone = models.CharField(max_length=20, blank=True, null=True)
+    phone = models.CharField(max_length=30, blank=True, null=True)
     tenant = models.ForeignKey('tenants.Tenant', on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
     role = models.CharField(
-        max_length=20,
-        choices=[
+        max_length=50, choices=[
             ('admin', 'Admin'),
             ('manager', 'Manager'),
             ('cashier', 'Cashier'),

@@ -17,7 +17,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Receipt, Download, Printer } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Receipt, Download, Printer, Store, User, CreditCard } from "lucide-react"
+import { useBusinessStore } from "@/stores/businessStore"
+import { formatCurrency } from "@/lib/utils/currency"
+import { useI18n } from "@/contexts/i18n-context"
 
 interface SaleItem {
   id: string
@@ -31,6 +35,7 @@ interface SaleDetails {
   id: string
   date: string
   customer?: string
+  outlet?: string
   items: SaleItem[]
   subtotal: number
   tax: number
@@ -47,6 +52,8 @@ interface ViewSaleDetailsModalProps {
 }
 
 export function ViewSaleDetailsModal({ open, onOpenChange, sale }: ViewSaleDetailsModalProps) {
+  const { currentBusiness } = useBusinessStore()
+  
   if (!sale) return null
 
   return (
@@ -55,7 +62,7 @@ export function ViewSaleDetailsModal({ open, onOpenChange, sale }: ViewSaleDetai
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Receipt className="h-5 w-5" />
-            Sale Details - #{sale.id}
+            Sale Details - Receipt #{sale.id}
           </DialogTitle>
           <DialogDescription>
             Transaction from {new Date(sale.date).toLocaleString()}
@@ -66,7 +73,7 @@ export function ViewSaleDetailsModal({ open, onOpenChange, sale }: ViewSaleDetai
           {/* Sale Info */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-sm text-muted-foreground">Sale ID</p>
+              <p className="text-sm text-muted-foreground">Receipt Number</p>
               <p className="font-medium">#{sale.id}</p>
             </div>
             <div>
@@ -75,23 +82,39 @@ export function ViewSaleDetailsModal({ open, onOpenChange, sale }: ViewSaleDetai
             </div>
             {sale.customer && (
               <div>
-                <p className="text-sm text-muted-foreground">Customer</p>
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <User className="h-3 w-3" />
+                  Customer
+                </p>
                 <p className="font-medium">{sale.customer}</p>
               </div>
             )}
+            {sale.outlet && (
+              <div>
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Store className="h-3 w-3" />
+                  Outlet
+                </p>
+                <p className="font-medium">{sale.outlet}</p>
+              </div>
+            )}
             <div>
-              <p className="text-sm text-muted-foreground">Payment Method</p>
-              <p className="font-medium">{sale.paymentMethod}</p>
+              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                <CreditCard className="h-3 w-3" />
+                Payment Method
+              </p>
+              <Badge variant="outline" className="capitalize mt-1">
+                {sale.paymentMethod}
+              </Badge>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Status</p>
-              <span className={`px-2 py-1 rounded-full text-xs ${
-                sale.status === "completed" 
-                  ? "bg-green-100 text-green-800" 
-                  : "bg-gray-100 text-gray-800"
-              }`}>
+              <Badge 
+                variant={sale.status === "completed" ? "default" : "secondary"}
+                className="mt-1"
+              >
                 {sale.status}
-              </span>
+              </Badge>
             </div>
           </div>
 
@@ -108,16 +131,26 @@ export function ViewSaleDetailsModal({ open, onOpenChange, sale }: ViewSaleDetai
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sale.items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell className="text-right">{item.quantity}</TableCell>
-                    <TableCell className="text-right">${item.price.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-semibold">
-                      ${item.total.toFixed(2)}
+                {sale.items.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground py-4">
+                      No items found
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  sale.items.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">{item.name}</TableCell>
+                      <TableCell className="text-right">{item.quantity}</TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(item.price, currentBusiness)}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {formatCurrency(item.total, currentBusiness)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
@@ -126,21 +159,25 @@ export function ViewSaleDetailsModal({ open, onOpenChange, sale }: ViewSaleDetai
           <div className="border-t pt-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Subtotal</span>
-              <span>${sale.subtotal.toFixed(2)}</span>
+              <span className="font-medium">{formatCurrency(sale.subtotal, currentBusiness)}</span>
             </div>
             {sale.discount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Discount</span>
-                <span className="text-green-600">-${sale.discount.toFixed(2)}</span>
+                <span className="text-green-600 font-medium">
+                  -{formatCurrency(sale.discount, currentBusiness)}
+                </span>
               </div>
             )}
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Tax</span>
-              <span>${sale.tax.toFixed(2)}</span>
-            </div>
+            {sale.tax > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Tax</span>
+                <span className="font-medium">{formatCurrency(sale.tax, currentBusiness)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-lg font-bold pt-2 border-t">
               <span>Total</span>
-              <span>${sale.total.toFixed(2)}</span>
+              <span>{formatCurrency(sale.total, currentBusiness)}</span>
             </div>
           </div>
         </div>

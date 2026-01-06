@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -97,13 +98,10 @@ export default function AdminBillingPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Billing Management</h1>
-            <p className="text-muted-foreground">Manage tenant subscriptions and payments</p>
-          </div>
-        </div>
+      <PageLayout
+        title="Billing Management"
+        description="Manage tenant subscriptions and payments"
+      >
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-4">
@@ -224,7 +222,7 @@ export default function AdminBillingPage() {
             </Tabs>
           </CardContent>
         </Card>
-      </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

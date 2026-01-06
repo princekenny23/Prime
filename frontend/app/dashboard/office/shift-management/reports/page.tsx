@@ -8,30 +8,24 @@ import { Download } from "lucide-react"
 export default function ShiftReportsPage() {
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Shift Reports</h1>
-          <p className="text-muted-foreground mt-1">
-            Generate shift reports and analytics
-          </p>
+      <PageLayout
+        title="Shift Reports"
+        description="Generate shift reports and analytics"
+      >
+        <div className="rounded-md border border-gray-300 bg-white p-6">
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Shift Reports</h3>
+            <p className="text-sm text-gray-600">Generate and download shift reports</p>
+          </div>
+          <div className="space-y-4">
+            <p className="text-gray-600">Shift reporting features coming soon...</p>
+            <Button disabled className="border-gray-300">
+              <Download className="mr-2 h-4 w-4" />
+              Generate Report
+            </Button>
+          </div>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Shift Reports</CardTitle>
-            <CardDescription>Generate and download shift reports</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <p className="text-muted-foreground">Shift reporting features coming soon...</p>
-              <Button disabled>
-                <Download className="mr-2 h-4 w-4" />
-                Generate Report
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

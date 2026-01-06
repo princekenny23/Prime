@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -56,19 +57,33 @@ export default function POSLandingPage() {
       return
     }
 
-    // For wholesale and retail businesses, load register statuses
+    // Route based on POS type
+    if (currentBusiness.posType === "single_product") {
+      // For single-product POS, redirect directly if shift is active
+      if (activeShift) {
+        router.push("/pos/single-product")
+      }
+      // Otherwise stay on landing page (single-product POS doesn't need register selection)
+      return
+    }
+
+    // For standard POS, check business type
     if (currentBusiness.type === "wholesale and retail") {
       loadRegisterStatuses()
     } else {
       // For other business types, redirect to their specific POS
       router.push(`/pos/${currentBusiness.type}`)
     }
-  }, [currentBusiness, outlets])
+  }, [currentBusiness, outlets, activeShift, router])
 
-  // If user already has an active shift, redirect to POS
+  // If user already has an active shift, redirect to appropriate POS
   useEffect(() => {
-    if (activeShift && currentBusiness?.type === "wholesale and retail") {
+    if (activeShift && currentBusiness) {
+      if (currentBusiness.posType === "single_product") {
+        router.push("/pos/single-product")
+      } else if (currentBusiness.type === "wholesale and retail") {
       router.push("/pos/retail")
+      }
     }
   }, [activeShift, currentBusiness, router])
 
@@ -181,22 +196,20 @@ export default function POSLandingPage() {
 
   return (
     <DashboardLayout>
-      <div className="flex items-center justify-center min-h-[calc(100vh-8rem)] py-8">
-        <div className="w-full max-w-2xl space-y-8">
-          {/* Cash Register Icon & Header */}
-          <div className="text-center space-y-4">
-            <div className="flex justify-center">
-              <div className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center">
-                <Calculator className="h-12 w-12 text-primary" />
+      <PageLayout
+        title="Point of Sale"
+        description="Select a running shift or start a new one to begin selling"
+      >
+        <div className="flex items-center justify-center min-h-[calc(100vh-8rem)] py-8">
+          <div className="w-full max-w-2xl space-y-8">
+            {/* Cash Register Icon */}
+            <div className="text-center space-y-4">
+              <div className="flex justify-center">
+                <div className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Calculator className="h-12 w-12 text-primary" />
+                </div>
               </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Point of Sale</h1>
-              <p className="text-muted-foreground mt-2">
-                Select a running shift or start a new one to begin selling
-              </p>
-            </div>
-          </div>
 
           {/* Main Options Card */}
           <Card>
@@ -316,6 +329,7 @@ export default function POSLandingPage() {
           )}
         </div>
       </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

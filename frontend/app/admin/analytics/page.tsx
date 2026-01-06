@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TrendingUp, Users, Building2, DollarSign, CreditCard, Calendar } from "lucide-react"
@@ -36,11 +37,10 @@ export default function AdminAnalyticsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Platform Analytics</h1>
-          <p className="text-muted-foreground">Comprehensive analytics and insights</p>
-        </div>
+      <PageLayout
+        title="Platform Analytics"
+        description="Comprehensive analytics and insights"
+      >
 
         {/* Key Metrics */}
         <div className="grid gap-4 md:grid-cols-4">
@@ -163,7 +163,7 @@ export default function AdminAnalyticsPage() {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

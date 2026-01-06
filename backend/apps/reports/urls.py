@@ -1,7 +1,8 @@
 from django.urls import path
 from .views import (
     sales_report, products_report, customers_report, profit_loss_report, stock_movement_report,
-    daily_sales_report, top_products_report, cash_summary_report, shift_summary_report
+    daily_sales_report, top_products_report, cash_summary_report, shift_summary_report,
+    inventory_valuation_report
 )
 
 urlpatterns = [
@@ -15,5 +16,7 @@ urlpatterns = [
     path('reports/top-products/', top_products_report, name='top-products-report'),
     path('reports/cash-summary/', cash_summary_report, name='cash-summary-report'),
     path('reports/shift-summary/', shift_summary_report, name='shift-summary-report'),
+    # Comprehensive inventory valuation report
+    path('reports/inventory-valuation/', inventory_valuation_report, name='inventory-valuation-report'),
 ]
 

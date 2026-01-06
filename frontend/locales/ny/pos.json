@@ -1,0 +1,140 @@
+{
+  "title": "Kugulitsa",
+  "new_sale": "Kugulitsa Kwatsopano",
+  "current_sale": "Malonda Apano",
+  "cart": {
+    "title": "Dengu",
+    "empty": "Dengu Lalibe Kanthu",
+    "empty_hint": "Onjezani zinthu kuti muyambe kugulitsa",
+    "items": "Zinthu",
+    "item": "Chinthu",
+    "clear": "Chotsani Zonse",
+    "clear_confirm": "Mukufuna kuchotsa zonse m'dengu?"
+  },
+  "product": {
+    "search": "Sakani zinthu...",
+    "search_by_name": "Sakani ndi dzina kapena barcode",
+    "scan_barcode": "Sikanani Barcode",
+    "no_products": "Palibe zinthu zopezeka",
+    "out_of_stock": "Zatha",
+    "low_stock": "Zatsala Pang'ono",
+    "select_variation": "Sankhani Mtundu",
+    "select_unit": "Sankhani Umo"
+  },
+  "search_placeholder": "Sakani ndi dzina, SKU, kapena barcode... (Dinani kuti muone zonse)",
+  "select_unit": "Sankhani Umo",
+  "pricing": {
+    "retail": "Mtengo wa Retail",
+    "wholesale": "Mtengo wa Wholesale",
+    "price": "Mtengo",
+    "unit_price": "Mtengo pa Chimodzi",
+    "quantity": "Kuchuluka",
+    "subtotal": "Chiwerengero",
+    "discount": "Kuchepetsa Mtengo",
+    "tax": "Msonkho",
+    "total": "Zonse",
+    "change": "Chenjiyo"
+  },
+  "payment": {
+    "title": "Malipiro",
+    "method": "Njira ya Kulipira",
+    "cash": "Ndalama",
+    "card": "Khadi",
+    "mobile": "Mobile Money",
+    "credit": "Ngongole",
+    "split": "Kulipira Kosiyanasiyana",
+    "amount": "Ndalama",
+    "received": "Ndalama Zolandidwa",
+    "due": "Ndalama Zoyenera",
+    "balance": "Zotsala",
+    "tender": "Ndalama Zoperekedwa",
+    "complete": "Maliza Kugulitsa",
+    "processing": "Kukonzekera Malipiro...",
+    "insufficient": "Ndalama sizikwanira"
+  },
+  "customer": {
+    "select": "Sankhani Kasitomala",
+    "add": "Onjezani Kasitomala",
+    "walk_in": "Kasitomala Wopanda Dzina",
+    "search": "Sakani kasitomala...",
+    "credit_sale": "Kugulitsa pa Ngongole",
+    "credit_limit": "Malire a Ngongole",
+    "available_credit": "Ngongole Yopezeka",
+    "outstanding": "Ngongole Yotsala"
+  },
+  "shift": {
+    "title": "Ntchito",
+    "current": "Ntchito Yapano",
+    "select": "Sankhani Ntchito",
+    "no_active": "Palibe ntchito yapano",
+    "start": "Yambani Ntchito",
+    "end": "Maliza Ntchito",
+    "opening_cash": "Ndalama Zoyamba",
+    "closing_cash": "Ndalama Zomaliza",
+    "cash_in_drawer": "Ndalama M'bokosi",
+    "required": "Muyenera kuyambitsa ntchito kuti mugulitse"
+  },
+  "receipt": {
+    "title": "Risiti",
+    "number": "Nambala ya Risiti",
+    "print": "Sindikizani Risiti",
+    "email": "Tumizani Risiti",
+    "new_sale": "Kugulitsa Kwatsopano",
+    "thank_you": "Zikomo kwambiri pogula!",
+    "visit_again": "Bwerani kachiwiri",
+    "date": "Tsiku",
+    "time": "Nthawi",
+    "cashier": "Wogulitsa",
+    "items_sold": "Zinthu Zogulitsidwa"
+  },
+  "hold": {
+    "title": "Sungani Kwa Nthawi",
+    "save": "Sungani",
+    "retrieve": "Tengani",
+    "held_sales": "Malonda Osungidwa",
+    "no_held": "Palibe malonda osungidwa",
+    "note": "Mawu (ngati mukufuna)"
+  },
+  "refund": {
+    "title": "Kubweza Ndalama",
+    "process": "Bwezerani Ndalama",
+    "reason": "Chifukwa cha Kubweza",
+    "amount": "Ndalama Zobwezedwa",
+    "confirm": "Tsimikizani Kubweza"
+  },
+  "messages": {
+    "sale_complete": "Kugulitsa kwatheka bwino",
+    "sale_failed": "Kugulitsa sikunatheka",
+    "cart_cleared": "Dengu lachotsedwa",
+    "product_added": "Chinthu chaonjezedwa",
+    "product_removed": "Chinthu chachotsedwa",
+    "quantity_updated": "Kuchuluka kwasinthidwa",
+    "payment_received": "Malipiro alandidwa",
+    "refund_processed": "Ndalama zabwezekedwa",
+    "shift_required": "Yambani ntchito kuti muyambe kugulitsa",
+    "stock_insufficient": "Zinthu sizikwanira",
+    "credit_exceeded": "Malire a ngongole apitidwa"
+  },
+  "quick_actions": {
+    "open_drawer": "Tsegulani Bokosi",
+    "add_discount": "Chepetsani Mtengo",
+    "add_note": "Onjezani Mawu",
+    "void_item": "Chotsani Chinthu",
+    "void_sale": "Chotsani Malonda",
+    "reprint": "Sindikizaninso"
+  },
+  "restaurant": {
+    "tables": "Matebulo",
+    "kitchen": "Kuphikira",
+    "orders": "Zofunsidwa",
+    "menu": "Menyu",
+    "recipes": "Zokonzera",
+    "reservations": "Kubukira"
+  },
+  "bar": {
+    "drinks": "Zakumwa",
+    "tabs": "Ma Tab a Bala",
+    "recipes": "Zokonzera Zakumwa"
+  }
+}
+

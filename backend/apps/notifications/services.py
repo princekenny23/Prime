@@ -79,6 +79,49 @@ class NotificationService:
             logger.error(f"Failed to send WebSocket notification: {str(e)}")
     
     @staticmethod
+    def _send_sale_update(sale, action='created'):
+        """Send sale update via WebSocket to relevant users for real-time sales list updates"""
+        if not channel_layer:
+            return
+        
+        try:
+            # Refresh sale with all relationships to avoid N+1 queries
+            from apps.sales.models import Sale
+            sale = Sale.objects.select_related(
+                'tenant', 'outlet', 'user', 'shift', 'customer'
+            ).prefetch_related(
+                'items',
+                'items__product'
+            ).get(id=sale.id)
+            
+            # Serialize sale data
+            from apps.sales.serializers import SaleSerializer
+            serializer = SaleSerializer(sale)
+            sale_data = serializer.data
+            
+            # Get tenant users who should receive this update
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            
+            # Send to all users in the tenant (or optionally filter by outlet)
+            tenant_users = User.objects.filter(tenant=sale.tenant)
+            
+            for user in tenant_users:
+                # Send sale update to user's notification channel
+                async_to_sync(channel_layer.group_send)(
+                    f'notifications_{user.id}',
+                    {
+                        'type': 'sale_update',
+                        'sale': sale_data,
+                        'action': action  # 'created', 'updated', 'refunded'
+                    }
+                )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to send sale update via WebSocket: {str(e)}")
+    
+    @staticmethod
     def notify_sale_completed(sale):
         """Create notification when a sale is completed"""
         notification = Notification.objects.create(
@@ -99,6 +142,9 @@ class NotificationService:
             }
         )
         NotificationService._send_websocket_notification(notification)
+        
+        # Also send real-time sale update to all users in the tenant/outlet
+        NotificationService._send_sale_update(sale, 'created')
     
     @staticmethod
     def notify_low_stock(variation, outlet=None):

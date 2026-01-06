@@ -1,20 +1,21 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { IntegrationsTab } from "@/components/settings/integrations-tab"
+import { useI18n } from "@/contexts/i18n-context"
 
 export default function IntegrationsSettingsPage() {
+  const { t } = useI18n()
+  
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Integrations</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage third-party integrations
-          </p>
-        </div>
+      <PageLayout
+        title={t("settings.integrations.title")}
+        description={t("settings.integrations.description")}
+      >
         <IntegrationsTab />
-      </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

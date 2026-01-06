@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -148,190 +149,123 @@ export default function ShiftHistoryPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Shift History</h1>
-            <p className="text-muted-foreground mt-1">
-              View and manage all day shift records
-            </p>
-          </div>
-          <Button>
+      <PageLayout
+        title="Shift History"
+        description="View and manage all day shift records"
+        actions={
+          <Button className="bg-white border-white text-[#1e3a8a] hover:bg-blue-50 hover:border-blue-50">
             <Download className="mr-2 h-4 w-4" />
             Export Report
           </Button>
-        </div>
-
-        {/* Statistics Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Shifts</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalShifts}</div>
-              <p className="text-xs text-muted-foreground">
-                {closedShifts} closed, {totalShifts - closedShifts} active
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">MWK {totalSales.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">
-                From closed shifts
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Avg. Duration</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {Math.floor(averageShiftDuration / 60)}h {Math.floor(averageShiftDuration % 60)}m
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Per shift
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Avg. Sales</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                MWK {closedShifts > 0 ? (totalSales / closedShifts).toFixed(2) : "0.00"}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Per closed shift
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
+        }
+      >
         {/* Filters */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Filters</CardTitle>
-            <CardDescription>Filter shifts by outlet, status, or date</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Search</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search shifts..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Outlet</label>
-                <Select value={selectedOutlet} onValueChange={setSelectedOutlet}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Outlets" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Outlets</SelectItem>
-                    {outlets.map((outlet) => (
-                      <SelectItem key={outlet.id} value={outlet.id}>
-                        {outlet.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Status</label>
-                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="OPEN">Open</SelectItem>
-                    <SelectItem value="CLOSED">Closed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Date</label>
-                <DatePicker
-                  date={selectedDate}
-                  onDateChange={setSelectedDate}
-                  placeholder="Select date"
+        <div className="mb-6 pb-4 border-b border-gray-300">
+          <div className="mb-4">
+            <h3 className="text-sm font-medium text-gray-900 mb-4">Filters</h3>
+            <p className="text-sm text-gray-600">Filter shifts by outlet, status, or date</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-900">Search</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                <Input
+                  placeholder="Search shifts..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-white border-gray-300"
                 />
               </div>
             </div>
-          </CardContent>
-        </Card>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-900">Outlet</label>
+              <Select value={selectedOutlet} onValueChange={setSelectedOutlet}>
+                <SelectTrigger className="bg-white border-gray-300">
+                  <SelectValue placeholder="All Outlets" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Outlets</SelectItem>
+                  {outlets.map((outlet) => (
+                    <SelectItem key={outlet.id} value={outlet.id}>
+                      {outlet.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-900">Status</label>
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger className="bg-white border-gray-300">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="OPEN">Open</SelectItem>
+                  <SelectItem value="CLOSED">Closed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-900">Date</label>
+              <DatePicker
+                date={selectedDate}
+                onDateChange={setSelectedDate}
+                placeholder="Select date"
+              />
+            </div>
+          </div>
+        </div>
 
         {/* Shifts Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Shift Records</CardTitle>
-            <CardDescription>
+        <div>
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Shift Records</h3>
+            <p className="text-sm text-gray-600">
               {filteredShifts.length} shift{filteredShifts.length !== 1 ? "s" : ""} found
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
+            </p>
+          </div>
+          <div className="rounded-md border border-gray-300 bg-white">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50">
+                  <TableHead className="text-gray-900 font-semibold">Date</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">Outlet</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">Till</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">Duration</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">Opening Cash</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">Closing Cash</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">Sales</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">Difference</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">Status</TableHead>
+                  <TableHead className="text-right text-gray-900 font-semibold">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Outlet</TableHead>
-                    <TableHead>Till</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Opening Cash</TableHead>
-                    <TableHead>Closing Cash</TableHead>
-                    <TableHead>Sales</TableHead>
-                    <TableHead>Difference</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableCell colSpan={10} className="text-center py-8 text-gray-600">
+                      Loading shifts...
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                        Loading shifts...
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredShifts.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                        No shifts found
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredShifts.map((shift) => {
-                      const sales = calculateSales(shift)
-                      const difference = calculateDifference(shift)
-                      const duration = calculateDuration(shift)
+                ) : filteredShifts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center py-8 text-gray-600">
+                      No shifts found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredShifts.map((shift) => {
+                    const sales = calculateSales(shift)
+                    const difference = calculateDifference(shift)
+                    const duration = calculateDuration(shift)
 
-                      return (
-                        <TableRow key={shift.id}>
+                    return (
+                      <TableRow key={shift.id} className="border-gray-300">
                           <TableCell className="font-medium">
                             {(() => {
                               if (!shift.operatingDate) return "N/A"
@@ -392,7 +326,7 @@ export default function ShiftHistoryPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button variant="ghost" size="sm">
+                            <Button variant="ghost" size="sm" className="border-gray-300">
                               <Eye className="h-4 w-4 mr-1" />
                               View
                             </Button>
@@ -404,9 +338,9 @@ export default function ShiftHistoryPage() {
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
+      </PageLayout>
     </DashboardLayout>
   )
 }

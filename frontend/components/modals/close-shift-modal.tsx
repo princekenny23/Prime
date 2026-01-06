@@ -25,6 +25,7 @@ import { useBusinessStore } from "@/stores/businessStore"
 import { useToast } from "@/components/ui/use-toast"
 import { cn } from "@/lib/utils"
 import type { Shift } from "@/lib/services/shiftService"
+import { useI18n } from "@/contexts/i18n-context"
 
 interface CloseShiftModalProps {
   open: boolean
@@ -36,6 +37,7 @@ interface CloseShiftModalProps {
 export function CloseShiftModal({ open, onOpenChange, shift, onSuccess }: CloseShiftModalProps) {
   const { currentBusiness } = useBusinessStore()
   const { toast } = useToast()
+  const { t } = useI18n()
   const [closingCash, setClosingCash] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string>("")
@@ -185,7 +187,7 @@ export function CloseShiftModal({ open, onOpenChange, shift, onSuccess }: CloseS
                 inputMode="decimal"
                 value={closingCash}
                 onChange={handleCashChange}
-                placeholder="0.00"
+                placeholder={t("common.amount_placeholder")}
                 className={cn(error && "border-destructive", "pl-12")}
                 disabled={isSubmitting}
                 autoFocus
@@ -246,6 +248,11 @@ export function CloseShiftModal({ open, onOpenChange, shift, onSuccess }: CloseS
     </Dialog>
   )
 }
+
+
+
+
+
 
 
 

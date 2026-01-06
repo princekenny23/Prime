@@ -9,8 +9,14 @@ class Tenant(models.Model):
         ('bar', 'Bar'),
     ]
 
+    POS_TYPES = [
+        ('standard', 'Standard POS'),
+        ('single_product', 'Single-Product POS'),
+    ]
+
     name = models.CharField(max_length=255)
     type = models.CharField(max_length=20, choices=BUSINESS_TYPES, default='retail')
+    pos_type = models.CharField(max_length=20, choices=POS_TYPES, default='standard')
     currency = models.CharField(max_length=3, default='MWK')
     currency_symbol = models.CharField(max_length=10, default='MK')  # MWK symbol
     phone = models.CharField(max_length=20, blank=True)

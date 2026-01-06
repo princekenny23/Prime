@@ -24,6 +24,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { userService } from "@/lib/services/userService"
 import { useBusinessStore } from "@/stores/businessStore"
 import type { User as UserType } from "@/lib/types"
+import { useI18n } from "@/contexts/i18n-context"
 
 interface AddEditUserModalProps {
   open: boolean
@@ -35,6 +36,7 @@ interface AddEditUserModalProps {
 export function AddEditUserModal({ open, onOpenChange, user, onSuccess }: AddEditUserModalProps) {
   const { toast } = useToast()
   const { currentBusiness } = useBusinessStore()
+  const { t } = useI18n()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
@@ -204,7 +206,7 @@ export function AddEditUserModal({ open, onOpenChange, user, onSuccess }: AddEdi
                 <Input
                   id="name"
                   className="pl-10"
-                  placeholder="Enter full name"
+                  placeholder={t("settings.users.name_placeholder")}
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
@@ -220,7 +222,7 @@ export function AddEditUserModal({ open, onOpenChange, user, onSuccess }: AddEdi
                   id="email"
                   type="email"
                   className="pl-10"
-                  placeholder="Enter email address"
+                  placeholder={t("settings.users.email_placeholder")}
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
@@ -237,7 +239,7 @@ export function AddEditUserModal({ open, onOpenChange, user, onSuccess }: AddEdi
                   id="phone"
                   type="tel"
                   className="pl-10"
-                  placeholder="Enter phone number"
+                  placeholder={t("settings.users.phone_placeholder")}
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 />
@@ -254,7 +256,7 @@ export function AddEditUserModal({ open, onOpenChange, user, onSuccess }: AddEdi
                   required
                 >
                   <SelectTrigger className="pl-10">
-                    <SelectValue placeholder="Select role" />
+                    <SelectValue placeholder={t("settings.users.role_placeholder")} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">Admin</SelectItem>
@@ -273,7 +275,7 @@ export function AddEditUserModal({ open, onOpenChange, user, onSuccess }: AddEdi
                   <Input
                     id="password"
                     type="password"
-                    placeholder="Enter password"
+                    placeholder={t("settings.users.password_placeholder")}
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     required={!user}
@@ -285,7 +287,7 @@ export function AddEditUserModal({ open, onOpenChange, user, onSuccess }: AddEdi
                   <Input
                     id="confirmPassword"
                     type="password"
-                    placeholder="Confirm password"
+                    placeholder={t("settings.users.confirm_password_placeholder")}
                     value={formData.confirmPassword}
                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                     required={!user}

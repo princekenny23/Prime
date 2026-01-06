@@ -1,0 +1,103 @@
+{
+  "title": "Makasitomala",
+  "select_customer": "Sankhani Kasitomala",
+  "search_or_create": "Sakani kasitomala kapena pangani watsopano",
+  "new_customer": "Kasitomala Watsopano",
+  "no_customers_found": "Palibe makasitomala opezeka",
+  "no_customers_yet": "Kulibe makasitomala",
+  "try_different_search": "Yesani mawu ena kapena pangani kasitomala watsopano",
+  "create_first_customer": "Pangani kasitomala woyamba kuti muyambe",
+  "loyalty_points": "ma points",
+  "menu": {
+    "all_customers": "Makasitomala Onse",
+    "add_customer": "Onjezani Kasitomala",
+    "customer_groups": "Magulu a Makasitomala",
+    "management": "Kuyang'anira Makasitomala",
+    "credit_accounts": "Ma Akaunti a Ngongole",
+    "loyalty": "Loyalty Program"
+  },
+  "management": {
+    "title": "Kuyang'anira Makasitomala",
+    "description": "Yang'anirani maubwenzi ndi makasitomala, loyalty, ndi ngongole"
+  },
+  "list": {
+    "title": "Mndandanda wa Makasitomala",
+    "empty": "Palibe makasitomala opezeka",
+    "add": "Onjezani Kasitomala",
+    "search": "Sakani makasitomala..."
+  },
+  "search_placeholder": "Sakani ndi dzina, imelo, kapena foni...",
+  "modal": {
+    "name_placeholder": "Lembani dzina la kasitomala",
+    "email_placeholder": "kasitomala@example.com",
+    "phone_placeholder": "Nambala ya foni",
+    "outlet_placeholder": "Sankhani outlet (osafunikira)",
+    "address_placeholder": "Adilesi ya kasitomala",
+    "credit_notes_placeholder": "Mawu ena okhudza akaunti ya ngongole"
+  },
+  "customer": {
+    "name": "Dzina",
+    "email": "Imelo",
+    "phone": "Foni",
+    "address": "Adilesi",
+    "notes": "Mawu"
+  },
+  "credit": {
+    "title": "Akaunti ya Ngongole",
+    "enabled": "Ngongole Yatsegulidwa",
+    "limit": "Malire a Ngongole",
+    "available": "Ngongole Yopezeka",
+    "outstanding": "Ngongole Yotsala",
+    "payment_terms": "Masiku Olipira",
+    "status": "Mkhalidwe wa Ngongole",
+    "active": "Ikugwira",
+    "suspended": "Yaimitsidwa",
+    "closed": "Yatsekedwa"
+  },
+  "loyalty": {
+    "title": "Loyalty",
+    "points": "Ma Points",
+    "total_spent": "Ndalama Zonse Zogwiritsidwa",
+    "last_visit": "Kubwera Komaliza",
+    "earn_points": "Pezani Ma Points",
+    "redeem_points": "Gwiritsani Ma Points"
+  },
+  "history": {
+    "title": "Mbiri ya Kugula",
+    "transactions": "Malonda",
+    "total_purchases": "Zinthu Zonse Zogulira",
+    "last_purchase": "Kugula Komaliza",
+    "view_all": "Onani Zonse"
+  },
+  "groups": {
+    "title": "Magulu a Makasitomala",
+    "add": "Onjezani Gulu",
+    "name": "Dzina la Gulu",
+    "discount": "Kuchepetsa Mtengo kwa Gulu",
+    "members": "Mamembala"
+  },
+  "payments": {
+    "title": "Malipiro",
+    "record": "Lembani Kulipira",
+    "amount": "Ndalama",
+    "method": "Njira",
+    "reference": "Nambala",
+    "date": "Tsiku",
+    "history": "Mbiri ya Malipiro"
+  },
+  "messages": {
+    "created": "Kasitomala wapangidwa bwino",
+    "updated": "Kasitomala wasinthidwa bwino",
+    "deleted": "Kasitomala wachotsedwa bwino",
+    "payment_recorded": "Kulipira kwalembedwa bwino",
+    "credit_exceeded": "Ndalama izi zipitilira malire a ngongole"
+  },
+  "filters": {
+    "all": "Makasitomala Onse",
+    "with_credit": "Okhala ndi Ngongole",
+    "with_balance": "Okhala ndi Ngongole Yotsala",
+    "active": "Akugwira",
+    "inactive": "Sakugwira"
+  }
+}
+

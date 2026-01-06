@@ -1,0 +1,94 @@
+{
+  "title": "Zinthu",
+  "list": {
+    "title": "Zinthu Zonse",
+    "empty": "Palibe zinthu zopezeka",
+    "add": "Onjezani Chinthu",
+    "import": "Lowetsani Zinthu",
+    "export": "Tulutsani Zinthu"
+  },
+  "product": {
+    "name": "Dzina la Chinthu",
+    "description": "Kufotokoza",
+    "category": "Gulu",
+    "sku": "SKU",
+    "barcode": "Barcode",
+    "unit": "Umo",
+    "image": "Chithunzi"
+  },
+  "pricing": {
+    "title": "Mitengo",
+    "cost": "Mtengo Wogulira",
+    "retail_price": "Mtengo wa Retail",
+    "wholesale_price": "Mtengo wa Wholesale",
+    "wholesale_enabled": "Yatsani Wholesale",
+    "min_wholesale_qty": "Kuchepa kwa Wholesale"
+  },
+  "stock": {
+    "title": "Katundu",
+    "current": "Katundu Wapano",
+    "available": "Wopezeka",
+    "reserved": "Wosungidwa",
+    "low_threshold": "Malire a Katundu Wochepa",
+    "track_inventory": "Werengerani Katundu"
+  },
+  "variations": {
+    "title": "Mitundu",
+    "add": "Onjezani Mtundu",
+    "name": "Dzina la Mtundu",
+    "size": "Kukula",
+    "color": "Mtundu wa Rangi",
+    "pack_size": "Kukula kwa Bokosi",
+    "none": "Palibe mitundu"
+  },
+  "categories": {
+    "title": "Magulu",
+    "add": "Onjezani Gulu",
+    "edit": "Sinthani Gulu",
+    "name": "Dzina la Gulu",
+    "description": "Kufotokoza",
+    "no_category": "Opanda Gulu"
+  },
+  "filters": {
+    "all": "Zinthu Zonse",
+    "in_stock": "Zili Ndi Katundu",
+    "low_stock": "Katundu Watsala Pang'ono",
+    "out_of_stock": "Katundu Watha",
+    "active": "Zikugwira",
+    "inactive": "Sizikugwira",
+    "by_category": "Mwa Gulu"
+  },
+  "import": {
+    "title": "Lowetsani Zinthu",
+    "download_template": "Tsitsani Chitsanzo",
+    "upload_file": "Kwezani Fayilo",
+    "select_file": "Sankhani Fayilo",
+    "preview": "Onani Kaye",
+    "importing": "Kulowetsa...",
+    "success": "Zinthu zalowetsedwa bwino",
+    "failed": "Kulowetsa sikunatheka"
+  },
+  "export": {
+    "title": "Tulutsani Zinthu",
+    "format": "Mtundu",
+    "excel": "Excel",
+    "csv": "CSV",
+    "exporting": "Kutulutsa...",
+    "success": "Zinthu zatulutsidwa bwino"
+  },
+  "messages": {
+    "created": "Chinthu chapangidwa bwino",
+    "updated": "Chinthu chasinthidwa bwino",
+    "deleted": "Chinthu chachotsedwa bwino",
+    "delete_confirm": "Mukufuna kuchotsa chinthu ichi?",
+    "not_found": "Chinthu sichinapezeke"
+  },
+  "expiry": {
+    "title": "Kutha",
+    "manufacturing_date": "Tsiku Lopangidwa",
+    "expiry_date": "Tsiku Lotha",
+    "expired": "Chatha",
+    "expiring_soon": "Chikutha Posachedwa"
+  }
+}
+

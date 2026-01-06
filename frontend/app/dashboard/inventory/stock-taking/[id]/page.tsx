@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -389,10 +390,11 @@ export default function StockTakingDetailPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      <PageLayout
+        title="Stock Taking Session"
+        description={`${stockTake?.outlet?.name || "Outlet"} - ${stockTake?.operating_date || ""}${stockTake?.description ? ` - ${stockTake.description}` : ""}`}
+        actions={
+          <div className="flex gap-2">
             <Button
               variant="ghost"
               size="icon"
@@ -400,15 +402,6 @@ export default function StockTakingDetailPage() {
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div>
-              <h1 className="text-3xl font-bold">Stock Taking Session</h1>
-              <p className="text-muted-foreground mt-1">
-                {stockTake?.outlet?.name || "Outlet"} - {stockTake?.operating_date || ""}
-                {stockTake?.description && ` - ${stockTake.description}`}
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
             {!isCompleted && (
               <>
                 {hasUncountedItems && (
@@ -436,7 +429,9 @@ export default function StockTakingDetailPage() {
               <Badge className="bg-green-600">Completed</Badge>
             )}
           </div>
-        </div>
+        }
+      >
+        <div className="space-y-6">
 
         {/* Progress Bar */}
         <Card>
@@ -723,6 +718,7 @@ export default function StockTakingDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </PageLayout>
     </DashboardLayout>
   )
 }

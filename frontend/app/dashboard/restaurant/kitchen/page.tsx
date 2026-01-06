@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
+import { PageLayout } from "@/components/layouts/page-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -134,13 +135,10 @@ export default function KitchenPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Kitchen Display</h1>
-            <p className="text-muted-foreground">Kitchen Order Tickets (KOT) management</p>
-          </div>
-        </div>
+      <PageLayout
+        title="Kitchen Display"
+        description="Kitchen Order Tickets (KOT) management"
+      >
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-4">
@@ -291,7 +289,7 @@ export default function KitchenPage() {
             )}
           </TabsContent>
         </Tabs>
-      </div>
+      </PageLayout>
 
       {/* Modals */}
       <KitchenOrderTicketModal

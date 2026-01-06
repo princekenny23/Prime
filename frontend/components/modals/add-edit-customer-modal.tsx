@@ -26,6 +26,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { customerService, type Customer } from "@/lib/services/customerService"
 import { useBusinessStore } from "@/stores/businessStore"
 import { useTenant } from "@/contexts/tenant-context"
+import { useI18n } from "@/contexts/i18n-context"
 
 interface AddEditCustomerModalProps {
   open: boolean
@@ -38,6 +39,7 @@ export function AddEditCustomerModal({ open, onOpenChange, customer, onSuccess }
   const { toast } = useToast()
   const { currentBusiness } = useBusinessStore()
   const { outlets } = useTenant()
+  const { t } = useI18n()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
@@ -196,7 +198,7 @@ export function AddEditCustomerModal({ open, onOpenChange, customer, onSuccess }
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Enter customer name"
+                    placeholder={t("customers.modal.name_placeholder")}
                   />
                 </div>
 
@@ -210,7 +212,7 @@ export function AddEditCustomerModal({ open, onOpenChange, customer, onSuccess }
                       className="pl-10"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="customer@example.com"
+                      placeholder={t("customers.modal.email_placeholder")}
                     />
                   </div>
                 </div>
@@ -225,7 +227,7 @@ export function AddEditCustomerModal({ open, onOpenChange, customer, onSuccess }
                       className="pl-10"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      placeholder="Phone number"
+                      placeholder={t("customers.modal.phone_placeholder")}
                     />
                   </div>
                 </div>
@@ -237,7 +239,7 @@ export function AddEditCustomerModal({ open, onOpenChange, customer, onSuccess }
                     onValueChange={(value) => setFormData({ ...formData, outlet_id: value === "none" ? "" : value })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select outlet (optional)" />
+                      <SelectValue placeholder={t("customers.modal.outlet_placeholder")} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No specific outlet</SelectItem>
@@ -259,7 +261,7 @@ export function AddEditCustomerModal({ open, onOpenChange, customer, onSuccess }
                       className="flex min-h-[80px] w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm"
                       value={formData.address}
                       onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      placeholder="Customer address"
+                      placeholder={t("customers.modal.address_placeholder")}
                     />
                   </div>
                 </div>
@@ -297,7 +299,7 @@ export function AddEditCustomerModal({ open, onOpenChange, customer, onSuccess }
                           required={formData.credit_enabled}
                           value={formData.credit_limit}
                           onChange={(e) => setFormData({ ...formData, credit_limit: e.target.value })}
-                          placeholder="0.00"
+                          placeholder={t("common.amount_placeholder")}
                         />
                       </div>
                       <p className="text-xs text-muted-foreground">
@@ -356,7 +358,7 @@ export function AddEditCustomerModal({ open, onOpenChange, customer, onSuccess }
                         className="flex min-h-[100px] w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm"
                         value={formData.credit_notes}
                         onChange={(e) => setFormData({ ...formData, credit_notes: e.target.value })}
-                        placeholder="Additional notes about customer's credit account"
+                        placeholder={t("customers.modal.credit_notes_placeholder")}
                       />
                     </div>
                   </div>

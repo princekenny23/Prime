@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Printer, Download, X } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { format } from "date-fns"
+import { useI18n } from "@/contexts/i18n-context"
 
 interface CartItem {
   id: string
@@ -25,12 +26,13 @@ interface CartItem {
 interface ReceiptPreviewModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  cart: CartItem[]
-  subtotal: number
-  discount: number
-  tax: number
-  total: number
+  cart?: CartItem[]
+  subtotal?: number
+  discount?: number
+  tax?: number
+  total?: number
   saleType?: "retail" | "wholesale"
+  discountReason?: string
   onPrint: () => void
   onSkip: () => void
 }
@@ -44,10 +46,17 @@ export function ReceiptPreviewModal({
   tax,
   total,
   saleType = "retail",
+  discountReason,
   onPrint,
   onSkip,
 }: ReceiptPreviewModalProps) {
   const { toast } = useToast()
+  
+  // Safe defaults for numeric values
+  const safeSubtotal = subtotal ?? 0
+  const safeDiscount = discount ?? 0
+  const safeTax = tax ?? 0
+  const safeTotal = total ?? 0
 
   const handlePrint = () => {
     toast({
@@ -97,21 +106,21 @@ export function ReceiptPreviewModal({
 
           {/* Receipt Items */}
           <div className="space-y-2 mb-4">
-            {cart.map((item) => (
+            {(cart || []).map((item) => (
               <div key={item.id} className="text-sm">
                 <div className="flex justify-between items-start mb-1">
                   <div className="flex-1">
                     <p className="font-medium">{item.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {item.quantity} x MWK {item.price.toFixed(2)}
-                      {item.discount > 0 && (
+                      {item.quantity} x MWK {(item.price ?? 0).toFixed(2)}
+                      {(item.discount ?? 0) > 0 && (
                         <span className="text-green-600 ml-1">
-                          (-MWK {item.discount.toFixed(2)})
+                          (-MWK {(item.discount ?? 0).toFixed(2)})
                         </span>
                       )}
                     </p>
                   </div>
-                  <p className="font-medium ml-2">MWK {item.total.toFixed(2)}</p>
+                  <p className="font-medium ml-2">MWK {(item.total ?? 0).toFixed(2)}</p>
                 </div>
               </div>
             ))}
@@ -121,21 +130,28 @@ export function ReceiptPreviewModal({
           <div className="border-t border-dashed pt-3 space-y-1 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Subtotal:</span>
-              <span>MWK {subtotal.toFixed(2)}</span>
+              <span>MWK {safeSubtotal.toFixed(2)}</span>
             </div>
-            {discount > 0 && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Discount:</span>
-                <span className="text-green-600">-MWK {discount.toFixed(2)}</span>
-              </div>
+            {safeDiscount > 0 && (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Discount:</span>
+                  <span className="text-green-600">-MWK {safeDiscount.toFixed(2)}</span>
+                </div>
+                {discountReason && (
+                  <div className="text-xs text-muted-foreground italic pl-2">
+                    Reason: {discountReason}
+                  </div>
+                )}
+              </>
             )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Tax:</span>
-              <span>MWK {tax.toFixed(2)}</span>
+              <span>MWK {safeTax.toFixed(2)}</span>
             </div>
             <div className="flex justify-between font-bold text-lg pt-2 border-t border-dashed">
               <span>Total:</span>
-              <span>MWK {total.toFixed(2)}</span>
+              <span>MWK {safeTotal.toFixed(2)}</span>
             </div>
           </div>
 

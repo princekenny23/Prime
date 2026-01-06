@@ -11,21 +11,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Upload, Building2 } from "lucide-react"
+import { Upload, Building2, AlertCircle } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { useTenant } from "@/contexts/tenant-context"
 import { tenantService } from "@/lib/services/tenantService"
-import type { BusinessType } from "@/lib/types"
+import { useAuthStore } from "@/stores/authStore"
+import { useBusinessStore } from "@/stores/businessStore"
+import type { BusinessType, POSType } from "@/lib/types"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export function BusinessInfoTab() {
   const { toast } = useToast()
   const { currentTenant } = useTenant()
+  const { user } = useAuthStore()
+  const { setCurrentBusiness } = useBusinessStore()
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [formData, setFormData] = useState({
     name: "",
     type: "" as "wholesale and retail" | "restaurant" | "bar" | "",
+    posType: "standard" as POSType,
     email: "",
     phone: "",
     address: "",
@@ -34,6 +40,9 @@ export function BusinessInfoTab() {
     taxId: "",
     timezone: "Africa/Blantyre",
   })
+  
+  // Check if user is admin
+  const isAdmin = user?.role === "admin" || user?.is_saas_admin
 
   useEffect(() => {
     const loadBusinessInfo = async () => {
@@ -45,6 +54,7 @@ export function BusinessInfoTab() {
         setFormData({
           name: tenant.name || "",
           type: tenant.type || "",
+          posType: tenant.posType || "standard",
           email: tenant.email || "",
           phone: tenant.phone || "",
           address: tenant.address || "",
@@ -72,6 +82,7 @@ export function BusinessInfoTab() {
       await tenantService.update(currentTenant.id, {
         name: formData.name,
         type: formData.type,
+        posType: formData.posType,
         email: formData.email,
         phone: formData.phone,
         address: formData.address,
@@ -82,9 +93,13 @@ export function BusinessInfoTab() {
           ...(formData.taxId && { taxId: formData.taxId }),
         },
       })
+      
+      // Reload business data to reflect changes
+      await setCurrentBusiness(currentTenant.id)
+      
       toast({
         title: "Settings Saved",
-        description: "Business information has been updated successfully.",
+        description: "Business information has been updated successfully. The POS interface will update on next navigation.",
       })
     } catch (error: any) {
       console.error("Failed to save business info:", error)
@@ -136,6 +151,48 @@ export function BusinessInfoTab() {
                 </SelectContent>
               </Select>
             </div>
+
+            {isAdmin && (
+              <div className="space-y-2">
+                <Label htmlFor="pos-type">POS Type *</Label>
+                <Select 
+                  value={formData.posType}
+                  onValueChange={(value) => setFormData({ ...formData, posType: value as POSType })}
+                  required
+                >
+                  <SelectTrigger id="pos-type">
+                    <SelectValue placeholder="Select POS type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="standard">Standard POS</SelectItem>
+                    <SelectItem value="single_product">Single-Product POS</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Changing POS type will affect how the POS interface is displayed. 
+                    Standard POS: Multiple products with cart-based checkout. 
+                    Single-Product POS: One product with fast quantity-first checkout.
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
+
+            {!isAdmin && (
+              <div className="space-y-2">
+                <Label htmlFor="pos-type-display">POS Type</Label>
+                <Input 
+                  id="pos-type-display" 
+                  value={formData.posType === "standard" ? "Standard POS" : "Single-Product POS"}
+                  disabled
+                  className="bg-muted"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Only administrators can change the POS type. Contact your admin to modify this setting.
+                </p>
+              </div>
+            )}
 
         <div className="space-y-2">
           <Label>Business Logo</Label>

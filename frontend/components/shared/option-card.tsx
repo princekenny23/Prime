@@ -3,29 +3,37 @@
 import Link from "next/link"
 import { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useI18n } from "@/contexts/i18n-context"
 
 export interface OptionCardProps {
   id: string
+  /** Display title (used if titleKey is not provided) */
   title: string
+  /** i18n translation key for title (takes precedence over title) */
+  titleKey?: string
   href: string
   icon: LucideIcon
   iconSize?: "sm" | "md" | "lg"
-  description?: string
 }
 
 export function OptionCard({ 
   id, 
   title, 
+  titleKey,
   href, 
   icon: Icon, 
   iconSize = "md",
-  description 
 }: OptionCardProps) {
+  const { t } = useI18n()
+  
   const iconSizes = {
     sm: "h-12 w-12",
     md: "h-20 w-20",
     lg: "h-24 w-24"
   }
+
+  // Use translation key if provided, otherwise use direct title
+  const displayTitle = titleKey ? t(titleKey) : title
 
   return (
     <Link
@@ -44,9 +52,9 @@ export function OptionCard({
         </div>
 
         {/* Title Section */}
-        <div className="absolute bottom-0 left-0 right-0 p-5 rounded-b-xl bg-gray-200">
+        <div className="absolute bottom-0 left-0 right-0 p-5 rounded-b-xl bg-gray-300">
           <h3 className="font-semibold text-lg text-center text-black">
-            {title}
+            {displayTitle}
           </h3>
         </div>
 

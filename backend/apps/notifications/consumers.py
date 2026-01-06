@@ -74,6 +74,15 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             'unread_count': event['unread_count']
         }))
     
+    async def sale_update(self, event):
+        """Send sale update to WebSocket for real-time sales list updates"""
+        sale_data = event.get('sale')
+        await self.send(text_data=json.dumps({
+            'type': 'sale_update',
+            'sale': sale_data,
+            'action': event.get('action', 'created')  # 'created', 'updated', 'refunded'
+        }))
+    
     @database_sync_to_async
     def get_user(self, user_id):
         """Get user by ID"""

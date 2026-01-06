@@ -1,11 +1,13 @@
 // Type Definitions for PrimePOS
 
 export type BusinessType = "wholesale and retail" | "restaurant" | "bar"
+export type POSType = "standard" | "single_product"
 
 export interface Business {
   id: string
   name: string
   type: BusinessType
+  posType: POSType
   currency: string
   currencySymbol: string
   phone: string

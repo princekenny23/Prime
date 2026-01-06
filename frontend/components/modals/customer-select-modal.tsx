@@ -19,6 +19,7 @@ import { customerService, type Customer } from "@/lib/services/customerService"
 import { useBusinessStore } from "@/stores/businessStore"
 import { AddEditCustomerModal } from "./add-edit-customer-modal"
 import { cn } from "@/lib/utils"
+import { useI18n } from "@/contexts/i18n-context"
 
 interface CustomerSelectModalProps {
   open: boolean
@@ -33,6 +34,7 @@ export function CustomerSelectModal({
   onSelect,
   selectedCustomer 
 }: CustomerSelectModalProps) {
+  const { t } = useI18n()
   const { toast } = useToast()
   const { currentBusiness } = useBusinessStore()
   const [searchTerm, setSearchTerm] = useState("")
@@ -113,10 +115,10 @@ export function CustomerSelectModal({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
-              Select Customer
+              {t("customers.select_customer")}
             </DialogTitle>
             <DialogDescription>
-              Search for an existing customer or create a new one
+              {t("customers.search_or_create")}
             </DialogDescription>
           </DialogHeader>
 
@@ -124,7 +126,7 @@ export function CustomerSelectModal({
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name, email, or phone..."
+                placeholder={t("customers.search_placeholder")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -137,25 +139,25 @@ export function CustomerSelectModal({
               className="whitespace-nowrap"
             >
               <UserPlus className="h-4 w-4 mr-2" />
-              New Customer
+              {t("customers.new_customer")}
             </Button>
           </div>
 
           <ScrollArea className="flex-1 min-h-0 mt-4">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
-                <p className="text-muted-foreground">Loading customers...</p>
+                <p className="text-muted-foreground">{t("common.messages.loading")}</p>
               </div>
             ) : filteredCustomers.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <User className="h-12 w-12 text-muted-foreground mb-4" />
                 <p className="text-muted-foreground mb-2">
-                  {searchTerm ? "No customers found" : "No customers yet"}
+                  {searchTerm ? t("customers.no_customers_found") : t("customers.no_customers_yet")}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {searchTerm 
-                    ? "Try a different search term or create a new customer"
-                    : "Create your first customer to get started"
+                    ? t("customers.try_different_search")
+                    : t("customers.create_first_customer")
                   }
                 </p>
               </div>
@@ -193,7 +195,7 @@ export function CustomerSelectModal({
                         </div>
                         {customer.loyalty_points !== undefined && customer.loyalty_points > 0 && (
                           <p className="text-xs text-muted-foreground mt-1">
-                            {customer.loyalty_points} loyalty points
+                            {customer.loyalty_points} {t("customers.loyalty_points")}
                           </p>
                         )}
                       </div>
@@ -211,7 +213,7 @@ export function CustomerSelectModal({
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("common.actions.cancel")}
             </Button>
             {selectedCustomer && (
               <Button 
@@ -221,7 +223,7 @@ export function CustomerSelectModal({
                   onOpenChange(false)
                 }}
               >
-                Select Customer
+                {t("customers.select_customer")}
               </Button>
             )}
           </DialogFooter>
