@@ -266,6 +266,54 @@ class ProductViewSet(viewsets.ModelViewSet, TenantFilterMixin):
             )
         
         return super().destroy(request, *args, **kwargs)
+
+    @action(detail=False, methods=['get'], url_path='lookup')
+    def lookup(self, request):
+        """Lookup products and variations by barcode.
+
+        Returns JSON with 'variations' and/or 'products' arrays when matches are found.
+        Respects tenant and outlet scoping via TenantFilterMixin/get_queryset.
+        """
+        barcode = request.query_params.get('barcode')
+        if not barcode:
+            return Response({"detail": "barcode query parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        barcode_val = str(barcode).strip()
+        outlet = self.get_outlet_for_request(request)
+        tenant = getattr(request, 'tenant', None) or (request.user.tenant if hasattr(request.user, 'tenant') else None)
+
+        results: dict = {}
+
+        # First, try exact match on variations (most specific)
+        var_qs = ItemVariation.objects.filter(barcode__iexact=barcode_val, product__tenant=tenant)
+        if outlet:
+            var_qs = var_qs.filter(product__outlet=outlet)
+        var_qs = var_qs.select_related('product')
+        if var_qs.exists():
+            serializer = ItemVariationSerializer(var_qs, many=True, context={'request': request, 'outlet': outlet})
+            results['variations'] = serializer.data
+
+        # Then exact match on products
+        prod_qs = self.get_queryset().filter(barcode__iexact=barcode_val)
+        if prod_qs.exists():
+            serializer = self.get_serializer(prod_qs, many=True, context={'request': request, 'outlet': outlet})
+            results['products'] = serializer.data
+
+        # If nothing exact, try contains (useful for prefix matches or partial scans)
+        if not results:
+            var_cont = ItemVariation.objects.filter(barcode__icontains=barcode_val, product__tenant=tenant)
+            if outlet:
+                var_cont = var_cont.filter(product__outlet=outlet)
+            var_cont = var_cont.select_related('product')
+            if var_cont.exists():
+                results['variations'] = ItemVariationSerializer(var_cont, many=True, context={'request': request, 'outlet': outlet}).data
+
+            prod_cont = self.get_queryset().filter(barcode__icontains=barcode_val)
+            if prod_cont.exists():
+                results['products'] = self.get_serializer(prod_cont, many=True, context={'request': request, 'outlet': outlet}).data
+
+        # Return structured results (empty dict if no matches)
+        return Response(results, status=status.HTTP_200_OK)
     
     def get_serializer_context(self):
         """Add request and outlet to serializer context"""

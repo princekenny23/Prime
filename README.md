@@ -13,6 +13,7 @@ A comprehensive, multi-tenant SaaS Point of Sale (POS) system designed for retai
 - [SaaS Progress & MVP Status](#-saas-progress--mvp-status)
 - [MVP Completion Checklist](#-mvp-completion-checklist)
 - [Project Structure](#project-structure)
+- [Developer Docs — Architecture & Data Flow](#developer-docs-----architecture--data-flow)
 - [Getting Started](#getting-started)
 - [API Documentation](#api-documentation)
 - [Key Modules](#key-modules)

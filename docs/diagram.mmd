@@ -1,0 +1,46 @@
+flowchart LR
+  subgraph Frontend [Frontend (Next.js)]
+    UI["Pages / Components / Modals\n(e.g., POS page, CreateSaleModal)"]
+    Services["Services (saleService, productService, receiptService)"]
+    Hooks["Hooks (useBarcodeScanner, stores)"]
+    UI --> Services
+    Hooks --> Services
+  end
+
+  APIClient["API Client (lib/api.ts)\nAdds auth & tenant headers"]
+  Services --> APIClient
+
+  APIClient -->|HTTP/JSON| BackendAPI["Django REST (ViewSets/Views)"]
+
+  subgraph Backend [Backend (Django + DRF)]
+    View["ViewSet / View\n(e.g., SaleViewSet.create)"]
+    Serializer["Serializer\n(e.g., SaleSerializer validates payload)"]
+    Service["Backend Services\n(receipt generation / stock adjustments)"]
+    Model["Models\n(Sale, SaleItem, Product, Variation)"]
+    DB[("Database\n(Postgres)")]
+
+    View --> Serializer
+    Serializer --> Model
+    Model --> DB
+    Serializer --> Service
+    Service -->|returns| View
+  end
+
+  BackendAPI --> View
+  View -->|JSON Response| APIClient
+  APIClient --> Services
+
+  %% Optional printing flow
+  Service --> ESC["ESC/POS Generator (bytes/base64)"]
+  ESC -->|sent to| QZ["Client print helper (QZ Tray)"]
+  QZ -->|prints| POSPrinter["Receipt printer"]
+
+  %% Lookup flow (barcode)
+  Hooks -->|barcode event| Services
+  Services -->|lookup| BackendAPI
+  BackendAPI --> ProductView["ProductViewSet.lookup"]
+  ProductView --> Serializer
+  Serializer --> Model
+  Model --> DB
+  ProductView -->|JSON| APIClient
+  APIClient --> Services

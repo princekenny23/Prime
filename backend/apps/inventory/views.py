@@ -197,21 +197,22 @@ class StockTakeItemViewSet(viewsets.ModelViewSet, TenantFilterMixin):
             serializer = self.get_serializer(self.get_object(), data=request.data, partial=True)
             if not serializer.is_valid():
                 logger.error(f"Stock take item validation errors: {serializer.errors}")
-                from rest_framework.response import Response
-                from rest_framework import status
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             
             serializer.save()
             logger.info(f"Stock take item {item_id} updated successfully: {serializer.data}")
             return Response(serializer.data)
         except Exception as e:
+            # Log full exception with traceback for debugging, but avoid returning raw exception text to client
             logger.error(f"Error updating stock take item {item_id}: {e}", exc_info=True)
-            from rest_framework.response import Response
-            from rest_framework import status
-            return Response(
-                {"detail": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            error_payload = {"detail": "Failed to update stock take item due to an internal error."}
+            # Provide minimal debug code for correlating logs with client errors
+            try:
+                error_code = getattr(e, 'code', None) or type(e).__name__
+                error_payload['error_code'] = str(error_code)
+            except Exception:
+                pass
+            return Response(error_payload, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class StockTakeViewSet(viewsets.ModelViewSet, TenantFilterMixin):
@@ -358,12 +359,12 @@ class StockTakeViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         
         return super().destroy(request, *args, **kwargs)
     
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
         """Complete stock take and apply adjustments"""
         stock_take = self.get_object()
         tenant = getattr(request, 'tenant', None) or request.user.tenant
-        
+
         # CRITICAL: Verify tenant matches (unless SaaS admin or tenant admin)
         from apps.tenants.permissions import is_admin_user
         if not is_admin_user(request.user) and tenant and stock_take.tenant != tenant:
@@ -371,43 +372,78 @@ class StockTakeViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                 {"detail": "You do not have permission to complete this stock take."},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
+
         if stock_take.status != 'running':
             return Response(
                 {"detail": "Stock take is not running"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         with transaction.atomic():
             # Apply adjustments
             for item in stock_take.items.all():
-                if item.difference != 0:
-                    # CRITICAL: Ensure product belongs to tenant
-                    product = item.product
-                    if product.tenant != stock_take.tenant:
-                        logger.warning(f"Product {product.id} tenant mismatch in stock take {stock_take.id}")
-                        continue
-                    product.stock += item.difference
-                    product.save()
-                    
-                    # Record movement
-                    StockMovement.objects.create(
-                        tenant=stock_take.tenant,
-                        product=product,
+                difference = item.difference
+                if difference == 0:
+                    continue
+
+                product = item.product
+                variation = getattr(item, 'variation', None)
+
+                # If product is missing but variation exists, get product from variation
+                if not product and variation:
+                    product = variation.product
+
+                if not product:
+                    logger.error(f"StockTakeItem {item.id} has no product or variation. Skipping.")
+                    continue
+
+                # Tenant safety
+                if product.tenant != stock_take.tenant:
+                    logger.warning(f"Tenant mismatch for StockTakeItem {item.id} in stock_take {stock_take.id}")
+                    continue
+
+                # Update product stock (backward compatibility)
+                product.stock += difference
+                product.save(update_fields=['stock'])
+
+                # Update LocationStock if variation is tracked
+                if variation and variation.track_inventory:
+                    from apps.inventory.models import LocationStock  # adjust import if needed
+                    location_stock, created = LocationStock.objects.get_or_create(
+                        tenant=tenant,
+                        variation=variation,
                         outlet=stock_take.outlet,
-                        user=request.user,
-                        movement_type='adjustment',
-                        quantity=abs(item.difference),
-                        reason=f"Stock take adjustment: {item.difference}",
-                        reference_id=str(stock_take.id)
+                        defaults={'quantity': 0}
                     )
-            
+                    old_quantity = location_stock.quantity
+                    location_stock.quantity = max(0, old_quantity + difference)
+                    location_stock.save()
+                    logger.info(
+                        f"LocationStock updated: variation {variation.id}, outlet {stock_take.outlet.id}, "
+                        f"{old_quantity} -> {location_stock.quantity}"
+                    )
+
+                # Record stock movement
+                StockMovement.objects.create(
+                    tenant=stock_take.tenant,
+                    product=product,
+                    variation=variation,  # ✅ this fixes the original bug
+                    outlet=stock_take.outlet,
+                    user=request.user,
+                    movement_type='adjustment',
+                    quantity=abs(difference),
+                    reason=f"Stock take adjustment ({difference})",
+                    reference_id=str(stock_take.id)
+                )
+
+            # Complete the stock take
             stock_take.status = 'completed'
             stock_take.completed_at = timezone.now()
-            stock_take.save()
-        
+            stock_take.save(update_fields=['status', 'completed_at'])
+
         serializer = self.get_serializer(stock_take)
         return Response(serializer.data)
+
 
 
 @api_view(['POST'])

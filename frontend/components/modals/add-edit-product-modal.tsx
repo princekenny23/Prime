@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { productService, categoryService } from "@/lib/services/productService"
 import { outletService } from "@/lib/services/outletService"
@@ -33,9 +33,10 @@ interface AddEditProductModalProps {
   onOpenChange: (open: boolean) => void
   product?: any
   onProductSaved?: () => void // Callback when product is saved
+  initialBarcode?: string
 }
 
-export function AddEditProductModal({ open, onOpenChange, product, onProductSaved }: AddEditProductModalProps) {
+export const AddEditProductModal: React.FC<AddEditProductModalProps> = ({ open, onOpenChange, product, onProductSaved, initialBarcode }) => {
   const { toast } = useToast()
   const { currentBusiness } = useBusinessStore()
   const { outlets } = useTenant()
@@ -124,7 +125,7 @@ export function AddEditProductModal({ open, onOpenChange, product, onProductSave
         if (product?.id) {
           try {
             // Fetch product with selling_units included
-            const fullProduct = await productService.get(product.id)
+            const fullProduct: any = await productService.get(product.id)
             setSellingUnits(fullProduct.selling_units || [])
           } catch (error) {
             console.error("Failed to load selling units:", error)
@@ -139,11 +140,11 @@ export function AddEditProductModal({ open, onOpenChange, product, onProductSave
 
   useEffect(() => {
     if (product) {
-      // Editing existing product - parse business-specific fields from description
       const businessFields = parseBusinessFieldsFromDescription(product.description || "")
       const cleanDesc = cleanDescription(product.description || "")
-      
-      setFormData({
+
+      setFormData(prev => ({
+        ...prev,
         name: product.name || "",
         sku: product.sku || "",
         categoryId: product.categoryId || "",
@@ -153,25 +154,23 @@ export function AddEditProductModal({ open, onOpenChange, product, onProductSave
         wholesale_price: product.wholesale_price || product.wholesalePrice || "",
         wholesale_enabled: product.wholesale_enabled || product.wholesaleEnabled || false,
         minimum_wholesale_quantity: product.minimum_wholesale_quantity || product.minimumWholesaleQuantity || 1,
+        outletId: product?.outlet?.id || product?.outlet_id || "",
         unit: product.unit || "pcs",
         stock: product.stock || 0,
         lowStockThreshold: product.lowStockThreshold || product.low_stock_threshold || 0,
         description: cleanDesc,
         isActive: product.isActive !== undefined ? product.isActive : true,
-        // Expiry fields
         manufacturing_date: product.manufacturing_date ? new Date(product.manufacturing_date).toISOString().split('T')[0] : "",
         expiry_date: product.expiry_date ? new Date(product.expiry_date).toISOString().split('T')[0] : "",
         track_expiration: product.track_expiration || false,
-        // Bar-specific fields
         volume_ml: businessFields.volume_ml ? String(businessFields.volume_ml) : "",
         alcohol_percentage: businessFields.alcohol_percentage ? String(businessFields.alcohol_percentage) : "",
-        // Restaurant-specific fields
         preparation_time: businessFields.preparation_time ? String(businessFields.preparation_time) : "",
-        is_menu_item: true, // Default to true, will be inferred from track_inventory if needed
-      })
+        is_menu_item: true,
+      }))
     } else if (open) {
-      // Creating new product - reset form and load preview SKU
-      setFormData({
+      setFormData(prev => ({
+        ...prev,
         name: "",
         sku: "",
         categoryId: "",
@@ -187,22 +186,44 @@ export function AddEditProductModal({ open, onOpenChange, product, onProductSave
         lowStockThreshold: 0,
         description: "",
         isActive: true,
-        // Expiry fields
         manufacturing_date: "",
         expiry_date: "",
         track_expiration: false,
-        // Bar-specific fields
         volume_ml: "",
         alcohol_percentage: "",
-        // Restaurant-specific fields
         preparation_time: "",
         is_menu_item: true,
-      })
+      }))
       setSellingUnits([])
-      
-      // SKU is now optional - no need to pre-fill
     }
   }, [product, open])
+
+  // Prefill barcode when opening modal for new product via prop
+  useEffect(() => {
+    if (open && !product && (initialBarcode && initialBarcode.trim() !== "")) {
+      setFormData(prev => ({ ...prev, barcode: initialBarcode }))
+      setTimeout(() => {
+        const el = document.getElementById('barcode') as HTMLInputElement | null
+        if (el) el.focus()
+      }, 50)
+    }
+  }, [open, product, initialBarcode])
+
+  // Listen for global barcode scans while the modal is open
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (!open) return
+      const code = e.detail as string
+      if (!code) return
+      setFormData(prev => ({ ...prev, barcode: code }))
+      setTimeout(() => {
+        const el = document.getElementById('barcode') as HTMLInputElement | null
+        if (el) el.focus()
+      }, 50)
+    }
+    window.addEventListener('barcode-scanned', handler as EventListener)
+    return () => window.removeEventListener('barcode-scanned', handler as EventListener)
+  }, [open])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -293,6 +314,25 @@ export function AddEditProductModal({ open, onOpenChange, product, onProductSave
         })
         setIsLoading(false)
         return
+      }
+
+      // If creating a new product and a barcode is provided, check for duplicates first
+      if (!product && formData.barcode && formData.barcode.trim() !== "") {
+        try {
+          const lookup = await productService.lookup(formData.barcode.trim())
+          if ((lookup.products && lookup.products.length > 0) || (lookup.variations && lookup.variations.length > 0)) {
+            toast({
+              title: "Validation Error",
+              description: "This barcode is already in use. Please use a different barcode or update the existing product.",
+              variant: "destructive",
+            })
+            setIsLoading(false)
+            return
+          }
+        } catch (err) {
+          console.warn("Barcode lookup failed during product creation check:", err)
+          // Don't block creation on lookup failure; backend will validate
+        }
       }
 
       // Build description with business-specific fields

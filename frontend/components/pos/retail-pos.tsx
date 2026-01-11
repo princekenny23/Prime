@@ -28,18 +28,21 @@ import { formatCurrency } from "@/lib/utils/currency"
 import { DiscountModal } from "@/components/modals/discount-modal"
 import { SaleDiscountModal, type SaleDiscount } from "@/components/modals/sale-discount-modal"
 import { CloseRegisterModal } from "@/components/modals/close-register-modal"
-import { ReceiptPreviewModal } from "@/components/modals/receipt-preview-modal"
 import { CustomerSelectModal } from "@/components/modals/customer-select-modal"
 import { SelectUnitModal } from "@/components/modals/select-unit-modal"
 import { SelectVariationModal } from "@/components/modals/select-variation-modal"
+import { AddEditProductModal } from "@/components/modals/add-edit-product-modal"
 import { PaymentMethodModal, type DeliveryInfo } from "@/components/modals/payment-method-modal"
 import { deliveryService } from "@/lib/services/deliveryService"
 import { useShift } from "@/contexts/shift-context"
 import { saleService } from "@/lib/services/saleService"
 import { useToast } from "@/components/ui/use-toast"
+import { printReceipt } from "@/lib/print"
 import type { Customer } from "@/lib/services/customerService"
 import type { Product } from "@/lib/types"
 import { useI18n } from "@/contexts/i18n-context"
+import { useBarcodeScanner } from "@/lib/hooks/useBarcodeScanner"
+// Printing helper removed - reverted to receipt preview flow
 
 type SaleType = "retail" | "wholesale"
 
@@ -69,8 +72,7 @@ export function RetailPOS() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [showDiscount, setShowDiscount] = useState(false)
   const [showCloseRegister, setShowCloseRegister] = useState(false)
-  const [showReceipt, setShowReceipt] = useState(false)
-  const [receiptData, setReceiptData] = useState<any>(null)
+  // Receipt preview in POS has been removed; printing is handled automatically
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<string[]>([])
   const [isLoadingProducts, setIsLoadingProducts] = useState(true)
@@ -79,6 +81,9 @@ export function RetailPOS() {
   const [selectedProductForUnit, setSelectedProductForUnit] = useState<any>(null)
   const [showVariationModal, setShowVariationModal] = useState(false)
   const [selectedProductForVariation, setSelectedProductForVariation] = useState<any>(null)
+  // Add product modal for creating product from barcode lookup
+  const [showAddProductModal, setShowAddProductModal] = useState(false)
+  const [productToCreate, setProductToCreate] = useState<any | null>(null)
   const [showSearchDropdown, setShowSearchDropdown] = useState(false)
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
@@ -138,35 +143,109 @@ export function RetailPOS() {
       .slice(0, 20) // Limit to 20 items for quick selection
   }, [products, selectedCategory])
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (!currentBusiness) {
-        setIsLoadingProducts(false)
-        return
-      }
-      
-      setIsLoadingProducts(true)
-      setProductsError(null)
-      
-      try {
-        const [productsData, categoriesData] = await Promise.all([
-          productService.list({ is_active: true }),
-          categoryService.list(),
-        ])
-        setProducts(productsData.results || productsData)
-        setCategories(["all", ...(categoriesData.map((c: any) => c.name) || [])])
-      } catch (error: any) {
-        console.error("Failed to load products:", error)
-        setProductsError("Failed to load products. Please refresh the page.")
-        setProducts([])
-        setCategories(["all"])
-      } finally {
-        setIsLoadingProducts(false)
-      }
+  const fetchProductsAndCategories = async () => {
+    if (!currentBusiness) {
+      setIsLoadingProducts(false)
+      return
     }
     
-    loadData()
+    setIsLoadingProducts(true)
+    setProductsError(null)
+    
+    try {
+      const [productsData, categoriesData] = await Promise.all([
+        productService.list({ is_active: true }),
+        categoryService.list(),
+      ])
+      setProducts(productsData.results || productsData)
+      setCategories(["all", ...(categoriesData.map((c: any) => c.name) || [])])
+    } catch (error: any) {
+      console.error("Failed to load products:", error)
+      setProductsError("Failed to load products. Please refresh the page.")
+      setProducts([])
+      setCategories(["all"])
+    } finally {
+      setIsLoadingProducts(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchProductsAndCategories()
   }, [currentBusiness])
+
+  // Global barcode scanner handler (keyboard-wedge)
+  const handleBarcodeScanned = async (code: string) => {
+    const term = String(code).trim()
+    if (!term) return
+
+    try {
+      const { products: matchedProducts, variations: matchedVariations } = await productService.lookup(term)
+
+      // Exact one variation -> add to cart directly
+      if (matchedVariations && matchedVariations.length === 1) {
+        const v = matchedVariations[0]
+        const productName = typeof v.product === 'object' ? v.product.name : ''
+        const productId = typeof v.product === 'object' ? v.product.id : v.product
+        addToCart({
+          id: `cart_${Date.now()}_${Math.random()}`,
+          productId: String(productId),
+          variationId: v.id,
+          name: `${productName ? productName + ' - ' : ''}${v.name}`,
+          price: parseFloat(String(v.price || 0)),
+          quantity: 1,
+          saleType: saleType,
+        })
+
+        toast({ title: "Added to cart", description: `${productName} - ${v.name} added via barcode` })
+        return
+      }
+
+      // Multiple variations -> allow selecting from list
+      if (matchedVariations && matchedVariations.length > 1) {
+        setSelectedProductForVariation({ id: null, name: `Barcode: ${term}`, variations: matchedVariations })
+        setShowVariationModal(true)
+        return
+      }
+
+      // Single product match (no variations) -> add to cart or open variation modal if variations exist
+      if (matchedProducts && matchedProducts.length === 1) {
+        const p = matchedProducts[0]
+        // If product has variations, open variation modal
+        if (p.variations && p.variations.length > 0) {
+          setSelectedProductForVariation(p)
+          setShowVariationModal(true)
+          return
+        }
+
+        // No variations - add product directly
+        const price = getProductPrice(p)
+        addToCart({
+          id: `cart_${Date.now()}_${Math.random()}`,
+          productId: String(p.id),
+          name: p.name,
+          price: price,
+          quantity: 1,
+          saleType: saleType,
+        })
+        toast({ title: "Added to cart", description: `${p.name} added via barcode` })
+        return
+      }
+
+      // No matches - offer to create product prefilled with barcode
+      toast({ title: "No product found", description: "Would you like to create a product with this barcode?" })
+      setProductToCreate({ barcode: term })
+      setShowAddProductModal(true)
+      return
+
+    } catch (err: any) {
+      console.error("Barcode lookup failed:", err)
+      toast({ title: "Lookup failed", description: err.message || String(err), variant: "destructive" })
+      return
+    }
+  }
+
+  useBarcodeScanner({ onScan: handleBarcodeScanned })
+
 
   const filteredProducts = products.filter((product: any) => {
     const matchesSearch = product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -230,7 +309,7 @@ export function RetailPOS() {
     const price = getProductPrice(product)
     addToCart({
       id: `cart_${Date.now()}_${Math.random()}`,
-      productId: product.id,
+      productId: String(product.id),
       name: product.name,
       price: price,
       quantity: 1,
@@ -246,7 +325,7 @@ export function RetailPOS() {
       const price = getProductPrice(selectedProductForUnit)
       addToCart({
         id: `cart_${Date.now()}_${Math.random()}`,
-        productId: selectedProductForUnit.id,
+        productId: String(selectedProductForUnit.id),
         name: selectedProductForUnit.name,
         price: price,
         quantity: 1,
@@ -266,7 +345,7 @@ export function RetailPOS() {
 
     addToCart({
       id: `cart_${Date.now()}_${Math.random()}`,
-      productId: selectedProductForUnit.id,
+      productId: String(selectedProductForUnit.id),
       name: displayName,
       price: price,
       quantity: 1,
@@ -283,7 +362,7 @@ export function RetailPOS() {
     const price = variation.price || getProductPrice(selectedProductForVariation)
     addToCart({
       id: `cart_${Date.now()}_${Math.random()}`,
-      productId: selectedProductForVariation.id,
+      productId: String(selectedProductForVariation.id),
       name: `${selectedProductForVariation.name} - ${variation.name}`,
       price: price,
       quantity: 1,
@@ -420,6 +499,14 @@ export function RetailPOS() {
 
       // Call backend API
       const sale = await saleService.create(saleData)
+      // Fetch canonical sale from backend to ensure printed receipt matches DB
+      let fullSale = sale
+      try {
+        fullSale = await saleService.get(String(sale.id))
+      } catch (err) {
+        // If fetching fails, fall back to the created sale response
+        console.warn('Failed to fetch full sale from backend, using immediate response', err)
+      }
 
       // Create delivery if delivery info was provided
       if (deliveryInfo && deliveryInfo.delivery_address) {
@@ -481,32 +568,37 @@ export function RetailPOS() {
       }
 
       // Prepare receipt data for modal
-      const receiptCartItems = cart.map((item) => ({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        discount: 0, // TODO: Calculate from item discounts if implemented
-        total: item.total,
+      // Prefer items from the backend canonical sale when available
+      const receiptCartItems = (fullSale.items || []).map((it: any, idx: number) => ({
+        id: it.productId ? `${it.productId}-${idx}` : `item-${idx}`,
+        name: it.productName || it.product_name || it.name || "Item",
+        price: it.price || 0,
+        quantity: it.quantity || 0,
+        discount: 0,
+        total: it.total || (it.quantity || 0) * (it.price || 0),
       }))
 
-      setReceiptData({
-        cart: receiptCartItems,
-        subtotal: subtotal,
-        discount: discount,
-        tax: tax,
-        total: total,
-        sale: sale,
-        discountReason: saleDiscount?.reason,
-      })
+      // Do not show receipt preview in the POS terminal; printing is handled automatically
 
       // Clear cart and discount
       clearCart()
       setSelectedCustomer(null)
       setSaleDiscount(null)
 
-      // Show receipt modal
-      setShowReceipt(true)
+  // Receipt preview removed: we no longer open a preview modal in the POS terminal
+      // Attempt to auto-print (non-blocking). Uses QZ Tray and saved default printer.
+      ;(async () => {
+        try {
+          const outletId = typeof currentOutlet!.id === 'string' ? parseInt(String(currentOutlet!.id), 10) : currentOutlet!.id
+          await printReceipt({ cart: receiptCartItems, subtotal: fullSale.subtotal ?? subtotal, discount: fullSale.discount ?? discount, tax: fullSale.tax ?? tax, total: fullSale.total ?? total, sale: fullSale }, outletId)
+          // optional: show a subtle toast on success
+          toast({ title: "Printed receipt", description: `Receipt ${receiptNumber} sent to printer.` })
+        } catch (err: any) {
+          // Non-blocking failure - inform user but don't interrupt flow
+          console.error("Auto-print failed:", err)
+          toast({ title: "Print failed", description: err?.message || "Unable to print receipt. Check printer settings.", variant: "destructive" })
+        }
+      })()
     } catch (error: any) {
       console.error("Checkout error:", error)
       toast({
@@ -642,11 +734,97 @@ export function RetailPOS() {
                   }
                 }}
                 autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && searchResults.length > 0) {
-                    handleAddToCart(searchResults[0])
-                    setSearchTerm("")
-                    setShowSearchDropdown(false)
+                onKeyDown={async (e) => {
+                  // If Enter is pressed, handle barcode lookup professionally when input looks like a barcode
+                  if (e.key === "Enter") {
+                    const term = searchTerm.trim()
+                    const barcodeLike = /^[0-9A-Za-z]{6,}$/.test(term) // flexible barcode heuristic
+
+                    if (barcodeLike) {
+                      try {
+                        const { products: matchedProducts, variations: matchedVariations } = await productService.lookup(term)
+
+                        // Exact one variation -> add to cart directly
+                        if (matchedVariations && matchedVariations.length === 1) {
+                          const v = matchedVariations[0]
+                          const productName = typeof v.product === 'object' ? v.product.name : ''
+                          const productId = typeof v.product === 'object' ? v.product.id : v.product
+                          addToCart({
+                            id: `cart_${Date.now()}_${Math.random()}`,
+                            productId: String(productId),
+                            variationId: v.id,
+                            name: `${productName ? productName + ' - ' : ''}${v.name}`,
+                            price: parseFloat(String(v.price || 0)),
+                            quantity: 1,
+                            saleType: saleType,
+                          })
+
+                          toast({ title: "Added to cart", description: `${productName} - ${v.name} added via barcode` })
+                          setSearchTerm("")
+                          setShowSearchDropdown(false)
+                          return
+                        }
+
+                        // Multiple variations -> allow selecting from list
+                        if (matchedVariations && matchedVariations.length > 1) {
+                          // Use select variation modal - provide product shape with variations
+                          setSelectedProductForVariation({ id: null, name: `Barcode: ${term}`, variations: matchedVariations })
+                          setShowVariationModal(true)
+                          setSearchTerm("")
+                          setShowSearchDropdown(false)
+                          return
+                        }
+
+                        // Single product match (no variations) -> add to cart or open variation modal if variations exist
+                        if (matchedProducts && matchedProducts.length === 1) {
+                          const p = matchedProducts[0]
+                          // If product has variations, open variation modal
+                          if (p.variations && p.variations.length > 0) {
+                            setSelectedProductForVariation(p)
+                            setShowVariationModal(true)
+                            setSearchTerm("")
+                            setShowSearchDropdown(false)
+                            return
+                          }
+
+                          // No variations - add product directly
+                          const price = getProductPrice(p)
+                          addToCart({
+                            id: `cart_${Date.now()}_${Math.random()}`,
+                            productId: String(p.id),
+                            name: p.name,
+                            price: price,
+                            quantity: 1,
+                            saleType: saleType,
+                          })
+                          toast({ title: "Added to cart", description: `${p.name} added via barcode` })
+                          setSearchTerm("")
+                          setShowSearchDropdown(false)
+                          return
+                        }
+
+                        // No matches - offer to create product prefilled with barcode
+                        toast({ title: "No product found", description: "Would you like to create a product with this barcode?" })
+                        setProductToCreate({ barcode: term })
+                        setShowAddProductModal(true)
+                        setSearchTerm("")
+                        setShowSearchDropdown(false)
+                        return
+
+                      } catch (err: any) {
+                        console.error("Barcode lookup failed:", err)
+                        toast({ title: "Lookup failed", description: err.message || String(err), variant: "destructive" })
+                        return
+                      }
+                    }
+
+                    // Fallback: if searchResults available, add first
+                    if (searchResults.length > 0) {
+                      handleAddToCart(searchResults[0])
+                      setSearchTerm("")
+                      setShowSearchDropdown(false)
+                    }
+
                   } else if (e.key === "Escape") {
                     setShowSearchDropdown(false)
                     setShowQuickSelectDropdown(false)
@@ -674,7 +852,7 @@ export function RetailPOS() {
                         const price = getProductPrice(product)
                         addToCart({
                           id: `cart_${Date.now()}_${Math.random()}`,
-                          productId: product.id,
+                          productId: String(product.id),
                           name: product.name,
                           price: price,
                           quantity: 1,
@@ -690,7 +868,7 @@ export function RetailPOS() {
                           const displayName = `${product.name} (${selectedUnit.unit_name})`
                           addToCart({
                             id: `cart_${Date.now()}_${Math.random()}`,
-                            productId: product.id,
+                            productId: String(product.id),
                             name: displayName,
                             price: unitPrice,
                             quantity: 1,
@@ -783,7 +961,7 @@ export function RetailPOS() {
                         const price = getProductPrice(product)
                         addToCart({
                           id: `cart_${Date.now()}_${Math.random()}`,
-                          productId: product.id,
+                          productId: String(product.id),
                           name: product.name,
                           price: price,
                           quantity: 1,
@@ -799,7 +977,7 @@ export function RetailPOS() {
                           const displayName = `${product.name} (${selectedUnit.unit_name})`
                           addToCart({
                             id: `cart_${Date.now()}_${Math.random()}`,
-                            productId: product.id,
+                            productId: String(product.id),
                             name: displayName,
                             price: unitPrice,
                             quantity: 1,
@@ -920,7 +1098,7 @@ export function RetailPOS() {
                       const price = getProductPrice(product)
                       addToCart({
                         id: `cart_${Date.now()}_${Math.random()}`,
-                        productId: product.id,
+                        productId: String(product.id),
                         name: product.name,
                         price: price,
                         quantity: 1,
@@ -936,7 +1114,7 @@ export function RetailPOS() {
                         const displayName = `${product.name} (${selectedUnit.unit_name})`
                         addToCart({
                           id: `cart_${Date.now()}_${Math.random()}`,
-                          productId: product.id,
+                          productId: String(product.id),
                           name: displayName,
                           price: unitPrice,
                           quantity: 1,
@@ -1219,26 +1397,7 @@ export function RetailPOS() {
         </AlertDialogContent>
       </AlertDialog>
       
-      {receiptData && (
-        <ReceiptPreviewModal
-          open={showReceipt}
-          onOpenChange={setShowReceipt}
-          cart={receiptData.cart}
-          subtotal={receiptData.subtotal}
-          discount={receiptData.discount}
-          tax={receiptData.tax}
-          total={receiptData.total}
-          discountReason={receiptData.discountReason}
-          onPrint={() => {
-            setShowReceipt(false)
-            setReceiptData(null)
-          }}
-          onSkip={() => {
-            setShowReceipt(false)
-            setReceiptData(null)
-          }}
-        />
-      )}
+      {/* Receipt preview removed from POS terminal - printing is automatic */}
 
       {/* Payment Method Selection Modal */}
       <PaymentMethodModal
@@ -1251,6 +1410,24 @@ export function RetailPOS() {
         onCancel={() => {
           setShowPaymentMethod(false)
           setIsProcessingPayment(false)
+        }}
+      />
+
+      {/* Add/Edit Product Modal used when barcode lookup returns no result */}
+      <AddEditProductModal
+        open={showAddProductModal}
+        onOpenChange={(open) => {
+          setShowAddProductModal(open)
+          if (!open) {
+            setProductToCreate(null)
+          }
+        }}
+        product={productToCreate || undefined}
+        onProductSaved={async () => {
+          // Refresh product list so newly created product is available immediately
+          await fetchProductsAndCategories()
+          setShowAddProductModal(false)
+          setProductToCreate(null)
         }}
       />
     </div>

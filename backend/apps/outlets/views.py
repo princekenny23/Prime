@@ -7,7 +7,10 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from .models import Outlet, Till
 from .serializers import OutletSerializer, TillSerializer
+from .models import Printer
+from .serializers import PrinterSerializer
 from apps.tenants.permissions import TenantFilterMixin
+from django.http import HttpResponse
 
 logger = logging.getLogger(__name__)
 
@@ -263,6 +266,65 @@ class OutletViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         serializer = TillSerializer(tills, many=True)
         return Response(serializer.data)
 
+    @action(detail=False, methods=['get'])
+    def qz_certificate(self, request):
+        """Return configured QZ PEM certificate (tenant-admin-only)"""
+        from django.conf import settings
+        from apps.tenants.permissions import is_admin_user
+        cert_path = getattr(settings, 'QZ_CERT_PATH', None)
+        if not cert_path:
+            return Response({'detail': 'QZ certificate not configured'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Only allow tenant admins or SaaS admins
+        if not is_admin_user(request.user):
+            return Response({'detail': 'Insufficient permission'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            with open(cert_path, 'r') as f:
+                pem = f.read()
+            # Return raw PEM string as plain text so clients can use it directly
+            return HttpResponse(pem, content_type='text/plain', status=status.HTTP_200_OK)
+        except Exception:
+            logger.exception("Error reading QZ certificate")
+            return Response({'detail': 'Failed to read certificate'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'])
+    def qz_sign(self, request):
+        """Sign a payload for QZ security (server-side signing). Request: { data: <string> }"""
+        from django.conf import settings
+        from apps.tenants.permissions import is_admin_user
+        import base64
+        data = request.data.get('data')
+        if not data:
+            return Response({'detail': 'Missing data to sign'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Only allow tenant admins or SaaS admins
+        if not is_admin_user(request.user):
+            return Response({'detail': 'Insufficient permission'}, status=status.HTTP_403_FORBIDDEN)
+
+        key_path = getattr(settings, 'QZ_PRIVATE_KEY_PATH', None)
+        if not key_path:
+            return Response({'detail': 'QZ signing key not configured'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            from cryptography.hazmat.primitives import serialization, hashes
+            from cryptography.hazmat.primitives.asymmetric import padding
+
+            with open(key_path, 'rb') as key_file:
+                private_key = serialization.load_pem_private_key(key_file.read(), password=None)
+
+            signature = private_key.sign(
+                data.encode('utf-8'),
+                padding.PKCS1v15(),
+                hashes.SHA1()
+            )
+            sig_b64 = base64.b64encode(signature).decode('ascii')
+            # Return raw base64 signature with text/plain content type (no JSON encoding)
+            return HttpResponse(sig_b64, content_type='text/plain', status=status.HTTP_200_OK)
+        except Exception:
+            logger.exception("Error signing QZ payload")
+            return Response({'detail': 'Failed to sign payload'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class TillViewSet(viewsets.ModelViewSet, TenantFilterMixin):
     """Till ViewSet"""
@@ -408,4 +470,41 @@ class TillViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         )
         serializer = self.get_serializer(tills, many=True)
         return Response(serializer.data)
+
+
+class PrinterViewSet(viewsets.ModelViewSet, TenantFilterMixin):
+    """Manage printers registered to outlets"""
+    queryset = Printer.objects.select_related('outlet', 'outlet__tenant').all()
+    serializer_class = PrinterSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['outlet', 'driver', 'is_default']
+    search_fields = ['name', 'identifier']
+    ordering_fields = ['created_at', 'name']
+
+    def get_queryset(self):
+        """Filter printers by tenant via outlet"""
+        queryset = super().get_queryset()
+        user = self.request.user
+        if not hasattr(user, '_tenant_loaded'):
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+                user = User.objects.select_related('tenant').get(pk=user.pk)
+                self.request.user = user
+                user._tenant_loaded = True
+            except User.DoesNotExist:
+                pass
+
+        if self.request.user.is_saas_admin:
+            return queryset
+        tenant = getattr(self.request, 'tenant', None) or getattr(self.request.user, 'tenant', None)
+        if tenant:
+            return queryset.filter(outlet__tenant=tenant)
+        return queryset.none()
+
+    def perform_create(self, serializer):
+        # outlet_id is validated in serializer
+        serializer.save()
+
 

@@ -107,7 +107,6 @@ export default function CategoriesPage() {
                   <TableRow className="bg-gray-50">
                     <TableHead className="text-gray-900 font-semibold">Category</TableHead>
                     <TableHead className="text-gray-900 font-semibold">Description</TableHead>
-                    <TableHead className="text-gray-900 font-semibold">Products</TableHead>
                     <TableHead className="text-gray-900 font-semibold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -123,10 +122,7 @@ export default function CategoriesPage() {
                       <TableCell className="text-muted-foreground">
                         {category.description || "No description"}
                       </TableCell>
-                      <TableCell>
-                        {/* Product count will be available from backend */}
-                        <span className="text-gray-600">-</span>
-                      </TableCell>
+                      
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Button 

@@ -40,7 +40,7 @@ export function PageRefreshButton({
         onClick={handleRefresh}
         disabled={isRefreshing}
         title="Refresh page"
-        className={className}
+        className={`bg-white border-white text-[#1e3a8a] hover:bg-blue-50 hover:border-blue-50 ${className}`}
       >
         <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
       </Button>
@@ -53,7 +53,7 @@ export function PageRefreshButton({
       size={size}
       onClick={handleRefresh}
       disabled={isRefreshing}
-      className={className}
+      className={`bg-white border-white text-[#1e3a8a] hover:bg-blue-50 hover:border-blue-50 ${className}`}
     >
       <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
       {showLabel && "Refresh"}

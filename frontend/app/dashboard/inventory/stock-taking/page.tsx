@@ -256,7 +256,7 @@ export default function StockTakingHistoryPage() {
                   <TableRow className="bg-gray-50">
                     <TableHead className="w-12"></TableHead>
                     <TableHead className="text-gray-900 font-semibold">STARTS</TableHead>
-                    <TableHead className="text-gray-900 font-semibold">CLOSED</TableHead>
+                    <TableHead className="text-gray-900 font-semibold">STATUS</TableHead>
                     <TableHead className="text-gray-900 font-semibold">OPERATING DATE</TableHead>
                     <TableHead className="text-gray-900 font-semibold">OUTLET</TableHead>
                     <TableHead className="text-gray-900 font-semibold">USER(S)</TableHead>

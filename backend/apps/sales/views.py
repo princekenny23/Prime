@@ -6,10 +6,12 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db import transaction
 from django.utils import timezone
+from django.template import engines
+import logging
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from .models import Sale, SaleItem, Delivery, DeliveryItem, DeliveryStatusHistory, Receipt
-from .serializers import SaleSerializer, SaleItemSerializer, DeliverySerializer, DeliveryItemSerializer, DeliveryStatusHistorySerializer, ReceiptSerializer
+from .models import Sale, SaleItem, Delivery, DeliveryItem, DeliveryStatusHistory, Receipt, ReceiptTemplate
+from .serializers import SaleSerializer, SaleItemSerializer, DeliverySerializer, DeliveryItemSerializer, DeliveryStatusHistorySerializer, ReceiptSerializer, ReceiptTemplateSerializer
 from .services import ReceiptService
 from apps.products.models import Product, ProductUnit, ItemVariation
 from apps.inventory.models import StockMovement, LocationStock
@@ -398,6 +400,9 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
             from apps.restaurant.models import KitchenOrderTicket
             
             # Generate unique KOT number (deterministic based on timestamp and count)
+            # After a sale is created and saved, don't block on generating receipts here; we use a post-commit
+            # signal to generate receipts. We also provide an on-demand endpoint for cases where the client
+            # needs to trigger generation synchronously (e.g., print attempts from POS).
             date_str = timezone.now().strftime('%Y%m%d')
             # Get count of KOTs for today to ensure uniqueness
             today_kot_count = KitchenOrderTicket.objects.filter(
@@ -772,7 +777,58 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         
         serializer = self.get_serializer(sale)
         return Response(serializer.data)
-    
+
+    @action(detail=True, methods=['post'])
+    def generate_receipt(self, request, pk=None):
+        """Generate a receipt for this sale on-demand.
+
+        Useful for POS clients that need an ESC/POS payload immediately when printing.
+        This action is idempotent — if a receipt already exists we'll return it.
+        """
+        sale = self.get_object()
+        tenant = getattr(request, 'tenant', None) or request.user.tenant
+
+        # Permission check: tenant must match unless SaaS admin
+        from apps.tenants.permissions import is_admin_user
+        if not is_admin_user(request.user) and tenant and sale.tenant != tenant:
+            return Response({"detail": "You do not have permission to generate a receipt for this sale."}, status=status.HTTP_403_FORBIDDEN)
+
+        fmt = request.query_params.get('format', request.data.get('format', 'escpos')) or 'escpos'
+        try:
+            receipt = ReceiptService.generate_receipt(sale, format=fmt, user=request.user)
+            serializer = ReceiptSerializer(receipt)
+            return Response(serializer.data)
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to generate receipt for sale {sale.id}: {str(e)}", exc_info=True)
+            return Response({"detail": "Failed to generate receipt"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['get'], url_path='escpos-receipt')
+    def escpos_receipt(self, request, pk=None):
+        """Convenience endpoint that returns an ESC/POS base64 payload for a sale.
+
+        If an ESC/POS receipt does not exist, this will generate it on-demand and return it.
+        """
+        sale = self.get_object()
+        tenant = getattr(request, 'tenant', None) or request.user.tenant
+
+        # Permission check: tenant must match unless SaaS admin
+        from apps.tenants.permissions import is_admin_user
+        if not is_admin_user(request.user) and tenant and sale.tenant != tenant:
+            return Response({"detail": "You do not have permission to view this sale's receipt."}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            receipt = ReceiptService.generate_receipt(sale, format='escpos', user=request.user)
+            return Response({
+                'receipt_number': receipt.receipt_number,
+                'format': receipt.format,
+                'content': receipt.content,
+            })
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to generate escpos receipt for sale {sale.id}: {str(e)}", exc_info=True)
+            return Response({"detail": "Failed to generate escpos receipt"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     @action(detail=False, methods=['get'])
     def stats(self, request):
         """Get sales statistics - optimized with database aggregation"""
@@ -1225,20 +1281,25 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet, TenantFilterMixin):
     
     @action(detail=True, methods=['post'], url_path='regenerate')
     def regenerate(self, request, pk=None):
-        """Regenerate receipt (admin only)"""
+        """Regenerate receipt (admin only). This creates a new immutable receipt
+        record and voids the previous one to preserve audit history."""
         receipt = self.get_object()
         format_type = request.data.get('format', 'html')
         
         try:
-            updated_receipt = ReceiptService.regenerate_receipt(receipt.id, format=format_type)
-            serializer = self.get_serializer(updated_receipt)
+            new_receipt = ReceiptService.regenerate_receipt(receipt.id, format=format_type, user=request.user)
+            serializer = self.get_serializer(new_receipt)
             return Response(serializer.data)
         except Exception as e:
             return Response(
                 {'error': f'Failed to regenerate receipt: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-    
+
+    # NOTE: Receipts are immutable legal records. The `update-content` endpoint
+    # used to allow editing stored receipt content; that is removed to enforce
+    # immutability. Use the `regenerate` action which creates a new receipt record
+    # (voiding the old one) if you need a new version (admin only).    
     @action(detail=True, methods=['get'], url_path='download')
     def download(self, request, pk=None):
         """Download receipt as HTML file"""
@@ -1249,4 +1310,85 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet, TenantFilterMixin):
         response = HttpResponse(receipt.content, content_type='text/html')
         response['Content-Disposition'] = f'attachment; filename="receipt_{receipt.receipt_number}.html"'
         return response
+
+
+class ReceiptTemplateViewSet(viewsets.ModelViewSet, TenantFilterMixin):
+    """Manage per-tenant receipt templates"""
+    from .models import ReceiptTemplate as _RT  # local import for typing
+    queryset = _RT.objects.all()
+    serializer_class = ReceiptTemplateSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['tenant', 'is_default']
+    search_fields = ['name']
+    ordering_fields = ['updated_at', 'created_at']
+    ordering = ['-is_default', 'name']
+
+    def get_queryset(self):
+        user = self.request.user
+        if not hasattr(user, '_tenant_loaded'):
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+                user = User.objects.select_related('tenant').get(pk=user.pk)
+                self.request.user = user
+                user._tenant_loaded = True
+            except User.DoesNotExist:
+                pass
+
+        is_saas_admin = getattr(user, 'is_saas_admin', False)
+        request_tenant = getattr(self.request, 'tenant', None)
+        user_tenant = getattr(user, 'tenant', None)
+        tenant = request_tenant or user_tenant
+
+        qs = ReceiptTemplate.objects.select_related('tenant').all()
+        if not is_saas_admin:
+            if tenant:
+                qs = qs.filter(tenant=tenant)
+            else:
+                return qs.none()
+
+        return qs.order_by('-is_default', 'name')
+
+    def perform_create(self, serializer):
+        # ensure tenant is set from request (do not allow creating templates for other tenants)
+        tenant = getattr(self.request, 'tenant', None) or self.request.user.tenant
+        serializer.save(tenant=tenant)
+
+    def perform_update(self, serializer):
+        # prevent changing tenant via update
+        serializer.save()
+
+    @action(detail=True, methods=['post'], url_path='preview')
+    def preview(self, request, pk=None):
+        """Render the template server-side with canned sample data and return the
+        rendered content. This ensures preview matches what will be generated for
+        actual sales and that rendering errors are caught on the backend.
+        """
+        template = self.get_object()
+        # Small, deterministic sample sale context used for previews
+        sample_sale = {
+            'receipt_number': 'SAMPLE-0001',
+            'created_at': timezone.now().isoformat(),
+            'subtotal': '9.99',
+            'tax': '0.00',
+            'discount': '0.00',
+            'total': '9.99',
+            'user': {'id': None, 'name': 'Cashier'},
+            'items': [
+                {'product_name': 'Sample Item', 'quantity': 1, 'price': '9.99', 'total': '9.99'}
+            ],
+            'outlet_detail': { 'name': getattr(request.tenant, 'name', '') if hasattr(request, 'tenant') else '' }
+        }
+
+        try:
+            engine = engines['django']
+            tpl = engine.from_string(template.content or '')
+            rendered = tpl.render({'sale': sample_sale, 'items': sample_sale['items'], 'tenant': {'name': template.tenant.name}})
+            return Response({'preview': rendered, 'format': template.format})
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"Template preview failed for template {template.id}: {str(e)}", exc_info=True)
+            return Response({'error': 'Failed to render preview'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 

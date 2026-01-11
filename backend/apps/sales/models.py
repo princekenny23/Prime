@@ -387,11 +387,21 @@ class DeliveryStatusHistory(models.Model):
 
 
 class Receipt(models.Model):
-    """Digital receipt stored in database"""
+    """Digital receipt stored in database.
+
+    Key invariants enforced here (Square-style):
+    - Receipts are immutable legal records once created. Attempts to modify
+      `sale`, `format` or `content` on an existing Receipt will raise an error.
+    - Receipts are versioned: regenerating a receipt will create a new Receipt
+      record and mark the previous one `is_current=False` and `voided=True`.
+    - The backend is the single source of truth: frontends MUST NOT edit stored
+      receipt content and must request the server for previews/printing.
+    """
     FORMAT_CHOICES = [
         ('html', 'HTML'),
         ('pdf', 'PDF'),
         ('json', 'JSON'),
+        ('escpos', 'ESC/POS'),
     ]
     
     SENT_VIA_CHOICES = [
@@ -402,20 +412,29 @@ class Receipt(models.Model):
     ]
     
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='receipts')
-    sale = models.OneToOneField(Sale, on_delete=models.CASCADE, related_name='receipt', help_text="The sale this receipt belongs to")
-    receipt_number = models.CharField(max_length=50, unique=True, db_index=True, help_text="Receipt number for quick lookup")
+    # Change to ForeignKey to allow versioning/history of receipts while keeping
+    # receipts immutable. Use related_name='receipts' to find all receipts for a sale.
+    sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='receipts', help_text="The sale this receipt belongs to")
+    # Note: receipt_number is not unique to allow versioning/history for the same sale
+    receipt_number = models.CharField(max_length=50, db_index=True, help_text="Receipt number for quick lookup")
     
     # Receipt content
-    format = models.CharField(max_length=10, choices=FORMAT_CHOICES, default='html', help_text="Format of stored receipt")
-    content = models.TextField(help_text="Receipt content (HTML/JSON)")
+    format = models.CharField(max_length=10, choices=FORMAT_CHOICES, default='json', help_text="Format of stored receipt")
+    content = models.TextField(help_text="Receipt content (HTML/JSON/ESC/POS base64)")
     pdf_file = models.FileField(upload_to='receipts/pdf/', null=True, blank=True, help_text="PDF file if format is PDF")
     
+    # Versioning / immutability
+    is_current = models.BooleanField(default=True, help_text="Whether this is the current receipt for the sale/format")
+    voided = models.BooleanField(default=False, help_text="Whether this receipt has been voided/superseded")
+    superseded_by = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='supersedes', help_text="If superseded, reference to the new receipt")
+
     # Metadata
     generated_at = models.DateTimeField(auto_now_add=True, help_text="When receipt was generated")
-    generated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='generated_receipts', help_text="User who created the sale")
+    generated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='generated_receipts', help_text="User who created the receipt")
     
     # Delivery tracking
     is_sent = models.BooleanField(default=False, help_text="Whether receipt was sent to customer")
+
     sent_at = models.DateTimeField(null=True, blank=True, help_text="When receipt was sent")
     sent_via = models.CharField(max_length=20, choices=SENT_VIA_CHOICES, default='none', help_text="Method used to send receipt")
     
@@ -437,10 +456,68 @@ class Receipt(models.Model):
     
     def __str__(self):
         return f"Receipt {self.receipt_number}"
-    
+
     def increment_access(self):
         """Increment access count and update last accessed time"""
         self.access_count += 1
         self.last_accessed_at = timezone.now()
         self.save(update_fields=['access_count', 'last_accessed_at'])
+
+    def save(self, *args, **kwargs):
+        """Enforce immutability for created receipts.
+
+        Once created, you must not change `sale`, `format` or `content` fields.
+        To update a receipt (e.g., regenerate), create a new Receipt record and
+        mark the old one `voided=True` and `is_current=False`.
+        """
+        if self.pk:
+            # Fetch current stored values and compare
+            try:
+                orig = Receipt.objects.get(pk=self.pk)
+                if (orig.sale_id != self.sale_id) or (orig.format != self.format) or (orig.content != self.content):
+                    raise ValueError('Receipts are immutable once created. Create a new receipt to replace an existing one.')
+            except Receipt.DoesNotExist:
+                # Shouldn't happen, but allow save in that case
+                pass
+        super().save(*args, **kwargs)
+
+
+class ReceiptTemplate(models.Model):
+    """Per-tenant editable receipt template.
+
+    Tenants can manage their own receipt appearance. The system will prefer
+    the tenant's default template when printing receipts.
+    """
+    FORMAT_CHOICES = [
+        ('text', 'Plain Text'),
+        ('html', 'HTML'),
+        ('json', 'JSON'),
+    ]
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='receipt_templates')
+    name = models.CharField(max_length=100, default='Default Template')
+    format = models.CharField(max_length=10, choices=FORMAT_CHOICES, default='text')
+    content = models.TextField(blank=True, help_text='Template content (text/html/json)')
+    is_default = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'sales_receipttemplate'
+        verbose_name = 'Receipt Template'
+        verbose_name_plural = 'Receipt Templates'
+        unique_together = [['tenant', 'name']]
+        ordering = ['-is_default', 'name']
+
+    def __str__(self):
+        return f"{self.tenant.name} - {self.name}"
+
+    def save(self, *args, **kwargs):
+        # If marking as default, unset other defaults for this tenant
+        if self.is_default:
+            if self.pk:
+                ReceiptTemplate.objects.filter(tenant=self.tenant).exclude(pk=self.pk).update(is_default=False)
+            else:
+                ReceiptTemplate.objects.filter(tenant=self.tenant).update(is_default=False)
+        super().save(*args, **kwargs)
 

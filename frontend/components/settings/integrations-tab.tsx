@@ -9,6 +9,9 @@ import { Badge } from "@/components/ui/badge"
 import { Printer, Key, MessageSquare, Mail, FileText } from "lucide-react"
 import { useState } from "react"
 import { useToast } from "@/components/ui/use-toast"
+import { PrinterSettings } from "@/components/settings/printer-settings"
+import HardwareScannerSettings from "@/components/settings/hardware-scanner-settings"
+import QzSettings from "@/components/settings/qz-settings"
 
 export function IntegrationsTab() {
   const { toast } = useToast()
@@ -20,6 +23,20 @@ export function IntegrationsTab() {
       name: "Printer Setup",
       description: "Configure receipt and label printers",
       icon: Printer,
+      enabled: true,
+    },
+    {
+      id: "qz",
+      name: "QZ Tray",
+      description: "Configure QZ Tray integration and auto-connect",
+      icon: FileText,
+      enabled: false,
+    },
+    {
+      id: "scanner",
+      name: "Hardware Scanner",
+      description: "Keyboard-wedge barcode scanner settings",
+      icon: Key,
       enabled: true,
     },
     {
@@ -98,12 +115,15 @@ export function IntegrationsTab() {
               {integration.enabled && (
                 <div className="space-y-2">
                   {integration.id === "printer" && (
-                    <>
-                      <Label htmlFor="printer-name">Printer Name</Label>
-                      <Input id="printer-name" defaultValue="Receipt Printer" />
-                      <Label htmlFor="printer-ip">Printer IP Address</Label>
-                      <Input id="printer-ip" defaultValue="192.168.1.100" />
-                    </>
+                    <PrinterSettings />
+                  )}
+
+                  {integration.id === "qz" && (
+                    <QzSettings />
+                  )}
+
+                  {integration.id === "scanner" && (
+                    <HardwareScannerSettings />
                   )}
 
                   {integration.id === "api" && (

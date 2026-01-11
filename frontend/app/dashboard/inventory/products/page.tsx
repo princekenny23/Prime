@@ -37,6 +37,7 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import { AddEditProductModal } from "@/components/modals/add-edit-product-modal"
 import { ImportProductsModal } from "@/components/modals/import-products-modal"
 import { productService, categoryService } from "@/lib/services/productService"
+import { useBarcodeScanner } from "@/lib/hooks/useBarcodeScanner"
 import { apiEndpoints } from "@/lib/api"
 import { useBusinessStore } from "@/stores/businessStore"
 import { useToast } from "@/components/ui/use-toast"
@@ -57,6 +58,16 @@ export default function ProductsPage() {
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<any>(null)
+  const [initialBarcode, setInitialBarcode] = useState<string | undefined>(undefined)
+
+  useBarcodeScanner({
+    onScan: async (code) => {
+      // Open create product modal prefilled with scanned barcode
+      setInitialBarcode(code)
+      setShowAddProduct(true)
+    }
+  });
+
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [activeTab, setActiveTab] = useState("all")
@@ -506,16 +517,7 @@ export default function ProductsPage() {
     <DashboardLayout>
       <PageLayout
         title="Products"
-        description={
-          <>
-            Manage your product catalog
-            {isAutoRefreshing && (
-              <span className="ml-2 text-xs text-blue-100">
-                (Updating...)
-              </span>
-            )}
-          </>
-        }
+        description={`Manage your product catalog${isAutoRefreshing ? ' (Updating...)' : ''}` }
         actions={
           <div className="flex gap-2">
             <Button
@@ -524,7 +526,7 @@ export default function ProductsPage() {
               disabled={isRefreshing || isLoading}
               className="bg-white border-white text-[#1e3a8a] hover:bg-blue-50 hover:border-blue-50"
             >
-              <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing || isAutoRefreshing ? "animate-spin" : ""}`} />
+              <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing  ? "animate-spin" : ""}`} />
               Refresh
             </Button>
             <Button
@@ -991,12 +993,14 @@ export default function ProductsPage() {
           setShowAddProduct(open)
           if (!open) {
             setSelectedProduct(null)
+            setInitialBarcode(undefined)
             // Always refresh when modal closes to ensure latest data is shown
             // This catches cases where stock might have changed externally
             handleProductSaved()
           }
         }}
         product={selectedProduct}
+        initialBarcode={initialBarcode}
         onProductSaved={async () => {
           // Refresh immediately after save to show updated data (stock, prices, etc.)
           await handleProductSaved()

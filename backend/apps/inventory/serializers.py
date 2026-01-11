@@ -1,6 +1,7 @@
 from rest_framework import serializers  # pyright: ignore[reportMissingImports]
 from .models import StockMovement, StockTake, StockTakeItem, LocationStock
 from apps.products.serializers import ProductSerializer, ItemVariationSerializer
+from apps.products.models import Product, ItemVariation
 
 
 class StockMovementSerializer(serializers.ModelSerializer):
@@ -9,8 +10,8 @@ class StockMovementSerializer(serializers.ModelSerializer):
     product_name = serializers.SerializerMethodField()
     variation = ItemVariationSerializer(read_only=True)
     variation_name = serializers.SerializerMethodField()
-    product_id = serializers.IntegerField(write_only=True, required=False, allow_null=True, source='product')
-    variation_id = serializers.IntegerField(write_only=True, required=False, allow_null=True, source='variation')
+    product_id = serializers.PrimaryKeyRelatedField(write_only=True, required=False, allow_null=True, source='product', queryset=Product.objects.all())
+    variation_id = serializers.PrimaryKeyRelatedField(write_only=True, required=False, allow_null=True, source='variation', queryset=ItemVariation.objects.all())
     user_name = serializers.SerializerMethodField()
     outlet_name = serializers.SerializerMethodField()
     
@@ -41,20 +42,23 @@ class StockMovementSerializer(serializers.ModelSerializer):
         return "N/A"
     
     def validate(self, attrs):
-        """Ensure either product or variation is set"""
-        product = attrs.get('product')
-        variation = attrs.get('variation')
-        
+        instance = getattr(self, 'instance', None)
+
+        product = attrs.get('product') or (instance.product if instance else None)
+        variation = attrs.get('variation') or (instance.variation if instance else None)
+
         if not product and not variation:
             raise serializers.ValidationError("Either product or variation must be set")
+
         if product and variation:
-            raise serializers.ValidationError("Cannot set both product and variation. Use variation for new records.")
-        
-        # Auto-set product from variation if needed
+           raise serializers.ValidationError("Cannot set both product and variation")
+
         if variation and not product:
-            attrs['product'] = variation.product
-        
+           attrs['product'] = variation.product
+
         return attrs
+
+
     
     class Meta:
         model = StockMovement
@@ -70,8 +74,8 @@ class StockTakeItemSerializer(serializers.ModelSerializer):
     product_name = serializers.SerializerMethodField()
     variation = ItemVariationSerializer(read_only=True)
     variation_name = serializers.SerializerMethodField()
-    product_id = serializers.IntegerField(write_only=True, required=False, allow_null=True, source='product')
-    variation_id = serializers.IntegerField(write_only=True, required=False, allow_null=True, source='variation')
+    product_id = serializers.PrimaryKeyRelatedField(write_only=True, required=False, allow_null=True, source='product', queryset=Product.objects.all())
+    variation_id = serializers.PrimaryKeyRelatedField(write_only=True, required=False, allow_null=True, source='variation', queryset=ItemVariation.objects.all())
     
     def get_product_name(self, obj):
         """Get product name from variation or product"""
@@ -89,18 +93,21 @@ class StockTakeItemSerializer(serializers.ModelSerializer):
     
     def validate(self, attrs):
         """Ensure either product or variation is set"""
-        product = attrs.get('product')
-        variation = attrs.get('variation')
-        
+        instance = getattr(self, 'instance', None)
+
+        # Allow partial updates: if instance exists, fall back to its product/variation
+        product = attrs.get('product') or (instance.product if instance else None)
+        variation = attrs.get('variation') or (instance.variation if instance else None)
+
         if not product and not variation:
             raise serializers.ValidationError("Either product or variation must be set")
         if product and variation:
             raise serializers.ValidationError("Cannot set both product and variation. Use variation for new records.")
-        
+
         # Auto-set product from variation if needed
         if variation and not product:
             attrs['product'] = variation.product
-        
+
         return attrs
     
     class Meta:
@@ -114,7 +121,7 @@ class StockTakeItemSerializer(serializers.ModelSerializer):
 class LocationStockSerializer(serializers.ModelSerializer):
     """Location stock serializer"""
     variation = ItemVariationSerializer(read_only=True)
-    variation_id = serializers.IntegerField(write_only=True, source='variation')
+    variation_id = serializers.PrimaryKeyRelatedField(write_only=True, source='variation', queryset=ItemVariation.objects.all())
     outlet_name = serializers.CharField(source='outlet.name', read_only=True)
     product_name = serializers.SerializerMethodField()
     

@@ -4,6 +4,8 @@ Handles creation and formatting of digital receipts
 """
 import logging
 from django.template.loader import render_to_string
+from django.template import engines, TemplateSyntaxError
+import json
 from django.utils import timezone
 from decimal import Decimal
 from .models import Sale, Receipt
@@ -17,7 +19,7 @@ class ReceiptService:
     """Service for generating and managing digital receipts"""
     
     @staticmethod
-    def generate_receipt(sale: Sale, format: str = 'html', user: User = None) -> Receipt:
+    def generate_receipt(sale: Sale, format: str = 'json', user: User = None) -> Receipt:
         """
         Generate and save a receipt for a sale
         
@@ -30,24 +32,109 @@ class ReceiptService:
             Receipt instance
         """
         try:
-            # Check if receipt already exists
-            if hasattr(sale, 'receipt'):
-                logger.info(f"Receipt already exists for sale {sale.id}")
-                return sale.receipt
-            
+            # If a current receipt with the requested format already exists, return it.
+            existing_same_format = Receipt.objects.filter(sale=sale, format=format, is_current=True, voided=False).first()
+            if existing_same_format:
+                logger.info(f"Found current receipt for sale {sale.id} format={format} -> receipt={existing_same_format.id}")
+                return existing_same_format
+
             # Get user
             if not user:
                 user = sale.user
+
+            # Prefer tenant's default receipt template when available
+            from .models import ReceiptTemplate
+            from .serializers import SaleSerializer
+
+            template = None
+            try:
+                template = ReceiptTemplate.objects.filter(tenant=sale.tenant, is_default=True).first()
+            except Exception:
+                template = None
+
+            # Build a safe context using serialized sale data
+            sale_data = SaleSerializer(sale).data
+            context = {
+                'sale': sale_data,
+                'items': sale_data.get('items', []),
+                'outlet': sale_data.get('outlet_detail') or {},
+                'tenant': {'id': str(sale.tenant.id), 'name': getattr(sale.tenant, 'name', '')},
+            }
+
+            if template and template.content:
+                # Render template according to its stored format
+                try:
+                    engine = engines['django']
+                    tpl = engine.from_string(template.content or '')
+                    rendered = tpl.render(context)
+                except TemplateSyntaxError as e:
+                    logger.error(f"Template syntax error for tenant {sale.tenant.id}: {str(e)}")
+                    # Fall back to programmatic generators
+                    rendered = None
+
+                if rendered is not None:
+                    # If caller asked for escpos, convert rendered text to escpos bytes
+                    if format == 'escpos':
+                        # Ensure we have a text representation
+                        text_to_convert = rendered
+                        # If template.format is json, dump to pretty text
+                        if template.format == 'json':
+                            try:
+                                parsed = json.loads(rendered)
+                                text_to_convert = json.dumps(parsed, indent=2)
+                            except Exception:
+                                # leave as-is
+                                pass
+                        content = ReceiptService._text_to_escpos(sale, text_to_convert)
+                    else:
+                        # Respect requested format when possible; otherwise store template's format
+                        if format == 'html' or template.format == 'html' or template.format == 'text':
+                            content = rendered
+                            # if requested format explicitly json, try to convert
+                            if format == 'json':
+                                try:
+                                    content = json.dumps(json.loads(rendered), indent=2)
+                                except Exception:
+                                    # if rendered is not valid JSON, keep as string
+                                    pass
+                        elif template.format == 'json' or format == 'json':
+                            # Ensure valid JSON string
+                            try:
+                                parsed = json.loads(rendered)
+                                content = json.dumps(parsed, indent=2)
+                            except Exception:
+                                # Fallback to putting rendered string in content
+                                content = rendered
+                        else:
+                            content = rendered
+                else:
+                    # Template failed to render; fall back to programmatic generation
+                    template = None
+
+            if not template or not template.content:
+                # Generate receipt content based on format (fallbacks)
+                if format == 'html':
+                    # HTML kept for previewing, but not intended for direct printing in POS flow
+                    content = ReceiptService._generate_html_receipt(sale)
+                elif format == 'json':
+                    content = ReceiptService._generate_json_receipt(sale)
+                elif format == 'escpos':
+                    # Return base64-encoded ESC/POS bytes as text payload
+                    content = ReceiptService._generate_escpos_receipt(sale)
+                else:
+                    # Fallback to structured JSON
+                    content = ReceiptService._generate_json_receipt(sale)
             
-            # Generate receipt content based on format
-            if format == 'html':
-                content = ReceiptService._generate_html_receipt(sale)
-            elif format == 'json':
-                content = ReceiptService._generate_json_receipt(sale)
-            else:
-                content = ReceiptService._generate_html_receipt(sale)
-            
-            # Create receipt
+            # Create a new Receipt record (immutable once created). For versioning,
+            # mark any existing current receipts for this sale+format as not current
+            # and void them.
+            # Note: receipt_number is intentionally left as the sale.receipt_number to
+            # maintain human-friendly numbering; if a new unique number is required we
+            # could append a suffix or generate a new token here.
+            previous = Receipt.objects.filter(sale=sale, format=format, is_current=True, voided=False)
+            if previous.exists():
+                previous.update(is_current=False, voided=True)
+
             receipt = Receipt.objects.create(
                 tenant=sale.tenant,
                 sale=sale,
@@ -56,8 +143,8 @@ class ReceiptService:
                 content=content,
                 generated_by=user,
             )
-            
-            logger.info(f"Receipt generated for sale {sale.id}: {receipt.id}")
+
+            logger.info(f"Receipt generated for sale {sale.id}: {receipt.id} format={format} by user={getattr(user, 'id', None)}")
             return receipt
             
         except Exception as e:
@@ -258,7 +345,7 @@ class ReceiptService:
         html += """
                 <div class="receipt-footer">
                     <p>Thank you for your business!</p>
-                    <p>This is a computer-generated receipt.</p>
+                    <p>Powered by PRIMEPOS +265 997575865</p>
                 </div>
             </div>
         </body>
@@ -321,14 +408,102 @@ class ReceiptService:
         }
         
         return json.dumps(receipt_data, indent=2)
+
+    @staticmethod
+    def _generate_escpos_receipt(sale: Sale) -> str:
+        """Build a minimal ESC/POS byte payload for thermal printers and return base64-encoded string.
+
+        The backend does NOT send this to any printer. The frontend should request a receipt
+        with format='escpos', decode the base64 payload and forward the bytes to QZ Tray.
+        """
+        import base64
+
+        def b(text: str = ""):
+            return (text + "\n").encode('utf-8')
+
+        # ESC/POS init
+        payload = bytearray()
+        payload.extend(b"\x1b@")  # initialize (note: kept as literal for clarity)
+
+        # Header: business/outlet
+        business = sale.tenant.name if sale.tenant else "Business"
+        outlet = sale.outlet.name if sale.outlet else ""
+        currency = sale.tenant.currency if sale.tenant and sale.tenant.currency else "MWK"
+        payload.extend(b(business.upper()))
+        if outlet:
+            payload.extend(b(outlet))
+
+        payload.extend(b(f"Receipt #: {sale.receipt_number}"))
+        payload.extend(b(f"Date: {sale.created_at.strftime('%Y-%m-%d %H:%M:%S')}"))
+
+        # Items
+        payload.extend(b("-----------------------------"))
+        for item in sale.items.all():
+            name = item.product_name
+            qty = item.quantity
+            price = f"{currency} {item.total:,.2f}"
+            line = f"{name} x{qty}  {price}"
+            payload.extend(b(line))
+
+        payload.extend(b("-----------------------------"))
+        payload.extend(b(f"Subtotal: {currency} {sale.subtotal:,.2f}"))
+        if sale.tax and sale.tax > 0:
+            payload.extend(b(f"Tax: {currency} {sale.tax:,.2f}"))
+        if sale.discount and sale.discount > 0:
+            payload.extend(b(f"Discount: -{currency} {sale.discount:,.2f}"))
+        payload.extend(b(f"Total: {currency} {sale.total:,.2f}"))
+        payload.extend(b(f"Payment: {sale.get_payment_method_display()}"))
+
+        payload.extend(b("\nThank you for your business!"))
+        payload.extend(b("Powered by PRIMEPOS +265 997575865"))
+
+        # Paper cut (may not be supported by all printers; frontend may choose to append)
+        try:
+            # GS V 0 -> b'\x1dV\x00'
+            payload.extend(b("\x1dV\x00"))
+        except Exception:
+            pass
+
+        # Return base64-encoded bytes so they can safely be stored/transferred as text
+        return base64.b64encode(bytes(payload)).decode('ascii')
+
+    @staticmethod
+    def _text_to_escpos(sale: Sale, text: str) -> str:
+        """Convert a rendered text receipt into a minimal ESC/POS base64 payload."""
+        import base64
+
+        def b(text_line: str = ""):
+            return (text_line + "\n").encode('utf-8')
+
+        payload = bytearray()
+        # Initialize
+        payload.extend(b"\x1b@")
+        # Add text
+        # Ensure text is str
+        if text:
+            # Split into lines to avoid enormous single writes
+            for line in str(text).splitlines():
+                payload.extend(b(line))
+        # Footer
+        payload.extend(b("\nThank you for your business!"))
+        payload.extend(b("Powered by PRIMEPOS +265 997575865"))
+        try:
+            payload.extend(b("\x1dV\x00"))
+        except Exception:
+            pass
+
+        return base64.b64encode(bytes(payload)).decode('ascii')
     
     @staticmethod
     def get_receipt_by_number(receipt_number: str) -> Receipt:
-        """Retrieve receipt by receipt number"""
+        """Retrieve the most recent non-voided receipt matching `receipt_number`"""
         try:
-            receipt = Receipt.objects.select_related('sale', 'tenant', 'generated_by').get(
-                receipt_number=receipt_number
-            )
+            receipt = Receipt.objects.select_related('sale', 'tenant', 'generated_by').filter(
+                receipt_number=receipt_number,
+                voided=False,
+            ).order_by('-generated_at').first()
+            if not receipt:
+                raise Receipt.DoesNotExist()
             receipt.increment_access()
             return receipt
         except Receipt.DoesNotExist:
@@ -336,37 +511,63 @@ class ReceiptService:
     
     @staticmethod
     def get_receipt_by_sale(sale_id: int) -> Receipt:
-        """Retrieve receipt by sale ID"""
+        """Retrieve the current receipt for a sale (by sale ID)"""
         try:
             receipt = Receipt.objects.select_related('sale', 'tenant', 'generated_by').get(
-                sale_id=sale_id
+                sale_id=sale_id,
+                is_current=True,
+                voided=False,
             )
             return receipt
         except Receipt.DoesNotExist:
-            raise Receipt.DoesNotExist(f"Receipt for sale {sale_id} not found")
+            raise Receipt.DoesNotExist(f"Active receipt for sale {sale_id} not found")
     
     @staticmethod
-    def regenerate_receipt(receipt_id: int, format: str = 'html') -> Receipt:
-        """Regenerate a receipt (useful if template changes)"""
+    def regenerate_receipt(receipt_id: int, format: str = 'html', user: User = None) -> Receipt:
+        """Regenerate a receipt by creating a new version and voiding the previous one.
+
+        This preserves immutability by creating a new Receipt row rather than
+        mutating the existing record.
+        """
         try:
-            receipt = Receipt.objects.get(id=receipt_id)
-            sale = receipt.sale
-            
-            # Generate new content
+            old = Receipt.objects.get(id=receipt_id)
+            sale = old.sale
+
+            if not user:
+                user = old.generated_by
+
+            # Generate new content according to requested format
             if format == 'html':
                 content = ReceiptService._generate_html_receipt(sale)
             elif format == 'json':
                 content = ReceiptService._generate_json_receipt(sale)
+            elif format == 'escpos':
+                content = ReceiptService._generate_escpos_receipt(sale)
             else:
                 content = ReceiptService._generate_html_receipt(sale)
-            
-            # Update receipt
-            receipt.content = content
-            receipt.format = format
-            receipt.save(update_fields=['content', 'format'])
-            
-            logger.info(f"Receipt {receipt.id} regenerated")
-            return receipt
+
+            # Mark old as voided and not current
+            old.voided = True
+            old.is_current = False
+            old.save(update_fields=['voided', 'is_current'])
+
+            # Create new receipt (new immutable record)
+            new_receipt = Receipt.objects.create(
+                tenant=old.tenant,
+                sale=sale,
+                receipt_number=sale.receipt_number,
+                format=format,
+                content=content,
+                generated_by=user,
+                superseded_by=None
+            )
+
+            # Link predecessor
+            old.superseded_by = new_receipt
+            old.save(update_fields=['superseded_by'])
+
+            logger.info(f"Receipt {old.id} regenerated -> new receipt {new_receipt.id} by user={getattr(user, 'id', None)}")
+            return new_receipt
         except Receipt.DoesNotExist:
             raise Receipt.DoesNotExist(f"Receipt {receipt_id} not found")
 

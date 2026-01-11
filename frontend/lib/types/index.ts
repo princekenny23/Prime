@@ -101,9 +101,13 @@ export interface Sale {
   subtotal: number
   tax: number
   total: number
+  discount?: number
+  discountType?: "percentage" | "amount"
+  discountReason?: string
   paymentMethod: "cash" | "card" | "mobile" | "tab"
   status: "completed" | "pending" | "refunded"
   createdAt: string
+  _raw?: any
 }
 
 export interface SaleItem {

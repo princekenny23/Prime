@@ -201,6 +201,13 @@ CHANNEL_LAYERS = {
     },
 }
 
+# QZ Tray signing configuration
+# Set these in environment for production. Example:
+# QZ_CERT_PATH=/etc/primepos/qz_cert.pem
+# QZ_PRIVATE_KEY_PATH=/etc/primepos/qz_private_key.pem
+QZ_CERT_PATH = config('QZ_CERT_PATH', default=None)
+QZ_PRIVATE_KEY_PATH = config('QZ_PRIVATE_KEY_PATH', default=None)
+
 # Logging
 LOGGING = {
     'version': 1,

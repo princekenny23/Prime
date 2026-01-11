@@ -1,6 +1,14 @@
 import { api, apiEndpoints } from "@/lib/api"
 import type { Sale } from "@/lib/types"
 
+// Sale with backend metadata such as nested detail fields and discount info
+type SaleWithMetadata = Sale & {
+  _raw?: any
+  discount?: number
+  discountType?: string | undefined
+  discountReason?: string | undefined
+}
+
 export interface SaleFilters {
   outlet?: string
   status?: string
@@ -55,6 +63,9 @@ function transformSale(backendSale: any): Sale {
     subtotal: parseFloat(backendSale.subtotal) || 0,
     tax: parseFloat(backendSale.tax) || 0,
     total: parseFloat(backendSale.total) || 0,
+    discount: backendSale.discount ? parseFloat(backendSale.discount) : 0,
+    discountType: backendSale.discount_type || backendSale.discountType,
+    discountReason: backendSale.discount_reason || backendSale.discount_reason,
     paymentMethod: backendSale.payment_method || backendSale.paymentMethod || "cash",
     status: backendSale.status || "completed",
     createdAt: backendSale.created_at || backendSale.createdAt || new Date().toISOString(),
@@ -68,11 +79,11 @@ function transformSale(backendSale: any): Sale {
       shift_detail: backendSale.shift_detail,
       customer_detail: backendSale.customer_detail,
     },
-  } as any
+  } as SaleWithMetadata
 }
 
 export const saleService = {
-  async list(filters?: SaleFilters): Promise<{ results: Sale[]; count: number }> {
+  async list(filters?: SaleFilters): Promise<{ results: SaleWithMetadata[]; count: number }> {
     const params = new URLSearchParams()
     if (filters?.outlet) params.append("outlet", filters.outlet)
     if (filters?.status) params.append("status", filters.status)
@@ -98,12 +109,12 @@ export const saleService = {
     }
   },
 
-  async get(id: string): Promise<Sale> {
+  async get(id: string): Promise<SaleWithMetadata> {
     const response = await api.get<any>(apiEndpoints.sales.get(id))
     return transformSale(response)
   },
 
-  async create(data: CreateSaleData): Promise<Sale> {
+  async create(data: CreateSaleData): Promise<SaleWithMetadata> {
     // Transform frontend data to backend format
     // Ensure all IDs are integers
     const backendData: any = {
@@ -172,7 +183,7 @@ export const saleService = {
     }
   },
 
-  async refund(id: string, reason?: string): Promise<Sale> {
+  async refund(id: string, reason?: string): Promise<SaleWithMetadata> {
     const response = await api.post<any>(`${apiEndpoints.sales.get(id)}refund/`, { reason })
     return transformSale(response)
   },

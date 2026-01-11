@@ -31,6 +31,9 @@ import {
 } from "@/components/ui/popover"
 import { ClipboardCheck, Search, Save, ArrowLeft, CheckCircle2, Zap, X } from "lucide-react"
 import { useState, useEffect, useMemo } from "react"
+import { useBarcodeScanner } from "@/lib/hooks/useBarcodeScanner"
+import { productService } from "@/lib/services/productService"
+import { AddEditProductModal } from "@/components/modals/add-edit-product-modal"
 import { useRouter, useParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { inventoryService } from "@/lib/services/inventoryService"
@@ -66,6 +69,43 @@ export default function StockTakingDetailPage() {
   const [isCompleting, setIsCompleting] = useState(false)
   const [isAutoCompleting, setIsAutoCompleting] = useState(false)
 
+  // Modal / scanner states
+  const [showAddProduct, setShowAddProduct] = useState(false)
+  const [initialBarcode, setInitialBarcode] = useState<string | undefined>(undefined)
+
+  // Barcode scanner - increment counts or open create modal
+  useBarcodeScanner({
+    onScan: async (code) => {
+      try {
+        console.log("Scanned barcode:", code)
+        const { products, variations } = await productService.lookup(code)
+        const product = (products && products.length > 0) ? products[0] : undefined
+        const variation = (variations && variations.length > 0) ? variations[0] : undefined
+
+        let matchedItem: StockTakingItem | undefined
+
+        if (variation) {
+          const prodId = typeof variation.product === 'object' ? String((variation.product as any).id) : String(variation.product)
+          matchedItem = items.find(i => i.product_id === prodId || i.barcode === code)
+        } else if (product) {
+          matchedItem = items.find(i => i.product_id === product.id || i.barcode === product.barcode || i.barcode === code)
+        }
+
+        if (matchedItem) {
+          const newCount = (matchedItem.countedQty || 0) + 1
+          await handleCountChange(matchedItem.id, String(newCount))
+          toast({ title: "Scanned", description: `${matchedItem.product_name} incremented to ${newCount}` })
+        } else {
+          // No match in stock take - open add product modal with barcode prefilled
+          setInitialBarcode(code)
+          setShowAddProduct(true)
+        }
+      } catch (error) {
+        console.error("Barcode lookup failed:", error)
+        toast({ title: "Scan Error", description: "Failed to lookup barcode.", variant: "destructive" })
+      }
+    }
+  })
   useEffect(() => {
     loadStockTakeData()
   }, [stockTakeId])
@@ -718,6 +758,23 @@ export default function StockTakingDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Add/Edit Product Modal for scanned barcodes */}
+      <AddEditProductModal
+        open={showAddProduct}
+        onOpenChange={(open) => {
+          setShowAddProduct(open)
+          if (!open) {
+            setInitialBarcode(undefined)
+            // Reload stock take data in case user created a product that should be counted
+            loadStockTakeData()
+          }
+        }}
+        product={undefined}
+        initialBarcode={initialBarcode}
+        onProductSaved={() => loadStockTakeData()}
+      />
+
       </PageLayout>
     </DashboardLayout>
   )

@@ -343,6 +343,14 @@ export const apiEndpoints = {
     update: (id: string) => `/outlets/${id}/`,
     delete: (id: string) => `/outlets/${id}/`,
   },
+  // Printers registered to outlets
+  printers: {
+    list: "/printers/",
+    get: (id: string) => `/printers/${id}/`,
+    create: "/printers/",
+    update: (id: string) => `/printers/${id}/`,
+    delete: (id: string) => `/printers/${id}/`,
+  },
   // Tills
   tills: {
     list: "/tills/",
@@ -374,8 +382,7 @@ export const apiEndpoints = {
     get: (id: string) => `/products/${id}/`,
     create: "/products/",
     update: (id: string) => `/products/${id}/`,
-    delete: (id: string) => `/products/${id}/`,
-  },
+    delete: (id: string) => `/products/${id}/`,    lookup: "/products/lookup/",  },
   // Variations
   variations: {
     list: "/products/variations/",
@@ -574,6 +581,8 @@ export const apiEndpoints = {
     unreadCount: "/notifications/unread_count/",
     summary: "/notifications/summary/",
   },
+  
+  
   // Notification Preferences
   notificationPreferences: {
     list: "/notification-preferences/",

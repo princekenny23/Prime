@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from decimal import Decimal, InvalidOperation
 from .models import Sale, SaleItem, Delivery, DeliveryItem, DeliveryStatusHistory, Receipt
+from .models import ReceiptTemplate
 from apps.products.serializers import ProductSerializer
 
 
@@ -389,4 +390,31 @@ class ReceiptSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.pdf_file.url)
             return obj.pdf_file.url
         return None
+
+
+class ReceiptTemplateSerializer(serializers.ModelSerializer):
+    """Serializer for per-tenant receipt templates"""
+    tenant_detail = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = ReceiptTemplate
+        fields = (
+            'id', 'tenant', 'tenant_detail', 'name', 'format', 'content', 'is_default', 'created_at', 'updated_at'
+        )
+        read_only_fields = ('id', 'tenant', 'tenant_detail', 'created_at', 'updated_at')
+
+    def get_tenant_detail(self, obj):
+        if obj.tenant:
+            return {'id': str(obj.tenant.id), 'name': obj.tenant.name}
+        return None
+
+    def create(self, validated_data):
+        # Tenant will be set in the view (perform_create) for security; keep behavior safe here
+        return super().create(validated_data)
+
+    def validate(self, attrs):
+        # Basic validation: ensure content is present for non-json/text formats
+        if attrs.get('format') in ['text', 'html'] and not attrs.get('content'):
+            raise serializers.ValidationError("Template content cannot be empty for text/html formats")
+        return attrs
 

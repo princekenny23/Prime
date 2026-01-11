@@ -237,6 +237,16 @@ export const productService = {
     return response.count
   },
 
+  async lookup(barcode: string): Promise<{ products: Product[]; variations: ItemVariation[] }> {
+    if (!barcode || barcode.trim() === "") {
+      return { products: [], variations: [] }
+    }
+    const response = await api.get<any>(`${apiEndpoints.products.lookup}?barcode=${encodeURIComponent(barcode.trim())}`)
+    const products = (response.products || []).map(transformProduct)
+    const variations = (response.variations || []).map(transformVariation)
+    return { products, variations }
+  },
+
       async generateSkuPreview(): Promise<string> {
         const response = await api.get<{ sku: string }>(`${apiEndpoints.products.list}generate-sku/`)
         return response.sku

@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { formatCurrency } from "@/lib/utils/currency"
-import type { Business } from "@/stores/businessStore"
+import type { Business } from "@/lib/types"
 import { CreditCard, Smartphone, Wallet, Receipt, Truck } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
@@ -446,33 +446,7 @@ export function PaymentMethodModal({
                 />
               </div>
 
-              {/* Quick Amount Buttons */}
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleQuickAmount(1)}
-                  className="text-xs h-8"
-                >
-                  Exact
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleQuickAmount(1.1)}
-                  className="text-xs h-8"
-                >
-                  +10%
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleQuickAmount(1.2)}
-                  className="text-xs h-8"
-                >
-                  +20%
-                </Button>
-              </div>
+            
 
               {/* Change Display */}
               {change > 0 && (

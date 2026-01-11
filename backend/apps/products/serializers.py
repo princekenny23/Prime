@@ -72,6 +72,48 @@ class ItemVariationSerializer(serializers.ModelSerializer):
         
         return value
 
+    def validate_barcode(self, value):
+        """Ensure barcode is unique across variations and products within tenant/outlet"""
+        if not value or (isinstance(value, str) and value.strip() == ""):
+            return None
+
+        request = self.context.get('request')
+        if not request:
+            return value
+
+        tenant = getattr(request, 'tenant', None) or (request.user.tenant if hasattr(request, 'user') and request.user.is_authenticated else None)
+        outlet = None
+        try:
+            outlet = getattr(request, 'outlet', None) or (request.query_params.get('outlet') if hasattr(request, 'query_params') else None)
+        except Exception:
+            outlet = None
+
+        barcode_val = str(value).strip()
+
+        # Check other variations
+        var_qs = ItemVariation.objects.filter(barcode__iexact=barcode_val, product__tenant=tenant)
+        if self.instance:
+            var_qs = var_qs.exclude(pk=self.instance.pk)
+        if outlet:
+            try:
+                var_qs = var_qs.filter(product__outlet=outlet)
+            except Exception:
+                pass
+        if var_qs.exists():
+            raise serializers.ValidationError("Barcode already exists for another variation in this tenant/outlet")
+
+        # Check products
+        prod_qs = Product.objects.filter(barcode__iexact=barcode_val, tenant=tenant)
+        if outlet:
+            try:
+                prod_qs = prod_qs.filter(outlet=outlet)
+            except Exception:
+                pass
+        if prod_qs.exists():
+            raise serializers.ValidationError("Barcode already exists for a product in this tenant/outlet")
+
+        return barcode_val
+
 
 class ProductUnitSerializer(serializers.ModelSerializer):
     """Product Unit serializer for multi-unit selling"""
@@ -209,6 +251,51 @@ class ProductSerializer(serializers.ModelSerializer):
                 if tenant and Product.objects.filter(tenant=tenant, sku=value).exists():
                     raise serializers.ValidationError("SKU already exists for this tenant")
         return value
+
+    def validate_barcode(self, value):
+        """Ensure barcode is unique across products and variations for the tenant/outlet"""
+        if not value or (isinstance(value, str) and value.strip() == ""):
+            return None
+
+        request = self.context.get('request')
+        if not request:
+            return value
+
+        tenant = getattr(request, 'tenant', None) or (request.user.tenant if hasattr(request, 'user') and request.user.is_authenticated else None)
+        outlet = None
+        try:
+            outlet = getattr(request, 'outlet', None) or (request.query_params.get('outlet') if hasattr(request, 'query_params') else None)
+        except Exception:
+            outlet = None
+
+        # Normalize
+        barcode_val = str(value).strip()
+
+        # Check against other products
+        prod_qs = Product.objects.filter(tenant=tenant, barcode__iexact=barcode_val)
+        if self.instance:
+            prod_qs = prod_qs.exclude(pk=self.instance.pk)
+        if outlet:
+            try:
+                prod_qs = prod_qs.filter(outlet=outlet)
+            except Exception:
+                pass
+        if prod_qs.exists():
+            raise serializers.ValidationError("Barcode already exists for another product in this tenant/outlet")
+
+        # Check against variations
+        var_qs = ItemVariation.objects.filter(barcode__iexact=barcode_val, product__tenant=tenant)
+        if self.instance and hasattr(self.instance, 'id'):
+            var_qs = var_qs.exclude(pk=getattr(self.instance, 'id'))
+        if outlet:
+            try:
+                var_qs = var_qs.filter(product__outlet=outlet)
+            except Exception:
+                pass
+        if var_qs.exists():
+            raise serializers.ValidationError("Barcode already exists for a variation of another product in this tenant/outlet")
+
+        return barcode_val
     
     def generate_sku(self, tenant):
         """Generate a unique SKU for the tenant"""

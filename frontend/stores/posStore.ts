@@ -12,6 +12,8 @@ export interface CartItem {
   notes?: string
   total: number
   saleType?: "retail" | "wholesale" // Optional sale type for unified POS
+  variationId?: string
+  unitId?: string
 }
 
 export interface Table {

@@ -268,7 +268,7 @@ export default function SalesPage() {
     setIsLoadingCredits(true)
     try {
       const filters: any = {
-        payment_method: "credit",
+        payment_method: "tab",
         outlet: currentOutlet?.id,
       }
       

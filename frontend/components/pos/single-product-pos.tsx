@@ -17,7 +17,9 @@ import { useBusinessStore } from "@/stores/businessStore"
 import { productService } from "@/lib/services/productService"
 import { formatCurrency } from "@/lib/utils/currency"
 import { PaymentMethodModal, type DeliveryInfo } from "@/components/modals/payment-method-modal"
-import { ReceiptPreviewModal } from "@/components/modals/receipt-preview-modal"
+// Receipt preview removed from POS terminal
+import { printReceipt } from "@/lib/print"
+// printReceiptAuto removed; using receipt preview modal
 import { CustomerSelectModal } from "@/components/modals/customer-select-modal"
 import { useShift } from "@/contexts/shift-context"
 import { saleService } from "@/lib/services/saleService"
@@ -47,8 +49,7 @@ export function SingleProductPOS() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [showCustomerSelect, setShowCustomerSelect] = useState(false)
   const [showPaymentMethod, setShowPaymentMethod] = useState(false)
-  const [showReceipt, setShowReceipt] = useState(false)
-  const [receiptData, setReceiptData] = useState<any>(null)
+  // Receipt preview removed from POS terminal
   const [products, setProducts] = useState<Product[]>([])
   const [isLoadingProducts, setIsLoadingProducts] = useState(true)
 
@@ -206,16 +207,36 @@ export function SingleProductPOS() {
       }
 
       const sale = await saleService.create(saleData)
-      
-      setReceiptData(sale)
-      setShowReceipt(true)
+
+      // Prepare receipt data
+      const receiptCartItems = cart.map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        discount: 0,
+        total: item.price * item.quantity,
+      }))
+
       clearCart()
       setSelectedCustomer(null)
-      
-      toast({
-        title: "Success",
-        description: "Sale completed successfully!",
-      })
+
+      // Attempt to print the canonical saved sale (non-blocking)
+      try {
+        const fullSale = await saleService.get(String(sale.id))
+        const receiptCartItems = (fullSale.items || []).map((it: any, idx: number) => ({
+          id: it.productId ? `${it.productId}-${idx}` : `item-${idx}`,
+          name: it.productName || it.product_name || it.name || "Item",
+          price: it.price || 0,
+          quantity: it.quantity || 0,
+          total: it.total || (it.quantity || 0) * (it.price || 0),
+        }))
+        await printReceipt({ cart: receiptCartItems, subtotal: fullSale.subtotal || cartTotal, discount: fullSale.discount || 0, tax: fullSale.tax || 0, total: fullSale.total || cartTotal, sale: fullSale }, currentOutlet!.id)
+        toast({ title: 'Printed receipt', description: `Receipt ${fullSale.id} sent to printer.` })
+      } catch (err: any) {
+        console.warn('Auto-print failed in SingleProductPOS:', err)
+        // Non-blocking
+      }
     } catch (error: any) {
       console.error("Failed to process payment:", error)
       toast({
@@ -554,11 +575,7 @@ export function SingleProductPOS() {
         onPayment={handlePayment}
       />
 
-      <ReceiptPreviewModal
-        open={showReceipt}
-        onOpenChange={setShowReceipt}
-        receiptData={receiptData}
-      />
+      {/* Receipt preview removed from POS terminal - printing is automatic */}
     </div>
   )
 }

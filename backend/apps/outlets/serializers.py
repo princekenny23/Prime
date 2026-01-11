@@ -1,6 +1,7 @@
 from rest_framework import serializers
 import logging
 from .models import Outlet, Till
+from .models import Printer
 
 logger = logging.getLogger(__name__)
 
@@ -143,4 +144,50 @@ class OutletSerializer(serializers.ModelSerializer):
                     })
         
         return attrs
+
+
+class PrinterSerializer(serializers.ModelSerializer):
+    """Serializer for Printer model. Validates outlet belongs to tenant and enforces uniqueness."""
+    outlet_id = serializers.IntegerField(write_only=True)
+
+    class Meta:
+        model = Printer
+        fields = ('id', 'outlet_id', 'name', 'identifier', 'driver', 'is_default', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+    def validate_outlet_id(self, value):
+        request = self.context.get('request')
+        if not request:
+            return value
+        tenant = getattr(request, 'tenant', None) or getattr(request.user, 'tenant', None)
+        from .models import Outlet
+        try:
+            outlet = Outlet.objects.get(id=value, tenant=tenant)
+            return value
+        except Outlet.DoesNotExist:
+            raise serializers.ValidationError('Outlet does not belong to your tenant')
+
+    def validate(self, attrs):
+        # Prevent duplicate identifiers per outlet (though DB unique_together also enforces it)
+        outlet_id = attrs.get('outlet_id')
+        identifier = attrs.get('identifier')
+        if outlet_id and identifier:
+            from .models import Printer
+            qs = Printer.objects.filter(outlet_id=outlet_id, identifier=identifier)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError({'identifier': 'This printer is already registered for the outlet.'})
+        return attrs
+
+    def create(self, validated_data):
+        from .models import Outlet
+        outlet = Outlet.objects.get(id=validated_data.pop('outlet_id'))
+        printer = Printer.objects.create(outlet=outlet, **validated_data)
+        return printer
+
+    def update(self, instance, validated_data):
+        # allow changing fields but ensure outlet isn't changed here
+        validated_data.pop('outlet_id', None)
+        return super().update(instance, validated_data)
 

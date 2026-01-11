@@ -27,7 +27,8 @@
       "@/*": [
         "./*"
       ]
-    }
+    },
+    "typeRoots": ["./types", "./node_modules/@types"]
   },
   "include": [
     "next-env.d.ts",
@@ -35,8 +36,7 @@
     "app/**/*.tsx",
     "components/**/*.ts",
     "components/**/*.tsx",
-    "lib/**/*.ts",
-    "hooks/**/*.ts",
+    "lib/**/*.ts",    "lib/**/*.d.ts",    "hooks/**/*.ts",
     "contexts/**/*.ts",
     "stores/**/*.ts",
     "middleware.ts",

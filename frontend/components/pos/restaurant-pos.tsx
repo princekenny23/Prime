@@ -18,12 +18,14 @@ import {
   ArrowLeft, RefreshCw, Printer, Receipt, CreditCard
 } from "lucide-react"
 import { CloseRegisterModal } from "@/components/modals/close-register-modal"
-import { ReceiptPreviewModal } from "@/components/modals/receipt-preview-modal"
+// Receipt preview removed from POS terminal
 import { SaleDiscountModal, type SaleDiscount } from "@/components/modals/sale-discount-modal"
+import { printReceipt } from "@/lib/print"
 import { useShift } from "@/contexts/shift-context"
 import { useTenant } from "@/contexts/tenant-context"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
+// printReceiptAuto removed; reverted to ReceiptPreviewModal flow
 
 interface RestaurantTable {
   id: string
@@ -64,8 +66,6 @@ export function RestaurantPOS() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | "all">("all")
   const [showPayment, setShowPayment] = useState(false)
   const [showCloseRegister, setShowCloseRegister] = useState(false)
-  const [showReceipt, setShowReceipt] = useState(false)
-  const [receiptData, setReceiptData] = useState<any>(null)
   const [products, setProducts] = useState<any[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [tables, setTables] = useState<RestaurantTable[]>([])
@@ -303,6 +303,9 @@ export function RestaurantPOS() {
     try {
       // Calculate totals
       const subtotal = cart.reduce((sum, item) => sum + (parseFloat(item.price.toString()) * item.quantity), 0)
+      const tax = 0
+      const discount = 0
+      const total = Math.round((subtotal - discount + tax) * 100) / 100
 
         // Create sale with proper data format
         const saleData = {
@@ -315,9 +318,10 @@ export function RestaurantPOS() {
             notes: item.modifiers?.join(", ") || "",
             kitchen_status: "pending",
           })),
-          subtotal: subtotal,
-          tax: 0,
-          discount: 0,
+          subtotal: Math.round(subtotal * 100) / 100,
+          tax: Math.round(tax * 100) / 100,
+          discount: Math.round(discount * 100) / 100,
+          total: Math.round(total * 100) / 100,
           payment_method: "cash" as const,
           status: "pending" as const,
           notes: `Table ${selectedTable.number} - Kitchen Order`,
@@ -461,23 +465,27 @@ export function RestaurantPOS() {
         total: item.total,
       }))
 
-      setReceiptData({
-        cart: receiptCartItems,
-        subtotal: subtotal,
-        discount: discount,
-        tax: tax,
-        total: total,
-        sale: sale,
-        discountReason: saleDiscount?.reason,
-      })
+      // Attempt to auto-print the canonical saved sale (non-blocking)
+      try {
+        const fullSale = await saleService.get(String(sale.id))
+        const receiptCartItems = (fullSale.items || []).map((it: any, idx: number) => ({
+          id: it.productId ? `${it.productId}-${idx}` : `item-${idx}`,
+          name: it.productName || it.product_name || it.name || "Item",
+          price: it.price || 0,
+          quantity: it.quantity || 0,
+          total: it.total || (it.quantity || 0) * (it.price || 0),
+        }))
+        await printReceipt({ cart: receiptCartItems, subtotal: fullSale.subtotal || subtotal, discount: fullSale.discount || 0, tax: fullSale.tax || 0, total: fullSale.total || total, sale: fullSale }, (currentOutlet || tenantOutlet).id)
+        toast({ title: 'Printed receipt', description: `Receipt ${fullSale.id} sent to printer.` })
+      } catch (err: any) {
+        console.warn('Auto-print failed in RestaurantPOS:', err)
+      }
 
       // Clear cart and discount
       clearCart()
       setSelectedTable(null)
       setSaleDiscount(null)
-
-      // Show receipt modal
-      setShowReceipt(true)
+      // Receipt preview removed from POS terminal
     } catch (error: any) {
       console.error("Checkout error:", error)
       toast({
@@ -952,26 +960,7 @@ export function RestaurantPOS() {
         open={showCloseRegister}
         onOpenChange={setShowCloseRegister}
       />
-      {receiptData && (
-        <ReceiptPreviewModal
-          open={showReceipt}
-          onOpenChange={setShowReceipt}
-          cart={receiptData.cart}
-          subtotal={receiptData.subtotal}
-          discount={receiptData.discount}
-          tax={receiptData.tax}
-          total={receiptData.total}
-          discountReason={receiptData.discountReason}
-          onPrint={() => {
-            setShowReceipt(false)
-            setReceiptData(null)
-          }}
-          onSkip={() => {
-            setShowReceipt(false)
-            setReceiptData(null)
-          }}
-        />
-      )}
+      {/* Receipt preview removed from POS terminal - printing is automatic */}
     </div>
   )
 }
