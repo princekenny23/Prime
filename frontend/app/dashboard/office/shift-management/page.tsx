@@ -23,6 +23,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { DatePicker } from "@/components/ui/date-picker"
 import {
   History,
@@ -35,14 +43,23 @@ import {
   TrendingDown,
   Minus,
   X,
+  Menu,
+  Share2,
 } from "lucide-react"
 import { format } from "date-fns"
 import { useShift, Shift } from "@/contexts/shift-context"
 import { useBusinessStore } from "@/stores/businessStore"
 import { shiftService } from "@/lib/services/shiftService"
+import { tillService } from "@/lib/services/tillService"
 import { CloseShiftModal } from "@/components/modals/close-shift-modal"
-import { PageRefreshButton } from "@/components/dashboard/page-refresh-button"
 import { useI18n } from "@/contexts/i18n-context"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 export default function ShiftManagementPage() {
   const router = useRouter()
@@ -50,15 +67,47 @@ export default function ShiftManagementPage() {
   const { shiftHistory } = useShift()
   const { t } = useI18n()
   const [activeTab, setActiveTab] = useState<string>("history")
-  const [searchTerm, setSearchTerm] = useState("")
   const [selectedOutlet, setSelectedOutlet] = useState<string>("all")
-  const [selectedStatus, setSelectedStatus] = useState<string>("all")
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined,
+  })
   const [shifts, setShifts] = useState<Shift[]>([])
   const [activeShifts, setActiveShifts] = useState<Shift[]>([])
+  const [tills, setTills] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingActive, setIsLoadingActive] = useState(true)
   const [shiftToClose, setShiftToClose] = useState<Shift | null>(null)
+  const [shiftToView, setShiftToView] = useState<Shift | null>(null)
+  const [isPrinting, setIsPrinting] = useState(false)
+
+  // Load tills for all outlets
+  useEffect(() => {
+    const loadTills = async () => {
+      if (!currentBusiness) return
+      
+      try {
+        const allTills: any[] = []
+        for (const outlet of outlets) {
+          try {
+            const response = await tillService.list({ outlet: outlet.id })
+            const tillsList = response.results || response
+            if (Array.isArray(tillsList)) {
+              allTills.push(...tillsList)
+            }
+          } catch (error) {
+            console.error(`Failed to load tills for outlet ${outlet.id}:`, error)
+          }
+        }
+        setTills(allTills)
+      } catch (error) {
+        console.error("Failed to load tills:", error)
+        setTills([])
+      }
+    }
+    
+    loadTills()
+  }, [currentBusiness, outlets])
 
   // Load shift history
   useEffect(() => {
@@ -71,11 +120,11 @@ export default function ShiftManagementPage() {
         if (selectedOutlet !== "all") {
           filters.outlet = selectedOutlet
         }
-        if (selectedStatus !== "all") {
-          filters.status = selectedStatus
+        if (dateRange.from) {
+          filters.operating_date_from = format(dateRange.from, "yyyy-MM-dd")
         }
-        if (selectedDate) {
-          filters.operating_date = format(selectedDate, "yyyy-MM-dd")
+        if (dateRange.to) {
+          filters.operating_date_to = format(dateRange.to, "yyyy-MM-dd")
         }
         
         const history = await shiftService.getHistory(filters)
@@ -89,7 +138,7 @@ export default function ShiftManagementPage() {
     }
     
     loadShifts()
-  }, [selectedOutlet, selectedStatus, selectedDate, currentBusiness])
+  }, [selectedOutlet, dateRange, currentBusiness])
 
   // Load active shifts
   useEffect(() => {
@@ -130,11 +179,11 @@ export default function ShiftManagementPage() {
         if (selectedOutlet !== "all") {
           filters.outlet = selectedOutlet
         }
-        if (selectedStatus !== "all") {
-          filters.status = selectedStatus
+        if (dateRange.from) {
+          filters.operating_date_from = format(dateRange.from, "yyyy-MM-dd")
         }
-        if (selectedDate) {
-          filters.operating_date = format(selectedDate, "yyyy-MM-dd")
+        if (dateRange.to) {
+          filters.operating_date_to = format(dateRange.to, "yyyy-MM-dd")
         }
         const history = await shiftService.getHistory(filters)
         setShifts(history)
@@ -147,18 +196,15 @@ export default function ShiftManagementPage() {
     loadShifts()
   }
 
-  // Filter shifts for history tab
-  const filteredShifts = shifts.filter(shift => {
-    if (selectedOutlet !== "all" && shift.outletId !== selectedOutlet) return false
-    if (selectedStatus !== "all" && shift.status !== selectedStatus) return false
-    if (selectedDate && shift.operatingDate !== format(selectedDate, "yyyy-MM-dd")) return false
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase()
-      return (
-        shift.id.toLowerCase().includes(searchLower) ||
-        shift.operatingDate.includes(searchTerm) ||
-        (shift.notes && shift.notes.toLowerCase().includes(searchLower))
-      )
+  // Filter shifts for history tab - combine active and history shifts
+  const filteredShifts = [...shifts, ...activeShifts].filter(shift => {
+    if (dateRange.from && shift.operatingDate) {
+      const shiftDate = new Date(shift.operatingDate)
+      if (shiftDate < dateRange.from) return false
+    }
+    if (dateRange.to && shift.operatingDate) {
+      const shiftDate = new Date(shift.operatingDate)
+      if (shiftDate > dateRange.to) return false
     }
     return true
   })
@@ -207,17 +253,175 @@ export default function ShiftManagementPage() {
     return outlet?.name || "Unknown Outlet"
   }
 
+  const getTillName = (tillId: string): string => {
+    const till = tills.find(t => t.id === tillId)
+    return till?.name || tillId
+  }
+
+  const handleExportToExcel = () => {
+    try {
+      // Dynamically import xlsx to avoid SSR issues
+      const XLSX = require('xlsx')
+      
+      // Prepare data for Excel
+      const excelData = filteredShifts.map(shift => ({
+        'Date': (() => {
+          if (!shift.operatingDate) return "N/A"
+          try {
+            const date = new Date(shift.operatingDate)
+            if (isNaN(date.getTime())) return "N/A"
+            return format(date, "MMM dd, yyyy")
+          } catch {
+            return "N/A"
+          }
+        })(),
+        'Outlet': getOutletName(shift.outletId),
+        'Till': getTillName(shift.tillId),
+        'Duration': (() => {
+          if (!shift.startTime || !shift.endTime) return "N/A"
+          try {
+            const startDate = new Date(shift.startTime)
+            const endDate = new Date(shift.endTime)
+            if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return "N/A"
+            const duration = (endDate.getTime() - startDate.getTime()) / (1000 * 60)
+            const hours = Math.floor(duration / 60)
+            const minutes = Math.floor(duration % 60)
+            return `${hours}h ${minutes}m`
+          } catch {
+            return "N/A"
+          }
+        })(),
+        'Opening Cash': shift.openingCashBalance || 0,
+        'Closing Cash': shift.closingCashBalance || "N/A",
+        'Sales': shift.status === "CLOSED" && shift.closingCashBalance 
+          ? Math.max(0, shift.closingCashBalance - (shift.openingCashBalance || 0) - (shift.floatingCash || 0))
+          : "N/A",
+        'Difference': shift.status === "CLOSED" && shift.closingCashBalance
+          ? shift.closingCashBalance - (shift.openingCashBalance || 0)
+          : "N/A",
+        'Status': shift.status,
+        'Notes': shift.notes || ""
+      }))
+
+      // Create workbook and worksheet
+      const worksheet = XLSX.utils.json_to_sheet(excelData)
+      
+      // Set column widths
+      const columnWidths = [
+        { wch: 15 },  // Date
+        { wch: 15 },  // Outlet
+        { wch: 15 },  // Till
+        { wch: 12 },  // Duration
+        { wch: 15 },  // Opening Cash
+        { wch: 15 },  // Closing Cash
+        { wch: 15 },  // Sales
+        { wch: 15 },  // Difference
+        { wch: 12 },  // Status
+        { wch: 20 }   // Notes
+      ]
+      worksheet['!cols'] = columnWidths
+
+      // Create workbook
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Shifts")
+
+      // Generate filename with date
+      const fileName = `shifts-report-${format(new Date(), "yyyy-MM-dd-HHmmss")}.xlsx`
+      
+      // Write file
+      XLSX.writeFile(workbook, fileName)
+    } catch (error) {
+      console.error("Failed to export Excel file:", error)
+    }
+  }
+
+  const handlePrintShift = async (shift: Shift) => {
+    setIsPrinting(true)
+    try {
+      const qz = require('qz-tray')
+      
+      // Generate shift report HTML content
+      const reportHTML = `
+        <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 10px; font-size: 12px; }
+              .header { text-align: center; margin-bottom: 10px; border-bottom: 1px solid #000; padding-bottom: 5px; }
+              .title { font-size: 16px; font-weight: bold; }
+              .business-name { font-size: 14px; margin-top: 2px; }
+              .section { margin-top: 10px; }
+              .label { font-weight: bold; }
+              .row { display: flex; justify-content: space-between; margin: 3px 0; }
+              .footer { text-align: center; margin-top: 10px; border-top: 1px solid #000; padding-top: 5px; font-size: 10px; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <div class="title">SHIFT REPORT</div>
+              <div class="business-name">${currentBusiness?.name || 'Business'}</div>
+            </div>
+            
+            <div class="section">
+              <div class="row">
+                <span class="label">Date:</span>
+                <span>${shift.operatingDate ? format(new Date(shift.operatingDate), "MMM dd, yyyy") : "N/A"}</span>
+              </div>
+              <div class="row">
+                <span class="label">Outlet:</span>
+                <span>${getOutletName(shift.outletId)}</span>
+              </div>
+              <div class="row">
+                <span class="label">Till:</span>
+                <span>${getTillName(shift.tillId)}</span>
+              </div>
+              <div class="row">
+                <span class="label">Status:</span>
+                <span>${shift.status}</span>
+              </div>
+            </div>
+            
+            <div class="section">
+              <div class="row">
+                <span class="label">Opening Cash:</span>
+                <span>MWK ${(shift.openingCashBalance || 0).toFixed(2)}</span>
+              </div>
+              <div class="row">
+                <span class="label">Closing Cash:</span>
+                <span>${shift.closingCashBalance ? `MWK ${shift.closingCashBalance.toFixed(2)}` : "N/A"}</span>
+              </div>
+              <div class="row">
+                <span class="label">Duration:</span>
+                <span>${calculateDuration(shift)}</span>
+              </div>
+            </div>
+            
+            <div class="footer">
+              <p>Printed: ${format(new Date(), "MMM dd, yyyy HH:mm:ss")}</p>
+            </div>
+          </body>
+        </html>
+      `
+
+      // Connect to qz-tray and print
+      await qz.websocket.connect()
+      
+      const config = qz.configs.create(qz.printers.getDefault())
+      const html = [{type: 'html', format: 'plain', data: reportHTML}]
+      
+      await qz.print(config, html)
+      await qz.websocket.disconnect()
+    } catch (error) {
+      console.error("Failed to print shift report:", error)
+    } finally {
+      setIsPrinting(false)
+    }
+  }
+
   const tabs: TabConfig[] = [
     {
       value: "history",
       label: t("shifts.history.title"),
       icon: History,
-    },
-    {
-      value: "active",
-      label: t("shifts.current.title"),
-      icon: Clock,
-      badgeCount: activeShifts.length,
     },
   ]
 
@@ -226,20 +430,23 @@ export default function ShiftManagementPage() {
       <PageLayout
         title={t("shifts.menu.management")}
         description={t("shifts.description")}
-        actions={<PageRefreshButton />}
       >
         <FilterableTabs
           tabs={tabs}
           activeTab={activeTab}
           onTabChange={setActiveTab}
-          searchValue={activeTab === "history" ? searchTerm : undefined}
-          onSearchChange={activeTab === "history" ? setSearchTerm : undefined}
-          searchPlaceholder="Search shifts..."
         >
           {/* Shift History Tab */}
           <TabsContent value="history" className="space-y-6">
-            {/* Start Shift Button */}
-            <div className="flex justify-end">
+            {/* Start Shift and Export Buttons */}
+            <div className="flex justify-end gap-3">
+              <Button
+                onClick={handleExportToExcel}
+                className="bg-blue-900 hover:bg-blue-800 text-white"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export Report
+              </Button>
               <Button
                 onClick={() => router.push("/dashboard/office/shift-management/start-shift")}
                 className="bg-blue-900 hover:bg-blue-800 text-white"
@@ -251,11 +458,7 @@ export default function ShiftManagementPage() {
 
             {/* Filters */}
             <div className="mb-6 pb-4 border-b border-gray-300">
-              <div className="mb-4">
-                <h3 className="text-sm font-medium text-gray-900 mb-4">Filters</h3>
-                <p className="text-sm text-gray-600">Filter shifts by outlet, status, or date</p>
-              </div>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-900">Outlet</label>
                   <Select value={selectedOutlet} onValueChange={setSelectedOutlet}>
@@ -274,43 +477,30 @@ export default function ShiftManagementPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-900">Status</label>
-                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                    <SelectTrigger className="bg-white border-gray-300">
-                      <SelectValue placeholder={t("common.all_status")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="OPEN">Open</SelectItem>
-                      <SelectItem value="CLOSED">Closed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-900">Date</label>
-                  <DatePicker
-                    date={selectedDate}
-                    onDateChange={setSelectedDate}
-                    placeholder={t("common.select_date")}
-                  />
+                  <label className="text-sm font-medium text-gray-900">Date Range</label>
+                  <div className="flex gap-2">
+                    <DatePicker
+                      date={dateRange.from}
+                      onDateChange={(date) => setDateRange({ ...dateRange, from: date })}
+                      placeholder="From date"
+                    />
+                    <DatePicker
+                      date={dateRange.to}
+                      onDateChange={(date) => setDateRange({ ...dateRange, to: date })}
+                      placeholder="To date"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Shifts Table */}
             <div>
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Shift Records</h3>
-                  <p className="text-sm text-gray-600">
-                    {filteredShifts.length} shift{filteredShifts.length !== 1 ? "s" : ""} found
-                  </p>
-                </div>
-                <Button className="bg-white border-white text-[#1e3a8a] hover:bg-blue-50 hover:border-blue-50">
-                  <Download className="mr-2 h-4 w-4" />
-                  Export Report
-                </Button>
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Shift Records</h3>
+                <p className="text-sm text-gray-600">
+                  {filteredShifts.length} shift{filteredShifts.length !== 1 ? "s" : ""} found
+                </p>
               </div>
               <div className="rounded-md border border-gray-300 bg-white">
                 <Table>
@@ -362,7 +552,7 @@ export default function ShiftManagementPage() {
                               })()}
                             </TableCell>
                             <TableCell>{getOutletName(shift.outletId)}</TableCell>
-                            <TableCell>{shift.tillId}</TableCell>
+                            <TableCell>{getTillName(shift.tillId)}</TableCell>
                             <TableCell>{duration}</TableCell>
                             <TableCell>MWK {(shift.openingCashBalance || 0).toFixed(2)}</TableCell>
                             <TableCell>
@@ -409,10 +599,34 @@ export default function ShiftManagementPage() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button variant="ghost" size="sm" className="border-gray-300">
-                                <Eye className="h-4 w-4 mr-1" />
-                                View
-                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <Menu className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => setShiftToView(shift)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handlePrintShift(shift)} disabled={isPrinting}>
+                                    <Share2 className="h-4 w-4 mr-2" />
+                                    {isPrinting ? "Printing..." : "Print Report"}
+                                  </DropdownMenuItem>
+                                  {shift.status === "OPEN" && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem onClick={() => setShiftToClose(shift)}>
+                                        <X className="h-4 w-4 mr-2" />
+                                        Close Shift
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </TableCell>
                           </TableRow>
                         )
@@ -423,85 +637,117 @@ export default function ShiftManagementPage() {
               </div>
             </div>
           </TabsContent>
-
-          {/* Active Shift Tab */}
-          <TabsContent value="active" className="space-y-6">
-            {isLoadingActive ? (
-              <div className="text-center py-8">
-                <p className="text-gray-600">Loading active shifts...</p>
-              </div>
-            ) : activeShifts.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-600 mb-4">No active shifts</p>
-                <Button
-                  onClick={() => router.push("/dashboard/office/shift-management/start-shift")}
-                  className="bg-blue-900 hover:bg-blue-800 text-white"
-                >
-                  <PlayCircle className="mr-2 h-4 w-4" />
-                  Start Shift
-                </Button>
-              </div>
-            ) : (
-              <div>
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Active Shifts</h3>
-                  <p className="text-sm text-gray-600">
-                    {activeShifts.length} active shift{activeShifts.length !== 1 ? "s" : ""}
-                  </p>
-                </div>
-                <div className="rounded-md border border-gray-300 bg-white">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-gray-50">
-                        <TableHead className="text-gray-900 font-semibold">Shift ID</TableHead>
-                        <TableHead className="text-gray-900 font-semibold">Outlet</TableHead>
-                        <TableHead className="text-gray-900 font-semibold">Till</TableHead>
-                        <TableHead className="text-gray-900 font-semibold">Started</TableHead>
-                        <TableHead className="text-gray-900 font-semibold">Duration</TableHead>
-                        <TableHead className="text-gray-900 font-semibold">Opening Cash</TableHead>
-                        <TableHead className="text-right text-gray-900 font-semibold">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {activeShifts.map((shift) => {
-                        const duration = calculateActiveDuration(shift)
-                        return (
-                          <TableRow key={shift.id} className="border-gray-300">
-                            <TableCell className="font-medium">#{shift.id.slice(-6)}</TableCell>
-                            <TableCell>{getOutletName(shift.outletId)}</TableCell>
-                            <TableCell>{shift.tillId}</TableCell>
-                            <TableCell>
-                              {shift.startTime
-                                ? format(new Date(shift.startTime), "MMM dd, yyyy HH:mm")
-                                : "N/A"}
-                            </TableCell>
-                            <TableCell>{duration}</TableCell>
-                            <TableCell>
-                              {currentBusiness?.currencySymbol || "MWK"}{" "}
-                              {(shift.openingCashBalance || 0).toFixed(2)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setShiftToClose(shift)}
-                                className="border-gray-300"
-                              >
-                                <X className="h-4 w-4 mr-1" />
-                                Close Shift
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            )}
-          </TabsContent>
         </FilterableTabs>
       </PageLayout>
+
+      {/* Shift Details Dialog */}
+      <Dialog open={!!shiftToView} onOpenChange={(open) => !open && setShiftToView(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Shift Details</DialogTitle>
+            <DialogDescription>
+              Complete shift information and summary
+            </DialogDescription>
+          </DialogHeader>
+          {shiftToView && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Date</label>
+                  <p className="text-base font-semibold">
+                    {shiftToView.operatingDate 
+                      ? format(new Date(shiftToView.operatingDate), "MMM dd, yyyy") 
+                      : "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Outlet</label>
+                  <p className="text-base font-semibold">{getOutletName(shiftToView.outletId)}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Till</label>
+                  <p className="text-base font-semibold">{getTillName(shiftToView.tillId)}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Status</label>
+                  <Badge variant={shiftToView.status === "OPEN" ? "default" : "secondary"}>
+                    {shiftToView.status}
+                  </Badge>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Started</label>
+                  <p className="text-base font-semibold">
+                    {shiftToView.startTime 
+                      ? format(new Date(shiftToView.startTime), "MMM dd, yyyy HH:mm") 
+                      : "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Duration</label>
+                  <p className="text-base font-semibold">{calculateDuration(shiftToView)}</p>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="font-semibold text-gray-900 mb-3">Cash Summary</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Opening Cash</label>
+                    <p className="text-base font-semibold">
+                      MWK {(shiftToView.openingCashBalance || 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Closing Cash</label>
+                    <p className="text-base font-semibold">
+                      {shiftToView.closingCashBalance 
+                        ? `MWK ${shiftToView.closingCashBalance.toFixed(2)}` 
+                        : "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Floating Cash</label>
+                    <p className="text-base font-semibold">
+                      MWK {(shiftToView.floatingCash || 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Sales</label>
+                    <p className="text-base font-semibold">
+                      {shiftToView.status === "CLOSED" 
+                        ? `MWK ${calculateSales(shiftToView).toFixed(2)}` 
+                        : "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Difference</label>
+                    <p className={`text-base font-semibold ${
+                      calculateDifference(shiftToView) > 0 
+                        ? "text-green-600" 
+                        : calculateDifference(shiftToView) < 0 
+                        ? "text-destructive" 
+                        : "text-gray-600"
+                    }`}>
+                      MWK {Math.abs(calculateDifference(shiftToView)).toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Shift ID</label>
+                    <p className="text-base font-semibold text-gray-600">#{shiftToView.id.slice(-6)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {shiftToView.notes && (
+                <div className="border-t pt-4">
+                  <h3 className="font-semibold text-gray-900 mb-2">Notes</h3>
+                  <p className="text-sm text-gray-600">{shiftToView.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <CloseShiftModal
         open={!!shiftToClose}

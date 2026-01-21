@@ -10,11 +10,12 @@ from django.template import engines
 import logging
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from .models import Sale, SaleItem, Delivery, DeliveryItem, DeliveryStatusHistory, Receipt, ReceiptTemplate
-from .serializers import SaleSerializer, SaleItemSerializer, DeliverySerializer, DeliveryItemSerializer, DeliveryStatusHistorySerializer, ReceiptSerializer, ReceiptTemplateSerializer
+from .models import Sale, SaleItem, Receipt, ReceiptTemplate
+from .serializers import SaleSerializer, SaleItemSerializer, ReceiptSerializer, ReceiptTemplateSerializer
 from .services import ReceiptService
 from apps.products.models import Product, ProductUnit, ItemVariation
-from apps.inventory.models import StockMovement, LocationStock
+from apps.inventory.models import StockMovement, LocationStock, Batch
+from apps.inventory.stock_helpers import get_available_stock, deduct_stock, add_stock
 from apps.tenants.permissions import TenantFilterMixin
 
 
@@ -280,15 +281,9 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                     raise serializers.ValidationError(f"Item {idx + 1}: Unit {unit_id} not found or inactive")
             
             # Check stock availability
-            if variation:
-                # Use LocationStock for variation-based inventory
-                location_stock, created = LocationStock.objects.select_for_update().get_or_create(
-                    variation=variation,
-                    outlet=outlet,
-                    tenant=tenant,
-                    defaults={'quantity': 0}
-                )
-                available_stock = location_stock.quantity
+            if variation and variation.track_inventory:
+                # Use batch-aware stock checking for variations
+                available_stock = get_available_stock(variation, outlet)
                 
                 if available_stock < quantity_in_base_units:
                     raise serializers.ValidationError(
@@ -296,20 +291,32 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                         f"Available: {available_stock} {product.unit}, Requested: {quantity_in_base_units} {product.unit}"
                     )
                 
-                # Deduct from LocationStock
-                location_stock.quantity -= quantity_in_base_units
-                location_stock.save()
+                # Deduct from batches (FIFO expiry logic)
+                try:
+                    deduct_stock(
+                        variation=variation,
+                        outlet=outlet,
+                        quantity=quantity_in_base_units,
+                        user=request.user,
+                        reference_id=str(sale.id),
+                        reason=f"Sale {sale.receipt_number}"
+                    )
+                except ValueError as e:
+                    raise serializers.ValidationError(f"Item {idx + 1}: {str(e)}")
+            elif variation and not variation.track_inventory:
+                # Variation exists but inventory tracking is disabled (e.g., services)
+                logger.info(f"Skipping inventory deduction for {variation.name} (track_inventory=False)")
             else:
-                # Fallback to product.stock (legacy)
+                # Fallback to product.stock (legacy - for products without variations)
                 if product.stock < quantity_in_base_units:
                     raise serializers.ValidationError(
                         f"Item {idx + 1}: Insufficient stock for {product.name}. "
                         f"Available: {product.stock} {product.unit}, Requested: {quantity_in_base_units} {product.unit}"
                     )
                 
-                # Deduct from product stock
+                # Deduct from product stock (legacy path)
                 product.stock -= quantity_in_base_units
-                product.save()
+                product.save(update_fields=['stock'])
             
             # Calculate item total - round to 2 decimal places
             item_total = (price * Decimal(quantity)).quantize(Decimal('0.01'))
@@ -336,17 +343,20 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                 kitchen_status=kitchen_status
             )
             
-            # Record stock movement (use base units)
-            StockMovement.objects.create(
-                tenant=tenant,
-                product=product,
-                variation=variation,
-                outlet=sale.outlet,
-                user=request.user,
-                movement_type='sale',
-                quantity=quantity_in_base_units,
-                reference_id=str(sale.id)
-            )
+            # Record stock movement only if variation doesn't track inventory (legacy products)
+            if not variation or not variation.track_inventory:
+                StockMovement.objects.create(
+                    tenant=tenant,
+                    product=product,
+                    variation=variation,
+                    outlet=sale.outlet,
+                    user=request.user,
+                    movement_type='sale',
+                    quantity=quantity_in_base_units,
+                    reference_id=str(sale.id),
+                    reason=f"Sale {sale.receipt_number}"
+                )
+            # Note: If variation.track_inventory=True, StockMovement was already created in deduct_stock()
         
         # Calculate totals - round to 2 decimal places to match DecimalField precision
         tax = sale.tax or Decimal('0')
@@ -559,6 +569,7 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         
         for idx, item in enumerate(items):
             product_id = item.get('product_id')
+            variation_id = item.get('variation_id')  # Support variations in cash checkout
             quantity = int(item.get('quantity', 1))
             price_str = str(item.get('price', '0'))
             
@@ -590,27 +601,54 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
             
             # Get product with lock for stock check
             try:
-                product = Product.objects.select_for_update().get(id=product_id, tenant=tenant)
+                product = Product.objects.select_for_update().get(id=product_id, tenant=tenant, outlet=outlet)
             except Product.DoesNotExist:
                 return Response(
-                    {"detail": f"Item {idx + 1}: Product {product_id} not found or does not belong to your tenant"},
+                    {"detail": f"Item {idx + 1}: Product {product_id} not found or does not belong to your tenant/outlet"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Check stock
-            if product.stock < quantity:
-                return Response(
-                    {"detail": f"Item {idx + 1}: Insufficient stock for {product.name}. Available: {product.stock}, Requested: {quantity}"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            # Get variation if provided
+            variation = None
+            if variation_id:
+                try:
+                    variation = ItemVariation.objects.select_for_update().get(
+                        id=variation_id,
+                        product=product,
+                        is_active=True
+                    )
+                except ItemVariation.DoesNotExist:
+                    return Response(
+                        {"detail": f"Item {idx + 1}: Variation {variation_id} not found or inactive"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # Check stock availability using batch-aware logic
+            if variation and variation.track_inventory:
+                available_stock = get_available_stock(variation, outlet)
+                if available_stock < quantity:
+                    return Response(
+                        {"detail": f"Item {idx + 1}: Insufficient stock for {product.name} - {variation.name}. Available: {available_stock}, Requested: {quantity}"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            elif not variation:
+                # Legacy: check product.stock
+                if product.stock < quantity:
+                    return Response(
+                        {"detail": f"Item {idx + 1}: Insufficient stock for {product.name}. Available: {product.stock}, Requested: {quantity}"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
             
             item_total = price * Decimal(quantity)
             total_subtotal += item_total
             
             sale_items_data.append({
                 'product': product,
+                'variation': variation,
                 'product_id': product_id,
+                'variation_id': variation_id,
                 'product_name': product.name,
+                'variation_name': variation.name if variation else '',
                 'quantity': quantity,
                 'price': price,
                 'total': item_total,
@@ -665,30 +703,56 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         
         # Create sale items and deduct stock
         for item_data in sale_items_data:
+            product = item_data['product']
+            variation = item_data.get('variation')
+            
             SaleItem.objects.create(
                 sale=sale,
-                product=item_data['product'],
+                product=product,
+                variation=variation,
                 product_name=item_data['product_name'],
+                variation_name=item_data.get('variation_name', ''),
                 quantity=item_data['quantity'],
+                quantity_in_base_units=item_data['quantity'],
                 price=item_data['price'],
                 total=item_data['total'],
             )
             
-            # Deduct stock
-            product = item_data['product']
-            product.stock -= item_data['quantity']
-            product.save()
-            
-            # Record stock movement
-            StockMovement.objects.create(
-                tenant=tenant,
-                product=product,
-                outlet=outlet,
-                user=request.user,
-                movement_type='sale',
-                quantity=item_data['quantity'],
-                reference_id=str(sale.id)
-            )
+            # Deduct stock using batch-aware logic
+            if variation and variation.track_inventory:
+                try:
+                    deduct_stock(
+                        variation=variation,
+                        outlet=outlet,
+                        quantity=item_data['quantity'],
+                        user=request.user,
+                        reference_id=str(sale.id),
+                        reason=f"Cash sale {sale.receipt_number}"
+                    )
+                except ValueError as e:
+                    # This shouldn't happen since we checked earlier, but handle gracefully
+                    logger.error(f"Stock deduction failed: {str(e)}")
+                    return Response(
+                        {"detail": f"Stock deduction failed: {str(e)}"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            else:
+                # Legacy: deduct from product.stock
+                product.stock -= item_data['quantity']
+                product.save(update_fields=['stock'])
+                
+                # Record stock movement for legacy products
+                StockMovement.objects.create(
+                    tenant=tenant,
+                    product=product,
+                    variation=variation,
+                    outlet=outlet,
+                    user=request.user,
+                    movement_type='sale',
+                    quantity=item_data['quantity'],
+                    reference_id=str(sale.id),
+                    reason=f"Cash sale {sale.receipt_number}"
+                )
         
         # Update customer if provided
         if customer:
@@ -797,7 +861,7 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         try:
             receipt = ReceiptService.generate_receipt(sale, format=fmt, user=request.user)
             serializer = ReceiptSerializer(receipt)
-            return Response(serializer.data)
+            return Response(serializer.data)  
         except Exception as e:
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to generate receipt for sale {sale.id}: {str(e)}", exc_info=True)
@@ -965,222 +1029,6 @@ class SaleViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         return Response(result)
 
 
-class DeliveryViewSet(viewsets.ModelViewSet, TenantFilterMixin):
-    """
-    ViewSet for managing deliveries
-    """
-    queryset = Delivery.objects.select_related('tenant', 'sale', 'customer', 'outlet', 'created_by', 'assigned_to', 'delivered_by').prefetch_related('delivery_items', 'status_history')
-    serializer_class = DeliverySerializer
-    permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['tenant', 'sale', 'customer', 'outlet', 'status', 'delivery_method']
-    search_fields = ['delivery_number', 'delivery_address', 'tracking_number', 'customer__name']
-    ordering_fields = ['scheduled_date', 'created_at', 'actual_delivery_date']
-    ordering = ['-created_at']
-    
-    def get_queryset(self):
-        """Apply tenant and outlet filtering"""
-        queryset = super().get_queryset()
-        queryset = self.filter_by_tenant(queryset)
-        
-        # Apply outlet filter if provided in query params
-        outlet_id = self.request.query_params.get('outlet')
-        if outlet_id:
-            try:
-                from apps.outlets.models import Outlet
-                tenant = getattr(self.request, 'tenant', None) or self.request.user.tenant
-                outlet = Outlet.objects.filter(id=outlet_id, tenant=tenant).first()
-                if outlet:
-                    queryset = queryset.filter(outlet=outlet)
-            except (ValueError, TypeError):
-                pass
-        
-        return queryset
-    
-    def perform_create(self, serializer):
-        """Set tenant and created_by, and create delivery items for all sale items"""
-        tenant = getattr(self.request, 'tenant', None) or self.request.user.tenant
-        delivery = serializer.save(tenant=tenant, created_by=self.request.user)
-        
-        # Automatically create delivery items for all sale items
-        if delivery.sale:
-            from .models import DeliveryItem
-            for sale_item in delivery.sale.items.all():
-                DeliveryItem.objects.create(
-                    delivery=delivery,
-                    sale_item=sale_item,
-                    quantity=sale_item.quantity,
-                    is_delivered=False,
-                    delivered_quantity=0
-                )
-        
-        # Create notification for new delivery (Square POS-like)
-        try:
-            from apps.notifications.services import NotificationService
-            NotificationService.notify_delivery_created(delivery)
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Failed to create delivery notification: {str(e)}")
-    
-    @action(detail=True, methods=['post'])
-    def confirm(self, request, pk=None):
-        """Confirm delivery (move from pending to confirmed)"""
-        delivery = self.get_object()
-        if delivery.status != 'pending':
-            return Response(
-                {"detail": f"Cannot confirm delivery with status '{delivery.status}'"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        old_status = delivery.status
-        delivery.status = 'confirmed'
-        delivery.confirmed_at = timezone.now()
-        delivery.save()
-        # Create status history
-        DeliveryStatusHistory.objects.create(
-            delivery=delivery,
-            status='confirmed',
-            previous_status='pending',
-            changed_by=request.user
-        )
-        
-        # Create notification for delivery status change (Square POS-like)
-        try:
-            from apps.notifications.services import NotificationService
-            NotificationService.notify_delivery_status_changed(delivery, old_status, 'confirmed')
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Failed to create delivery status notification: {str(e)}")
-        
-        serializer = self.get_serializer(delivery)
-        return Response(serializer.data)
-    
-    @action(detail=True, methods=['post'])
-    def dispatch(self, request, pk=None):
-        """Mark delivery as dispatched (ready or in_transit)"""
-        delivery = self.get_object()
-        new_status = request.data.get('status', 'in_transit')  # 'ready' or 'in_transit'
-        if new_status not in ['ready', 'in_transit']:
-            return Response(
-                {"detail": "Status must be 'ready' or 'in_transit'"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        previous_status = delivery.status
-        delivery.status = new_status
-        delivery.dispatched_at = timezone.now()
-        # Update tracking info if provided
-        if 'tracking_number' in request.data:
-            delivery.tracking_number = request.data['tracking_number']
-        if 'courier_name' in request.data:
-            delivery.courier_name = request.data['courier_name']
-        if 'driver_name' in request.data:
-            delivery.driver_name = request.data['driver_name']
-        if 'vehicle_number' in request.data:
-            delivery.vehicle_number = request.data['vehicle_number']
-        delivery.save()
-        # Create status history
-        DeliveryStatusHistory.objects.create(
-            delivery=delivery,
-            status=new_status,
-            previous_status=previous_status,
-            changed_by=request.user,
-            notes=request.data.get('notes', '')
-        )
-        
-        # Create notification for delivery status change (Square POS-like)
-        try:
-            from apps.notifications.services import NotificationService
-            NotificationService.notify_delivery_status_changed(delivery, previous_status, new_status)
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Failed to create delivery status notification: {str(e)}")
-        
-        serializer = self.get_serializer(delivery)
-        return Response(serializer.data)
-    
-    @action(detail=True, methods=['post'])
-    def complete(self, request, pk=None):
-        """Mark delivery as completed"""
-        delivery = self.get_object()
-        if delivery.status not in ['in_transit', 'delivered']:
-            return Response(
-                {"detail": f"Cannot complete delivery with status '{delivery.status}'"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        previous_status = delivery.status
-        delivery.status = 'completed'
-        delivery.actual_delivery_date = timezone.now()
-        delivery.completed_at = timezone.now()
-        delivery.delivered_by = request.user
-        delivery.save()
-        
-        # Mark delivery items as delivered
-        delivery.delivery_items.update(is_delivered=True)
-        
-        # Create status history
-        DeliveryStatusHistory.objects.create(
-            delivery=delivery,
-            status='completed',
-            previous_status=previous_status,
-            changed_by=request.user,
-            notes=request.data.get('notes', '')
-        )
-        
-        # Create notification for delivery status change (Square POS-like)
-        try:
-            from apps.notifications.services import NotificationService
-            NotificationService.notify_delivery_status_changed(delivery, previous_status, 'completed')
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Failed to create delivery status notification: {str(e)}")
-        
-        serializer = self.get_serializer(delivery)
-        return Response(serializer.data)
-    
-    @action(detail=True, methods=['post'])
-    def cancel(self, request, pk=None):
-        """Cancel delivery"""
-        delivery = self.get_object()
-        if not delivery.can_be_cancelled:
-            return Response(
-                {"detail": f"Cannot cancel delivery with status '{delivery.status}'"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        previous_status = delivery.status
-        delivery.status = 'cancelled'
-        delivery.save()
-        # Create status history
-        DeliveryStatusHistory.objects.create(
-            delivery=delivery,
-            status='cancelled',
-            previous_status=previous_status,
-            changed_by=request.user,
-            notes=request.data.get('reason', '')
-        )
-        serializer = self.get_serializer(delivery)
-        return Response(serializer.data)
-    
-    @action(detail=False, methods=['get'])
-    def pending(self, request):
-        """Get all pending deliveries"""
-        queryset = self.filter_queryset(self.get_queryset())
-        queryset = queryset.filter(status='pending')
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-    
-    @action(detail=False, methods=['get'])
-    def scheduled_today(self, request):
-        """Get deliveries scheduled for today"""
-        today = timezone.now().date()
-        queryset = self.filter_queryset(self.get_queryset())
-        queryset = queryset.filter(scheduled_date=today, status__in=['confirmed', 'preparing', 'ready', 'in_transit'])
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-
-
 class ReceiptViewSet(viewsets.ReadOnlyModelViewSet, TenantFilterMixin):
     """Receipt ViewSet - Read-only for retrieving receipts"""
     queryset = Receipt.objects.select_related('sale', 'tenant', 'generated_by', 'sale__outlet', 'sale__customer')
@@ -1284,7 +1132,7 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet, TenantFilterMixin):
         """Regenerate receipt (admin only). This creates a new immutable receipt
         record and voids the previous one to preserve audit history."""
         receipt = self.get_object()
-        format_type = request.data.get('format', 'html')
+        format_type = request.data.get('format', 'pdf')
         
         try:
             new_receipt = ReceiptService.regenerate_receipt(receipt.id, format=format_type, user=request.user)
@@ -1302,14 +1150,33 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet, TenantFilterMixin):
     # (voiding the old one) if you need a new version (admin only).    
     @action(detail=True, methods=['get'], url_path='download')
     def download(self, request, pk=None):
-        """Download receipt as HTML file"""
+        """Download receipt - PDF file if available, ESC/POS content otherwise"""
         receipt = self.get_object()
         
-        from django.http import HttpResponse
+        from django.http import HttpResponse, FileResponse
         
-        response = HttpResponse(receipt.content, content_type='text/html')
-        response['Content-Disposition'] = f'attachment; filename="receipt_{receipt.receipt_number}.html"'
-        return response
+        # If PDF file exists, serve it
+        if receipt.pdf_file:
+            receipt.increment_access()
+            return FileResponse(
+                receipt.pdf_file.open('rb'),
+                as_attachment=True,
+                filename=f"receipt_{receipt.receipt_number}.pdf",
+                content_type='application/pdf'
+            )
+        
+        # Otherwise, if ESC/POS content, return as text file
+        if receipt.format == 'escpos' and receipt.content:
+            receipt.increment_access()
+            response = HttpResponse(receipt.content, content_type='text/plain')
+            response['Content-Disposition'] = f'attachment; filename="receipt_{receipt.receipt_number}.txt"'
+            return response
+        
+        # Fallback
+        return Response(
+            {'error': 'No downloadable content available for this receipt'},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
 
 class ReceiptTemplateViewSet(viewsets.ModelViewSet, TenantFilterMixin):

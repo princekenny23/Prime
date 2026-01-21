@@ -59,10 +59,9 @@ export function SubNavbar({
 
   // Don't show on dashboard pages or admin home
   const isDashboardPage = pathname === "/dashboard" || 
-    pathname === "/dashboard/retail/dashboard" ||
     pathname === "/dashboard/restaurant/dashboard" ||
     pathname === "/dashboard/bar/dashboard" ||
-    pathname?.match(/^\/dashboard\/(retail|restaurant|bar)\/dashboard$/)
+    pathname?.match(/^\/dashboard\/(restaurant|bar)\/dashboard$/)
   
   if (isDashboardPage || pathname === "/admin") {
     return null

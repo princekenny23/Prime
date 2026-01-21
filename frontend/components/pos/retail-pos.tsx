@@ -32,8 +32,7 @@ import { CustomerSelectModal } from "@/components/modals/customer-select-modal"
 import { SelectUnitModal } from "@/components/modals/select-unit-modal"
 import { SelectVariationModal } from "@/components/modals/select-variation-modal"
 import { AddEditProductModal } from "@/components/modals/add-edit-product-modal"
-import { PaymentMethodModal, type DeliveryInfo } from "@/components/modals/payment-method-modal"
-import { deliveryService } from "@/lib/services/deliveryService"
+import { PaymentMethodModal } from "@/components/modals/payment-method-modal"
 import { useShift } from "@/contexts/shift-context"
 import { saleService } from "@/lib/services/saleService"
 import { useToast } from "@/components/ui/use-toast"
@@ -443,7 +442,7 @@ export function RetailPOS() {
     setShowPaymentMethod(true)
   }
 
-  const handlePaymentConfirm = async (method: "cash" | "card" | "mobile" | "tab", amount?: number, change?: number, deliveryInfo?: DeliveryInfo) => {
+  const handlePaymentConfirm = async (method: "cash" | "card" | "mobile" | "tab", amount?: number, change?: number) => {
     setShowPaymentMethod(false)
     
     // Re-validate (shouldn't happen, but safety check)
@@ -494,7 +493,7 @@ export function RetailPOS() {
         discount_reason: saleDiscount?.reason,
         total: Math.round(total * 100) / 100,
         payment_method: method,
-        notes: method === "tab" ? "Credit sale" : deliveryInfo ? "Delivery order" : "",
+        notes: method === "tab" ? "Credit sale" : "",
       }
 
       // Call backend API
@@ -506,50 +505,6 @@ export function RetailPOS() {
       } catch (err) {
         // If fetching fails, fall back to the created sale response
         console.warn('Failed to fetch full sale from backend, using immediate response', err)
-      }
-
-      // Create delivery if delivery info was provided
-      if (deliveryInfo && deliveryInfo.delivery_address) {
-        try {
-          // Convert IDs to integers for backend compatibility
-          const saleId = typeof sale.id === 'string' ? parseInt(sale.id, 10) : sale.id
-          const outletId = typeof currentOutlet!.id === 'string' ? parseInt(String(currentOutlet!.id), 10) : currentOutlet!.id
-          const customerId = selectedCustomer?.id ? (typeof selectedCustomer.id === 'string' ? parseInt(String(selectedCustomer.id), 10) : selectedCustomer.id) : undefined
-          
-          const deliveryData: any = {
-            sale_id: saleId,
-            outlet: outletId,
-            customer: customerId,
-            delivery_address: deliveryInfo.delivery_address,
-            delivery_city: deliveryInfo.delivery_city || "",
-            delivery_state: deliveryInfo.delivery_state || "",
-            delivery_postal_code: deliveryInfo.delivery_postal_code || "",
-            delivery_country: deliveryInfo.delivery_country || "",
-            delivery_contact_name: deliveryInfo.delivery_contact_name || selectedCustomer?.name || "",
-            delivery_contact_phone: deliveryInfo.delivery_contact_phone || selectedCustomer?.phone || "",
-            delivery_method: "own_vehicle" as const,
-            delivery_fee: deliveryInfo.delivery_fee || 0,
-            delivery_instructions: deliveryInfo.delivery_instructions || "",
-            status: "pending" as const,
-          }
-          await deliveryService.create(deliveryData)
-          toast({
-            title: "Delivery created",
-            description: "Delivery order has been created successfully.",
-          })
-          // Dispatch event to refresh deliveries page
-          window.dispatchEvent(new CustomEvent("delivery-created", {
-            detail: { saleId: sale.id }
-          }))
-        } catch (error: any) {
-          console.error("Failed to create delivery:", error)
-          // Don't fail the sale if delivery creation fails, just log it
-          toast({
-            title: "Warning",
-            description: error.message || "Sale completed but delivery creation failed. Please create delivery manually.",
-            variant: "destructive",
-          })
-        }
       }
 
       // Show success message

@@ -13,10 +13,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Plus, Search, Receipt, Edit, Trash2, Filter } from "lucide-react"
+import { Plus, Search, Receipt, Edit, Trash2, Filter, Download, Calendar, CheckCircle, XCircle, Menu } from "lucide-react"
 import { useState, useEffect, useCallback } from "react"
 import { useBusinessStore } from "@/stores/businessStore"
 import { useToast } from "@/components/ui/use-toast"
+import { DatePicker } from "@/components/ui/date-picker"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import {
   Select,
   SelectContent,
@@ -24,6 +30,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +48,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { ExpenseApprovalModal } from "@/components/modals/expense-approval-modal"
+import { EditExpenseModal } from "@/components/modals/edit-expense-modal"
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency } from "@/lib/utils/currency"
 import Link from "next/link"
@@ -56,6 +72,11 @@ interface Expense {
   outlet_name?: string
   status: "pending" | "approved" | "rejected"
   created_at: string
+  approved_by?: string
+  approved_at?: string
+  approval_notes?: string
+  rejected_by?: string
+  rejected_at?: string
 }
 
 const expenseCategories = [
@@ -86,8 +107,17 @@ export default function ExpensesPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined,
+  })
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [expenseToEdit, setExpenseToEdit] = useState<Expense | null>(null)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [expenseToApprove, setExpenseToApprove] = useState<Expense | null>(null)
+  const [showApprovalModal, setShowApprovalModal] = useState(false)
+  const [approvalAction, setApprovalAction] = useState<"approve" | "reject" | null>(null)
 
   const loadExpenses = useCallback(async () => {
     if (!currentBusiness) {
@@ -128,13 +158,17 @@ export default function ExpensesPage() {
       expense.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       expense.vendor?.toLowerCase().includes(searchTerm.toLowerCase())
     
-    const matchesCategory = 
-      categoryFilter === "all" || expense.category === categoryFilter
-    
     const matchesStatus = 
       statusFilter === "all" || expense.status === statusFilter
+
+    let matchesDate = true
+    if (dateRange.from || dateRange.to) {
+      const expenseDate = new Date(expense.expense_date)
+      if (dateRange.from && expenseDate < dateRange.from) matchesDate = false
+      if (dateRange.to && expenseDate > dateRange.to) matchesDate = false
+    }
     
-    return matchesSearch && matchesCategory && matchesStatus
+    return matchesSearch && matchesStatus && matchesDate
   })
 
   const totalExpenses = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0)
@@ -170,6 +204,23 @@ export default function ExpensesPage() {
     }
   }
 
+  const handleEdit = (expense: Expense) => {
+    setExpenseToEdit(expense)
+    setShowEditModal(true)
+  }
+
+  const handleApprove = (expense: Expense) => {
+    setExpenseToApprove(expense)
+    setApprovalAction("approve")
+    setShowApprovalModal(true)
+  }
+
+  const handleReject = (expense: Expense) => {
+    setExpenseToApprove(expense)
+    setApprovalAction("reject")
+    setShowApprovalModal(true)
+  }
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "approved":
@@ -188,48 +239,16 @@ export default function ExpensesPage() {
       <PageLayout
         title={t("reports.menu.expenses")}
         description={t("reports.expense_report.description")}
-        actions={
-          <Link href="/dashboard/office/expenses/new">
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Expense
-            </Button>
-          </Link>
-        }
       >
 
         {/* Filters */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Filters</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder={t("reports.expenses.search_placeholder")}
-                    className="pl-10"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-              </div>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder={t("common.category")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {expenseCategories.map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <div className="mb-6 pb-4 border-b border-gray-300">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-900">Status</label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder={t("common.status")} />
+                <SelectTrigger className="bg-white border-gray-300">
+                  <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
@@ -239,8 +258,69 @@ export default function ExpensesPage() {
                 </SelectContent>
               </Select>
             </div>
-          </CardContent>
-        </Card>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-900">Search</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search expenses..."
+                  className="pl-10 bg-white border-gray-300"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 mt-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-900">Date Range</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-left bg-white border-gray-300">
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {dateRange.from && dateRange.to
+                      ? `${format(dateRange.from, "MMM dd")} - ${format(dateRange.to, "MMM dd")}`
+                      : dateRange.from
+                      ? format(dateRange.from, "MMM dd, yyyy")
+                      : "Select date range"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <div className="flex gap-4 p-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-gray-600">From</label>
+                      <DatePicker
+                        date={dateRange.from}
+                        onDateChange={(date) => setDateRange({ ...dateRange, from: date })}
+                        placeholder="Start date"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-gray-600">To</label>
+                      <DatePicker
+                        date={dateRange.to}
+                        onDateChange={(date) => setDateRange({ ...dateRange, to: date })}
+                        placeholder="End date"
+                      />
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+        </div>
+
+        {/* Add Expense Button */}
+        <div className="mb-6 flex justify-end">
+          <Link href="/dashboard/office/expenses/new">
+            <Button className="bg-blue-900 hover:bg-blue-800 text-white">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Expense
+            </Button>
+          </Link>
+        </div>
 
         {/* Expenses Table */}
         <Card>
@@ -296,21 +376,35 @@ export default function ExpensesPage() {
                         <TableCell className="capitalize">{expense.payment_method.replace("_", " ")}</TableCell>
                         <TableCell>{getStatusBadge(expense.status)}</TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Link href={`/dashboard/office/expenses/${expense.id}/edit`}>
-                              <Button variant="ghost" size="icon" title="Edit">
-                                <Edit className="h-4 w-4" />
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <Menu className="h-4 w-4" />
                               </Button>
-                            </Link>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDelete(expense.id)}
-                              title="Delete"
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleEdit(expense)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleApprove(expense)}>
+                                <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                                Approve
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleReject(expense)}>
+                                <XCircle className="h-4 w-4 mr-2 text-red-600" />
+                                Reject
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleDelete(expense.id)} className="text-destructive">
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -320,6 +414,25 @@ export default function ExpensesPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Edit Modal */}
+        <EditExpenseModal
+          open={showEditModal}
+          onOpenChange={setShowEditModal}
+          expense={expenseToEdit}
+          currentBusiness={currentBusiness}
+          onSuccess={loadExpenses}
+        />
+
+        {/* Approval Modal */}
+        <ExpenseApprovalModal
+          open={showApprovalModal}
+          onOpenChange={setShowApprovalModal}
+          expense={expenseToApprove}
+          action={approvalAction}
+          currentBusiness={currentBusiness}
+          onSuccess={loadExpenses}
+        />
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

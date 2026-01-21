@@ -246,7 +246,7 @@ export default function AdminDashboard() {
                     await setCurrentBusiness(business.id)
                     // Redirect immediately to the correct dashboard based on business type
                     if (business.type === "wholesale and retail") {
-                      router.push("/dashboard/retail")
+                      router.push("/dashboard")
                     } else if (business.type === "restaurant") {
                       router.push("/dashboard/restaurant/dashboard")
                     } else if (business.type === "bar") {

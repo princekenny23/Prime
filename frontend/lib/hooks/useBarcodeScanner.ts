@@ -77,7 +77,8 @@ export function useBarcodeScanner(options: BarcodeScannerOptions = {}) {
 
       lastTimeRef.current = now
 
-      // Ignore modifier keys
+      // Ignore modifier keys; guard against undefined/non-string keys
+      if (typeof e.key !== 'string') return
       if (e.key.length > 1 && e.key !== suffixKey) return
 
       // Append character (avoid interfering with typing into inputs)
@@ -102,7 +103,6 @@ export function useBarcodeScanner(options: BarcodeScannerOptions = {}) {
       }
 
       // Append regular character
-      // For Enter not pressed, add key value
       bufferRef.current += e.key
 
       // Clear previous timeout

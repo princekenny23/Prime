@@ -108,54 +108,20 @@ export default function WholesalePricingPage() {
                 <DollarSign className="h-12 w-12 text-muted-foreground mb-4" />
                 <p className="text-muted-foreground mb-4">No wholesale products found</p>
                 <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Enable Wholesale Pricing
-                </Button>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>SKU</TableHead>
-                    <TableHead>Retail Price</TableHead>
-                    <TableHead>Wholesale Price</TableHead>
-                    <TableHead>Min Qty</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredProducts.map((product) => (
-                    <TableRow key={product.id}>
-                      <TableCell className="font-medium">{product.name}</TableCell>
-                      <TableCell>{product.sku || "N/A"}</TableCell>
-                      <TableCell>
-                        {currentBusiness?.currencySymbol || "MWK"} {product.retail_price?.toFixed(2) || product.price?.toFixed(2) || "0.00"}
-                      </TableCell>
-                      <TableCell className="font-semibold">
-                        {currentBusiness?.currencySymbol || "MWK"} {product.wholesale_price?.toFixed(2) || "0.00"}
-                      </TableCell>
-                      <TableCell>{product.minimum_wholesale_quantity || 1}</TableCell>
-                      <TableCell>
-                        <Badge variant={product.wholesale_enabled ? "default" : "secondary"}>
-                          {product.wholesale_enabled ? "Enabled" : "Disabled"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          Edit
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </PageLayout>
-    </DashboardLayout>
-  )
-}
+                  "use client"
 
+                  import { useEffect } from "react"
+                  import { useRouter } from "next/navigation"
+
+                  export default function WholesalePricingPage() {
+                    const router = useRouter()
+
+                    useEffect(() => {
+                      router.replace("/dashboard")
+                    }, [router])
+
+                    return null
+                  }
+                    <TableHead>Actions</TableHead>
+
+                  </TableRow>

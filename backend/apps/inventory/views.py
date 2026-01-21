@@ -7,9 +7,11 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db import transaction
 from django.utils import timezone
 from decimal import Decimal
+from datetime import timedelta
 import logging
-from .models import StockMovement, StockTake, StockTakeItem, LocationStock
-from .serializers import StockMovementSerializer, StockTakeSerializer, StockTakeItemSerializer, LocationStockSerializer
+from .models import StockMovement, StockTake, StockTakeItem, LocationStock, Batch
+from .serializers import StockMovementSerializer, StockTakeSerializer, StockTakeItemSerializer, LocationStockSerializer, BatchSerializer
+from .stock_helpers import get_available_stock, deduct_stock, add_stock, adjust_stock, mark_expired_batches, get_expiring_soon
 from apps.products.models import Product, ItemVariation
 from apps.tenants.permissions import TenantFilterMixin
 
@@ -81,7 +83,7 @@ class StockMovementViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         return queryset
     
     def perform_create(self, serializer):
-        """Create stock movement and update LocationStock if variation is provided"""
+        """Create stock movement and update batches/LocationStock if variation is provided"""
         tenant = getattr(self.request, 'tenant', None) or self.request.user.tenant
         if not tenant:
             from rest_framework.exceptions import ValidationError
@@ -91,42 +93,91 @@ class StockMovementViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         outlet = serializer.validated_data.get('outlet')
         movement_type = serializer.validated_data.get('movement_type')
         quantity = serializer.validated_data.get('quantity')
+        reason = serializer.validated_data.get('reason', '')
         
-        # Save the movement
-        movement = serializer.save(tenant=tenant, user=self.request.user)
-        
-        # Update LocationStock if variation is provided and track_inventory is enabled
+        # Handle stock changes using batch-aware logic
         if variation and variation.track_inventory and outlet:
-            location_stock, created = LocationStock.objects.get_or_create(
-                tenant=tenant,
-                variation=variation,
-                outlet=outlet,
-                defaults={'quantity': 0}
-            )
-            
-            # Update stock based on movement type
-            if movement_type in ['sale', 'transfer_out', 'damage', 'expiry']:
-                location_stock.quantity = max(0, location_stock.quantity - quantity)
-            elif movement_type in ['purchase', 'transfer_in', 'return', 'adjustment']:
-                if movement_type == 'adjustment':
-                    # For adjustments, quantity can be positive or negative
-                    location_stock.quantity = max(0, location_stock.quantity + quantity)
+            try:
+                if movement_type in ['purchase', 'transfer_in', 'return']:
+                    # Adding stock - create/update batch
+                    # Generate batch number based on movement type
+                    today = timezone.now().date()
+                    batch_number = f"{movement_type.upper()}-{today.strftime('%Y%m%d')}-{variation.id}"
+                    expiry_date = today + timedelta(days=365)  # Default 1 year expiry
+                    
+                    # Allow custom expiry date from request data if provided
+                    if 'expiry_date' in self.request.data:
+                        try:
+                            from datetime import datetime
+                            expiry_date = datetime.strptime(self.request.data['expiry_date'], '%Y-%m-%d').date()
+                        except (ValueError, TypeError):
+                            pass
+                    
+                    batch = add_stock(
+                        variation=variation,
+                        outlet=outlet,
+                        quantity=quantity,
+                        batch_number=batch_number,
+                        expiry_date=expiry_date,
+                        user=self.request.user,
+                        reason=reason or f"{movement_type} movement"
+                    )
+                    
+                    # Save movement with batch reference
+                    movement = serializer.save(tenant=tenant, user=self.request.user, batch=batch)
+                    
+                elif movement_type in ['sale', 'transfer_out', 'damage', 'expiry']:
+                    # Removing stock - deduct from batches (FIFO)
+                    deduct_stock(
+                        variation=variation,
+                        outlet=outlet,
+                        quantity=quantity,
+                        user=self.request.user,
+                        reference_id=f"MANUAL-{timezone.now().strftime('%Y%m%d%H%M%S')}",
+                        reason=reason or f"{movement_type} movement"
+                    )
+                    
+                    # Movement already created in deduct_stock, just return it
+                    movement = StockMovement.objects.filter(
+                        variation=variation,
+                        outlet=outlet,
+                        movement_type=movement_type
+                    ).latest('created_at')
+                    
+                elif movement_type == 'adjustment':
+                    # Adjustment - can be positive or negative
+                    # For simplicity, treat as add or deduct based on sign
+                    current_stock = get_available_stock(variation, outlet)
+                    # The quantity in adjustment is the change amount, not absolute
+                    # For now, we'll just add a new batch or deduct
+                    today = timezone.now().date()
+                    batch_number = f"ADJ-{today.strftime('%Y%m%d')}-{variation.id}"
+                    expiry_date = today + timedelta(days=365)
+                    
+                    batch = add_stock(
+                        variation=variation,
+                        outlet=outlet,
+                        quantity=quantity,
+                        batch_number=batch_number,
+                        expiry_date=expiry_date,
+                        user=self.request.user,
+                        reason=reason or "Stock adjustment"
+                    )
+                    
+                    movement = serializer.save(tenant=tenant, user=self.request.user, batch=batch)
+                
                 else:
-                    location_stock.quantity += quantity
-            location_stock.save()
-            
-            # Check for low stock and create notification (Square POS-like)
-            if variation.track_inventory and location_stock.quantity <= variation.low_stock_threshold:
-                try:
-                    from apps.notifications.services import NotificationService
-                    # Only notify if stock is actually low (not just at threshold)
-                    if location_stock.quantity < variation.low_stock_threshold or (
-                        location_stock.quantity == variation.low_stock_threshold and variation.low_stock_threshold > 0
-                    ):
-                        # Check if notification already exists for this variation to avoid duplicates
+                    # Unknown movement type - save without batch logic
+                    movement = serializer.save(tenant=tenant, user=self.request.user)
+                
+                # Check for low stock after the movement
+                available = get_available_stock(variation, outlet)
+                if available <= variation.low_stock_threshold and variation.low_stock_threshold > 0:
+                    try:
+                        from apps.notifications.services import NotificationService
                         from apps.notifications.models import Notification
-                        from django.utils import timezone
-                        from datetime import timedelta
+                        
+                        # Check if notification already exists to avoid duplicates
                         recent_notification = Notification.objects.filter(
                             tenant=tenant,
                             type='stock',
@@ -138,10 +189,15 @@ class StockMovementViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                         
                         if not recent_notification:
                             NotificationService.notify_low_stock(variation, outlet)
-                except Exception as e:
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.error(f"Failed to create low stock notification: {str(e)}")
+                    except Exception as e:
+                        logger.error(f"Failed to create low stock notification: {str(e)}")
+                
+            except ValueError as e:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError(str(e))
+        else:
+            # Legacy: Save movement without batch logic (for products without variations or track_inventory=False)
+            movement = serializer.save(tenant=tenant, user=self.request.user)
         
         return movement
     
@@ -402,39 +458,35 @@ class StockTakeViewSet(viewsets.ModelViewSet, TenantFilterMixin):
                     logger.warning(f"Tenant mismatch for StockTakeItem {item.id} in stock_take {stock_take.id}")
                     continue
 
-                # Update product stock (backward compatibility)
-                product.stock += difference
-                product.save(update_fields=['stock'])
+                # Update product stock (backward compatibility for legacy products)
+                if not variation or not variation.track_inventory:
+                    product.stock += difference
+                    product.save(update_fields=['stock'])
 
-                # Update LocationStock if variation is tracked
+                # Update batches if variation tracks inventory
                 if variation and variation.track_inventory:
-                    from apps.inventory.models import LocationStock  # adjust import if needed
-                    location_stock, created = LocationStock.objects.get_or_create(
-                        tenant=tenant,
-                        variation=variation,
-                        outlet=stock_take.outlet,
-                        defaults={'quantity': 0}
-                    )
-                    old_quantity = location_stock.quantity
-                    location_stock.quantity = max(0, old_quantity + difference)
-                    location_stock.save()
-                    logger.info(
-                        f"LocationStock updated: variation {variation.id}, outlet {stock_take.outlet.id}, "
-                        f"{old_quantity} -> {location_stock.quantity}"
-                    )
-
-                # Record stock movement
-                StockMovement.objects.create(
-                    tenant=stock_take.tenant,
-                    product=product,
-                    variation=variation,  # ✅ this fixes the original bug
-                    outlet=stock_take.outlet,
-                    user=request.user,
-                    movement_type='adjustment',
-                    quantity=abs(difference),
-                    reason=f"Stock take adjustment ({difference})",
-                    reference_id=str(stock_take.id)
-                )
+                    try:
+                        # Use adjust_stock helper to create/update batch
+                        current_stock = get_available_stock(variation, stock_take.outlet)
+                        new_quantity = item.counted_quantity
+                        
+                        # Adjust to the counted quantity
+                        adjust_stock(
+                            variation=variation,
+                            outlet=stock_take.outlet,
+                            new_quantity=new_quantity,
+                            user=request.user,
+                            reason=f"Stock take {stock_take.id}: Expected {item.expected_quantity}, Counted {item.counted_quantity}"
+                        )
+                        
+                        logger.info(
+                            f"Stock adjusted for {variation.product.name} - {variation.name}: "
+                            f"{item.expected_quantity} -> {item.counted_quantity}"
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to adjust stock for variation {variation.id}: {str(e)}")
+                        # Continue with other items even if one fails
+                        continue
 
             # Complete the stock take
             stock_take.status = 'completed'
@@ -997,3 +1049,135 @@ class LocationStockViewSet(viewsets.ModelViewSet, TenantFilterMixin):
             'results': results,
             'error_details': errors
         }, status=status.HTTP_200_OK)
+
+
+class BatchViewSet(viewsets.ModelViewSet, TenantFilterMixin):
+    """
+    Batch ViewSet for expiry tracking
+    Provides CRUD operations and expiry monitoring
+    """
+    queryset = Batch.objects.select_related('variation', 'variation__product', 'outlet')
+    serializer_class = BatchSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['tenant', 'variation', 'outlet', 'batch_number']
+    search_fields = ['batch_number', 'variation__name', 'variation__product__name']
+    ordering_fields = ['expiry_date', 'created_at', 'quantity']
+    ordering = ['expiry_date']
+    
+    def get_queryset(self):
+        """Filter batches by tenant"""
+        user = self.request.user
+        is_saas_admin = getattr(user, 'is_saas_admin', False)
+        request_tenant = getattr(self.request, 'tenant', None)
+        user_tenant = getattr(user, 'tenant', None)
+        tenant = request_tenant or user_tenant
+        
+        queryset = Batch.objects.select_related('variation', 'variation__product', 'outlet').all()
+        
+        if not is_saas_admin:
+            if tenant:
+                queryset = queryset.filter(tenant=tenant)
+            else:
+                return queryset.none()
+        
+        # Filter by outlet if provided
+        outlet = self.get_outlet_for_request(self.request)
+        if outlet:
+            queryset = queryset.filter(outlet=outlet)
+        
+        return queryset
+    
+    def perform_create(self, serializer):
+        """Create batch with tenant"""
+        tenant = getattr(self.request, 'tenant', None) or self.request.user.tenant
+        if not tenant:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("Tenant is required")
+        
+        serializer.save(tenant=tenant)
+    
+    @action(detail=False, methods=['get'])
+    def expiring_soon(self, request):
+        """Get batches expiring within specified days (default 30)"""
+        days = int(request.query_params.get('days', 30))
+        variation_id = request.query_params.get('variation')
+        outlet_id = request.query_params.get('outlet')
+        
+        variation = None
+        outlet = None
+        
+        if variation_id:
+            try:
+                variation = ItemVariation.objects.get(pk=variation_id)
+            except ItemVariation.DoesNotExist:
+                pass
+        
+        if outlet_id:
+            try:
+                from apps.outlets.models import Outlet
+                outlet = Outlet.objects.get(pk=outlet_id)
+            except:
+                pass
+        
+        expiring = get_expiring_soon(days=days, variation=variation, outlet=outlet)
+        
+        # Apply tenant filter
+        tenant = getattr(request, 'tenant', None) or request.user.tenant
+        if tenant and not request.user.is_saas_admin:
+            expiring = expiring.filter(tenant=tenant)
+        
+        serializer = self.get_serializer(expiring, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def expired(self, request):
+        """Get all expired batches with quantity > 0"""
+        tenant = getattr(request, 'tenant', None) or request.user.tenant
+        today = timezone.now().date()
+        
+        queryset = Batch.objects.filter(
+            expiry_date__lte=today,
+            quantity__gt=0
+        )
+        
+        if tenant and not request.user.is_saas_admin:
+            queryset = queryset.filter(tenant=tenant)
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['post'])
+    def mark_expired(self, request):
+        """Mark expired batches and create expiry movements"""
+        variation_id = request.query_params.get('variation')
+        outlet_id = request.query_params.get('outlet')
+        
+        variation = None
+        outlet = None
+        
+        if variation_id:
+            try:
+                variation = ItemVariation.objects.get(pk=variation_id)
+            except ItemVariation.DoesNotExist:
+                return Response(
+                    {"detail": "Variation not found"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        
+        if outlet_id:
+            try:
+                from apps.outlets.models import Outlet
+                outlet = Outlet.objects.get(pk=outlet_id)
+            except:
+                return Response(
+                    {"detail": "Outlet not found"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        
+        expired_count = mark_expired_batches(variation=variation, outlet=outlet)
+        
+        return Response({
+            "detail": f"Marked {expired_count} batches as expired",
+            "expired_count": expired_count
+        })

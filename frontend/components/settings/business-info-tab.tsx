@@ -20,6 +20,7 @@ import { useAuthStore } from "@/stores/authStore"
 import { useBusinessStore } from "@/stores/businessStore"
 import type { BusinessType, POSType } from "@/lib/types"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { LogoUploadModal } from "@/components/modals/logo-upload-modal"
 
 export function BusinessInfoTab() {
   const { toast } = useToast()
@@ -28,9 +29,22 @@ export function BusinessInfoTab() {
   const { setCurrentBusiness } = useBusinessStore()
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [formData, setFormData] = useState({
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [showLogoModal, setShowLogoModal] = useState(false)
+  const [formData, setFormData] = useState<{
+    name: string
+    type: BusinessType | ""
+    posType: POSType
+    email: string
+    phone: string
+    address: string
+    currency: string
+    currencySymbol: string
+    taxId: string
+    timezone: string
+  }>({
     name: "",
-    type: "" as "wholesale and retail" | "restaurant" | "bar" | "",
+    type: "" as BusinessType | "",
     posType: "standard" as POSType,
     email: "",
     phone: "",
@@ -63,6 +77,7 @@ export function BusinessInfoTab() {
           taxId: (tenant.settings as any)?.taxId || "",
           timezone: (tenant.settings as any)?.timezone || "Africa/Blantyre",
         })
+        setLogoUrl((tenant as any)?.logo || null)
       } catch (error) {
         console.error("Failed to load business info:", error)
       } finally {
@@ -79,9 +94,10 @@ export function BusinessInfoTab() {
     setIsSaving(true)
     try {
       // Store timezone and taxId in settings JSONField
+      const tenant = await tenantService.get(currentTenant.id)
       await tenantService.update(currentTenant.id, {
         name: formData.name,
-        type: formData.type,
+        type: formData.type || undefined,
         posType: formData.posType,
         email: formData.email,
         phone: formData.phone,
@@ -89,6 +105,7 @@ export function BusinessInfoTab() {
         currency: formData.currency,
         currencySymbol: formData.currencySymbol,
         settings: {
+          ...tenant.settings,
           timezone: formData.timezone,
           ...(formData.taxId && { taxId: formData.taxId }),
         },
@@ -197,15 +214,28 @@ export function BusinessInfoTab() {
         <div className="space-y-2">
           <Label>Business Logo</Label>
           <div className="flex items-center gap-4">
-            <div className="w-24 h-24 rounded-lg border-2 border-dashed flex items-center justify-center bg-muted">
-              <Building2 className="h-8 w-8 text-muted-foreground" />
+            <div className="w-24 h-24 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 overflow-hidden">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt="Business Logo"
+                  className="w-full h-full object-contain p-1"
+                />
+              ) : (
+                <Building2 className="h-8 w-8 text-gray-400" />
+              )}
             </div>
             <div className="space-y-2">
-              <Button variant="outline" size="sm">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowLogoModal(true)}
+              >
                 <Upload className="mr-2 h-4 w-4" />
                 Upload Logo
               </Button>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-gray-600">
                 Recommended: 200x200px, PNG or JPG
               </p>
             </div>
@@ -331,6 +361,21 @@ export function BusinessInfoTab() {
           </>
         )}
       </CardContent>
+
+      {/* Logo Upload Modal */}
+      <LogoUploadModal
+        open={showLogoModal}
+        onOpenChange={setShowLogoModal}
+        tenantId={currentTenant?.id || ""}
+        currentLogo={logoUrl || undefined}
+        onSuccess={(newLogoUrl) => {
+          setLogoUrl(newLogoUrl)
+          toast({
+            title: "Logo Updated",
+            description: "Your business logo has been updated successfully.",
+          })
+        }}
+      />
     </Card>
   )
 }

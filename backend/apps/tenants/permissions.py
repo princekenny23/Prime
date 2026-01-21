@@ -22,15 +22,21 @@ class IsTenantAdmin(permissions.BasePermission):
         user = request.user
         if not user or not user.is_authenticated:
             return False
-        # Tenant admin is a user with role='admin' and not a SaaS admin
-        return user.role == 'admin' and not user.is_saas_admin
+        # Tenant admin has settings permission and is not a SaaS admin
+        # Check through role system first, fall back to role field
+        if user.is_saas_admin:
+            return False
+        return user.has_permission('can_settings') or user.effective_role == 'admin'
 
 
 def is_tenant_admin(user):
     """Helper function to check if user is a tenant admin"""
     if not user or not user.is_authenticated:
         return False
-    return user.role == 'admin' and not user.is_saas_admin
+    if user.is_saas_admin:
+        return False
+    # Check through role system first, fall back to role field
+    return user.has_permission('can_settings') or user.effective_role == 'admin'
 
 
 def is_admin_user(user):

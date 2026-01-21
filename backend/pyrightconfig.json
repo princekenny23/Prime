@@ -1,6 +1,6 @@
 {
   "include": [
-    "."
+    "backend"
   ],
   "exclude": [
     "**/__pycache__",
@@ -9,11 +9,11 @@
     "**/.next",
     "**/templates",
     "**/*.md",
-    "env",
-    ".venv",
-    "../frontend",
-    "../node_modules",
-    "../templates"
+    "**/env",
+    "**/.venv",
+    "frontend",
+    "node_modules",
+    "templates"
   ],
   "reportMissingImports": false,
   "reportMissingModuleSource": false,
@@ -38,10 +38,7 @@
   "pythonVersion": "3.8",
   "pythonPlatform": "All",
   "typeCheckingMode": "off",
-  "venvPath": ".",
-  "venv": "env",
-  "extraPaths": [
-    "env/Lib/site-packages"
-  ]
+  "venvPath": "backend",
+  "venv": "env"
 }
 

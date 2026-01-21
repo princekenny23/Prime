@@ -53,15 +53,13 @@ export function middleware(request: NextRequest) {
   // Decode URL-encoded pathname to handle spaces properly
   const decodedPathname = decodeURIComponent(pathname)
 
-  // Redirect /dashboard/wholesale and retail (or URL-encoded versions) to /dashboard/retail
-  // This handles legacy URLs or URLs with spaces
+  // Redirect /dashboard/wholesale and retail (or URL-encoded versions) to main dashboard (retail MVP removed)
   if (pathname === "/dashboard/wholesale and retail" || 
       pathname === "/dashboard/wholesale and retail/" ||
       pathname.includes("wholesale%20and%20retail") || 
       pathname.includes("wholesale+and+retail")) {
     const url = request.nextUrl.clone()
-    // Replace with /dashboard/retail
-    url.pathname = pathname.replace(/\/dashboard\/wholesale(?:%20|\+)?and(?:%20|\+)?retail/g, "/dashboard/retail")
+    url.pathname = "/dashboard"
     return NextResponse.redirect(url)
   }
 

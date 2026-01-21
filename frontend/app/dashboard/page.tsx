@@ -50,12 +50,7 @@ export default function DashboardPage() {
     // Only redirect if we're on the main dashboard page, not if already on business-specific dashboard
     const currentPath = window.location.pathname
     if (currentPath === "/dashboard" || currentPath === "/dashboard/") {
-      // Redirect retail businesses to their specific dashboard (Square POS-like)
-      if (currentBusiness.type === "wholesale and retail") {
-        router.push("/dashboard/retail")
-        return
-      }
-      
+      // No retail-specific dashboard; stay on main dashboard
       // Redirect restaurant to dashboard (not features page)
       if (currentBusiness.type === "restaurant") {
         router.push("/dashboard/restaurant/dashboard")

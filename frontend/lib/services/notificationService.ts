@@ -11,7 +11,7 @@ export interface Notification {
     email: string
     name: string
   } | null
-  type: 'sale' | 'stock' | 'payment' | 'customer' | 'staff' | 'report' | 'system' | 'shift' | 'inventory' | 'delivery'
+  type: 'sale' | 'stock' | 'payment' | 'customer' | 'staff' | 'report' | 'system' | 'shift' | 'inventory'
   priority: 'low' | 'normal' | 'high' | 'urgent'
   title: string
   message: string

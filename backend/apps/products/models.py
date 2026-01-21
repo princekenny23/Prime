@@ -78,9 +78,9 @@ class Product(models.Model):
         return self.name
 
     def get_total_stock(self, outlet=None):
-        """Get total stock from all variations' LocationStock"""
-        from django.db.models import Sum
-        from apps.inventory.models import LocationStock
+        """Get total stock from all variations using batch-aware calculation"""
+        from apps.inventory.stock_helpers import get_available_stock
+        from apps.outlets.models import Outlet
         
         # Get all active variations that track inventory
         variations = self.variations.filter(is_active=True, track_inventory=True)
@@ -89,24 +89,22 @@ class Product(models.Model):
             # Fallback to legacy stock field if no variations
             return self.stock
         
-        # Sum stock from all variations' LocationStock
+        # Sum stock from all variations using batch-aware calculation
         if outlet:
-            # Get stock for specific outlet
-            location_stocks = LocationStock.objects.filter(
-                variation__in=variations,
-                outlet=outlet
-            )
-            result = location_stocks.aggregate(total=Sum('quantity'))
-            return result['total'] or 0
+            # Get stock for specific outlet from non-expired batches
+            return sum(get_available_stock(variation, outlet) for variation in variations)
         else:
             # Sum across all outlets
-            location_stocks = LocationStock.objects.filter(variation__in=variations)
-            result = location_stocks.aggregate(total=Sum('quantity'))
-            return result['total'] or 0
+            total = 0
+            outlets = Outlet.objects.filter(tenant=self.tenant)
+            for variation in variations:
+                for outlet_obj in outlets:
+                    total += get_available_stock(variation, outlet_obj)
+            return total
     
     @property
     def is_low_stock(self):
-        """Check if product is low on stock by checking all variations"""
+        """Check if product is low on stock by checking all variations (computed from batches)"""
         # Check if any variation is low stock
         variations = self.variations.filter(is_active=True, track_inventory=True)
         
@@ -114,13 +112,19 @@ class Product(models.Model):
             # Fallback to legacy check if no variations
             return self.low_stock_threshold > 0 and self.stock <= self.low_stock_threshold
         
-        # Check each variation for low stock
+        # Check each variation for low stock using batch-aware calculation
         for variation in variations:
-            total_stock = variation.get_total_stock()
-            if variation.low_stock_threshold > 0 and total_stock <= variation.low_stock_threshold:
-                return True
+            from apps.inventory.stock_helpers import get_available_stock
+            from apps.outlets.models import Outlet
+            
+            # Check stock across all outlets for this variation
+            outlets = Outlet.objects.filter(tenant=self.tenant)
+            for outlet in outlets:
+                available_stock = get_available_stock(variation, outlet)
+                if variation.low_stock_threshold > 0 and available_stock <= variation.low_stock_threshold:
+                    return True
         
-        # Also check product-level threshold if set
+        # Also check product-level threshold if set (sum of all variations)
         if self.low_stock_threshold > 0:
             total_stock = self.get_total_stock()
             if total_stock <= self.low_stock_threshold:
@@ -237,26 +241,36 @@ class ItemVariation(models.Model):
     
     @property
     def is_low_stock(self):
-        """Check if variation is low on stock (requires LocationStock check)"""
+        """Check if variation is low on stock (batch-aware calculation)"""
         if not self.track_inventory:
             return False
         if self.low_stock_threshold <= 0:
             return False
-        total_stock = self.get_total_stock()
-        return total_stock <= self.low_stock_threshold
+        
+        # Use batch-aware calculation
+        from apps.inventory.stock_helpers import get_available_stock
+        from apps.outlets.models import Outlet
+        
+        # Check across all outlets
+        outlets = Outlet.objects.filter(tenant=self.product.tenant)
+        for outlet in outlets:
+            available_stock = get_available_stock(self, outlet)
+            if available_stock <= self.low_stock_threshold:
+                return True
+        
+        return False
     
     def get_total_stock(self, outlet=None):
-        """Get total stock for this variation (across all outlets or specific outlet)"""
-        from django.db.models import Sum
-        from apps.inventory.models import LocationStock
+        """Get total stock for this variation (batch-aware, excluding expired)"""
+        from apps.inventory.stock_helpers import get_available_stock
+        from apps.outlets.models import Outlet
+        
         if outlet:
-            location_stock = LocationStock.objects.filter(variation=self, outlet=outlet).first()
-            return location_stock.quantity if location_stock else 0
+            return get_available_stock(self, outlet)
+        
         # Sum across all outlets
-        result = LocationStock.objects.filter(variation=self).aggregate(
-            total=Sum('quantity')
-        )
-        return result['total'] or 0
+        outlets = Outlet.objects.filter(tenant=self.product.tenant)
+        return sum(get_available_stock(self, outlet) for outlet in outlets)
 
 
 class ProductUnit(models.Model):

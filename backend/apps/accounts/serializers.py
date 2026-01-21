@@ -8,6 +8,9 @@ User = get_user_model()
 class UserSerializer(serializers.ModelSerializer):
     """User serializer"""
     tenant = serializers.SerializerMethodField()
+    permissions = serializers.SerializerMethodField()
+    staff_role = serializers.SerializerMethodField()
+    effective_role = serializers.SerializerMethodField()
     
     def get_tenant(self, obj):
         """Get tenant info without circular import"""
@@ -17,10 +20,31 @@ class UserSerializer(serializers.ModelSerializer):
         from apps.tenants.serializers import TenantSerializer
         return TenantSerializer(obj.tenant).data
     
+    def get_permissions(self, obj):
+        """Get user permissions from their role"""
+        return obj.get_permissions()
+    
+    def get_staff_role(self, obj):
+        """Get staff role details if exists"""
+        staff_role = obj.staff_role
+        if staff_role:
+            return {
+                'id': staff_role.id,
+                'name': staff_role.name,
+                'description': staff_role.description,
+            }
+        return None
+    
+    def get_effective_role(self, obj):
+        """Get the effective role (staff role or user role)"""
+        return obj.effective_role
+    
     class Meta:
         model = User
-        fields = ('id', 'email', 'username', 'name', 'phone', 'tenant', 'role', 'is_saas_admin', 'is_active', 'date_joined')
-        read_only_fields = ('id', 'date_joined')
+        fields = ('id', 'email', 'username', 'name', 'phone', 'tenant', 'role', 
+                  'effective_role', 'staff_role', 'permissions', 'is_saas_admin', 
+                  'is_active', 'date_joined')
+        read_only_fields = ('id', 'date_joined', 'permissions', 'staff_role', 'effective_role')
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):

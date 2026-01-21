@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from decimal import Decimal, InvalidOperation
-from .models import Sale, SaleItem, Delivery, DeliveryItem, DeliveryStatusHistory, Receipt
+from .models import Sale, SaleItem, Receipt
 from .models import ReceiptTemplate
 from apps.products.serializers import ProductSerializer
 
@@ -251,98 +251,6 @@ class SaleSerializer(serializers.ModelSerializer):
                 })
         
         return attrs
-
-
-class DeliveryItemSerializer(serializers.ModelSerializer):
-    """Delivery item serializer"""
-    sale_item = SaleItemSerializer(read_only=True)
-    sale_item_id = serializers.IntegerField(write_only=True)
-    
-    class Meta:
-        model = DeliveryItem
-        fields = ('id', 'delivery', 'sale_item', 'sale_item_id', 'quantity', 'is_delivered', 
-                  'delivered_quantity', 'notes', 'created_at')
-        read_only_fields = ('id', 'delivery', 'created_at')
-
-
-class DeliveryStatusHistorySerializer(serializers.ModelSerializer):
-    """Delivery status history serializer"""
-    changed_by_email = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = DeliveryStatusHistory
-        fields = ('id', 'delivery', 'status', 'previous_status', 'changed_by', 'changed_by_email', 
-                  'notes', 'created_at')
-        read_only_fields = ('id', 'delivery', 'changed_by', 'created_at')
-    
-    def get_changed_by_email(self, obj):
-        return obj.changed_by.email if obj.changed_by else None
-
-
-class DeliverySerializer(serializers.ModelSerializer):
-    """Delivery serializer"""
-    delivery_items = DeliveryItemSerializer(many=True, read_only=True)
-    sale = SaleSerializer(read_only=True)
-    sale_id = serializers.IntegerField(write_only=True, required=True)
-    customer_name = serializers.SerializerMethodField()
-    outlet_name = serializers.SerializerMethodField()
-    created_by_email = serializers.SerializerMethodField()
-    assigned_to_email = serializers.SerializerMethodField()
-    delivered_by_email = serializers.SerializerMethodField()
-    status_history = DeliveryStatusHistorySerializer(many=True, read_only=True)
-    
-    class Meta:
-        model = Delivery
-        fields = (
-            'id', 'tenant', 'sale', 'sale_id', 'outlet', 'outlet_name', 'customer', 'customer_name',
-            'delivery_number', 'status', 'delivery_method',
-            'delivery_address', 'delivery_city', 'delivery_state', 'delivery_postal_code', 'delivery_country',
-            'delivery_contact_name', 'delivery_contact_phone',
-            'scheduled_date', 'scheduled_time_start', 'scheduled_time_end', 'actual_delivery_date',
-            'courier_name', 'tracking_number', 'driver_name', 'vehicle_number',
-            'delivery_fee', 'shipping_cost',
-            'notes', 'customer_notes', 'delivery_instructions',
-            'created_by', 'created_by_email', 'assigned_to', 'assigned_to_email', 
-            'delivered_by', 'delivered_by_email',
-            'created_at', 'updated_at', 'confirmed_at', 'dispatched_at', 'completed_at',
-            'delivery_items', 'status_history'
-        )
-        read_only_fields = (
-            'id', 'tenant', 'sale', 'delivery_number', 'outlet_name', 'customer_name',
-            'created_by', 'created_by_email', 'assigned_to_email', 'delivered_by_email',
-            'created_at', 'updated_at', 'confirmed_at', 'dispatched_at', 'completed_at'
-        )
-    
-    def get_customer_name(self, obj):
-        return obj.customer.name if obj.customer else None
-    
-    def get_outlet_name(self, obj):
-        return obj.outlet.name if obj.outlet else None
-    
-    def get_created_by_email(self, obj):
-        return obj.created_by.email if obj.created_by else None
-    
-    def get_assigned_to_email(self, obj):
-        return obj.assigned_to.email if obj.assigned_to else None
-    
-    def get_delivered_by_email(self, obj):
-        return obj.delivered_by.email if obj.delivered_by else None
-    
-    def validate_sale_id(self, value):
-        """Validate sale exists and belongs to tenant"""
-        request = self.context.get('request')
-        if not request:
-            return value
-        
-        tenant = getattr(request, 'tenant', None) or request.user.tenant
-        if not tenant:
-            raise serializers.ValidationError("Unable to determine tenant")
-        
-        try:
-            sale = Sale.objects.get(id=value, tenant=tenant)
-            return sale.id
-        except Sale.DoesNotExist:
-            raise serializers.ValidationError(f"Sale {value} not found or does not belong to your tenant")
 
 
 class ReceiptSerializer(serializers.ModelSerializer):

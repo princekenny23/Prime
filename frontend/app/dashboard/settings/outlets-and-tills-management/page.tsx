@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { PageLayout } from "@/components/layouts/page-layout"
 import { Button } from "@/components/ui/button"
-import { Plus, Store, RefreshCw, ChevronDown, Pencil, Trash2 } from "lucide-react"
+import { Plus, Store, RefreshCw, ChevronDown, Pencil, Trash2, Menu } from "lucide-react"
 import { OutletList } from "@/components/outlets/outlet-list"
 import { AddEditOutletModal } from "@/components/modals/add-edit-outlet-modal"
 import { AddEditTillModal } from "@/components/modals/add-edit-till-modal"
@@ -235,68 +235,6 @@ export default function OutletsAndTillsManagementPage() {
       <PageLayout
         title={t("settings.outlets.title")}
         description={t("settings.outlets.description")}
-        actions={
-          <div className="flex gap-2">
-            {/* Switch Outlet Dropdown */}
-            {outlets.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" disabled={isSwitching !== null}>
-                    <Store className="mr-2 h-4 w-4" />
-                    {currentOutlet ? `${t("settings.outlets.current")}: ${currentOutlet.name}` : t("settings.outlets.switch_outlet")}
-                    <ChevronDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>{t("settings.outlets.switch_outlet")}</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {currentOutlet && (
-                    <>
-                      <DropdownMenuItem disabled className="opacity-100">
-                        <div className="flex items-center gap-2 w-full">
-                          <Store className="h-4 w-4 text-primary" />
-                          <div className="flex-1">
-                            <div className="font-medium">{currentOutlet.name}</div>
-                            <div className="text-xs text-muted-foreground">{t("settings.outlets.current")}</div>
-                          </div>
-                        </div>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                    </>
-                  )}
-                  {availableOutlets.length === 0 ? (
-                    <DropdownMenuItem disabled>
-                      {t("settings.outlets.no_other_outlets")}
-                    </DropdownMenuItem>
-                  ) : (
-                    availableOutlets.map((outlet) => (
-                      <DropdownMenuItem
-                        key={outlet.id}
-                        onClick={() => handleSwitchOutlet(String(outlet.id))}
-                        disabled={isSwitching === String(outlet.id)}
-                      >
-                        {isSwitching === String(outlet.id) ? (
-                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <Store className="mr-2 h-4 w-4" />
-                        )}
-                        {outlet.name}
-                      </DropdownMenuItem>
-                    ))
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-            <Button 
-              variant="outline" 
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-              {t("common.refresh")}
-            </Button>
-          </div>
-        }
       >
         {/* Tabs */}
         <FilterableTabs
@@ -315,10 +253,62 @@ export default function OutletsAndTillsManagementPage() {
                       {totalOutlets} {totalOutlets === 1 ? t("settings.outlets.outlet_singular") : t("settings.outlets.outlet_plural")} {t("common.total")}
                     </CardDescription>
                   </div>
-                  <Button onClick={() => setIsOutletModalOpen(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    {t("settings.outlets.add_outlet")}
-                  </Button>
+                  <div className="flex gap-2">
+                    {/* Switch Outlet Dropdown */}
+                    {outlets.length > 0 && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button disabled={isSwitching !== null}>
+                            <Store className="mr-2 h-4 w-4" />
+                            {currentOutlet ? `${t("settings.outlets.current")}: ${currentOutlet.name}` : t("settings.outlets.switch_outlet")}
+                            <ChevronDown className="ml-2 h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuLabel>{t("settings.outlets.switch_outlet")}</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          {currentOutlet && (
+                            <>
+                              <DropdownMenuItem disabled className="opacity-100">
+                                <div className="flex items-center gap-2 w-full">
+                                  <Store className="h-4 w-4 text-primary" />
+                                  <div className="flex-1">
+                                    <div className="font-medium">{currentOutlet.name}</div>
+                                    <div className="text-xs text-muted-foreground">{t("settings.outlets.current")}</div>
+                                  </div>
+                                </div>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
+                          {availableOutlets.length === 0 ? (
+                            <DropdownMenuItem disabled>
+                              {t("settings.outlets.no_other_outlets")}
+                            </DropdownMenuItem>
+                          ) : (
+                            availableOutlets.map((outlet) => (
+                              <DropdownMenuItem
+                                key={outlet.id}
+                                onClick={() => handleSwitchOutlet(String(outlet.id))}
+                                disabled={isSwitching === String(outlet.id)}
+                              >
+                                {isSwitching === String(outlet.id) ? (
+                                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Store className="mr-2 h-4 w-4" />
+                                )}
+                                {outlet.name}
+                              </DropdownMenuItem>
+                            ))
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                    <Button onClick={() => setIsOutletModalOpen(true)}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      {t("settings.outlets.add_outlet")}
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -352,11 +342,11 @@ export default function OutletsAndTillsManagementPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>{t("common.name")}</TableHead>
-                          <TableHead>{t("settings.outlets.outlet_singular")}</TableHead>
-                          <TableHead>{t("common.status")}</TableHead>
-                          <TableHead>{t("settings.outlets.in_use")}</TableHead>
-                          <TableHead className="text-right">{t("common.actions")}</TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Outlet</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>In Use</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -379,24 +369,34 @@ export default function OutletsAndTillsManagementPage() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEditTill(till)}
-                                  disabled={till.is_in_use}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setDeletingTill(till)}
-                                  disabled={till.is_in_use}
-                                >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </div>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <Menu className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={() => handleEditTill(till)}
+                                    disabled={till.is_in_use}
+                                  >
+                                    <Pencil className="mr-2 h-4 w-4" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => setDeletingTill(till)}
+                                    disabled={till.is_in_use}
+                                    className="text-destructive"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </TableCell>
                           </TableRow>
                         ))}

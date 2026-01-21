@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Plus, Search, User, Mail, Phone, Shield, Building2, Edit, Trash2, Eye, Lock, Settings, CheckCircle2, ShoppingCart, Package, Users as UsersIcon, BarChart3, FileText } from "lucide-react"
+import { Plus, Search, Mail, Phone, Shield, Building2, Edit, Trash2, Eye, Lock, Settings, CheckCircle2, ShoppingCart, Package, Users as UsersIcon, BarChart3, FileText, Menu } from "lucide-react"
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { userService } from "@/lib/services/userService"
 import { useBusinessStore } from "@/stores/businessStore"
@@ -35,6 +35,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import type { User } from "@/lib/types"
 import { useI18n } from "@/contexts/i18n-context"
 
@@ -76,11 +84,14 @@ export default function AccountsPage() {
           email: backendUser.email || "",
           name: backendUser.name || backendUser.username || backendUser.email?.split("@")[0] || "",
           role: backendUser.role || "staff",
+          effective_role: backendUser.effective_role || backendUser.role || "staff",
           businessId: String(currentBusiness.id),
           outletIds: [],
           createdAt: backendUser.date_joined || new Date().toISOString(),
           is_saas_admin: backendUser.is_saas_admin || false,
           tenant: currentBusiness,
+          permissions: backendUser.permissions || undefined,
+          staff_role: backendUser.staff_role || undefined,
         }))
         
         setUsers(transformedUsers)
@@ -141,7 +152,7 @@ export default function AccountsPage() {
     {
       value: "users",
       label: "Users",
-      icon: User,
+      icon: UsersIcon,
       badgeCount: users.length,
       badgeVariant: "secondary",
     },
@@ -234,8 +245,9 @@ export default function AccountsPage() {
                         filteredUsers.map((user) => {
                           const userName = user.name || user.email?.split("@")[0] || "N/A"
                           const userEmail = user.email || "N/A"
-                          const userRole = user.role || "staff"
-                          const isAdmin = user.is_saas_admin || userRole === "admin"
+                          // Display staff_role name if available, otherwise fall back to role
+                          const displayRole = user.staff_role?.name || user.effective_role || user.role || "staff"
+                          const isAdmin = user.is_saas_admin || user.role === "admin"
                           
                           return (
                             <TableRow key={user.id} className="border-gray-300">
@@ -247,9 +259,16 @@ export default function AccountsPage() {
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                                  {userRole}
-                                </span>
+                                <div className="flex flex-col gap-1">
+                                  <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 inline-block w-fit">
+                                    {displayRole}
+                                  </span>
+                                  {user.staff_role && user.staff_role.description && (
+                                    <span className="text-xs text-gray-500">
+                                      {user.staff_role.description}
+                                    </span>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-2">
@@ -271,39 +290,46 @@ export default function AccountsPage() {
                                 </span>
                               </TableCell>
                               <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                      setSelectedUser(user)
-                                      setShowViewUser(true)
-                                    }}
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                      setSelectedUser(user)
-                                      setShowAddUser(true)
-                                    }}
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-destructive"
-                                    onClick={() => {
-                                      setUserToDelete(user.id)
-                                      setShowDeleteDialog(true)
-                                    }}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="border-gray-300">
+                                      <Menu className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setSelectedUser(user)
+                                        setShowViewUser(true)
+                                      }}
+                                    >
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      View
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setSelectedUser(user)
+                                        setShowAddUser(true)
+                                      }}
+                                    >
+                                      <Edit className="mr-2 h-4 w-4" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setUserToDelete(user.id)
+                                        setShowDeleteDialog(true)
+                                      }}
+                                      className="text-destructive focus:text-destructive"
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </TableCell>
                             </TableRow>
                           )
@@ -360,11 +386,11 @@ export default function AccountsPage() {
                         if (name.includes("admin")) {
                           return { icon: Shield, color: "bg-red-100 text-red-600", iconColor: "text-red-600" }
                         } else if (name.includes("manager")) {
-                          return { icon: User, color: "bg-blue-100 text-blue-600", iconColor: "text-blue-600" }
+                          return { icon: UsersIcon, color: "bg-blue-100 text-blue-600", iconColor: "text-blue-600" }
                         } else if (name.includes("cashier")) {
                           return { icon: ShoppingCart, color: "bg-green-100 text-green-600", iconColor: "text-green-600" }
                         } else {
-                          return { icon: User, color: "bg-gray-100 text-gray-600", iconColor: "text-gray-600" }
+                          return { icon: UsersIcon, color: "bg-gray-100 text-gray-600", iconColor: "text-gray-600" }
                         }
                       }
 

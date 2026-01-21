@@ -76,15 +76,19 @@ export class ApiClient {
     }
 
     try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), this.timeout)
+      // Support environments where AbortController may be missing (older Node/browsers)
+      const AbortCtrl: typeof AbortController | null =
+        typeof AbortController !== "undefined" ? AbortController : null
+
+      const controller = AbortCtrl ? new AbortCtrl() : null
+      const timeoutId = controller ? setTimeout(() => controller.abort(), this.timeout) : null
 
       const response = await fetch(url, {
         ...config,
-        signal: controller.signal,
+        signal: controller ? controller.signal : undefined,
       })
 
-      clearTimeout(timeoutId)
+      if (timeoutId) clearTimeout(timeoutId)
 
       // Handle 401 Unauthorized - try to refresh token
       if (response.status === 401 && retry && typeof window !== "undefined") {
@@ -426,20 +430,6 @@ export const apiEndpoints = {
     bySale: (saleId: string) => `/receipts/by-sale/${saleId}/`,
     download: (id: string) => `/receipts/${id}/download/`,
     regenerate: (id: string) => `/receipts/${id}/regenerate/`,
-  },
-  // Deliveries
-  deliveries: {
-    list: "/deliveries/",
-    get: (id: string) => `/deliveries/${id}/`,
-    create: "/deliveries/",
-    update: (id: string) => `/deliveries/${id}/`,
-    delete: (id: string) => `/deliveries/${id}/`,
-    confirm: (id: string) => `/deliveries/${id}/confirm/`,
-    dispatch: (id: string) => `/deliveries/${id}/dispatch/`,
-    complete: (id: string) => `/deliveries/${id}/complete/`,
-    cancel: (id: string) => `/deliveries/${id}/cancel/`,
-    pending: "/deliveries/pending/",
-    scheduledToday: "/deliveries/scheduled_today/",
   },
   // Customers
   customers: {

@@ -76,7 +76,7 @@ export default function LoginPage() {
           // Redirect to the appropriate dashboard based on business type
           let dashboardRoute: string
           if (businessType === "wholesale and retail") {
-            dashboardRoute = "/dashboard/retail"
+            dashboardRoute = "/dashboard"
           } else if (businessType === "restaurant") {
             dashboardRoute = "/dashboard/restaurant/dashboard"
           } else if (businessType === "bar") {

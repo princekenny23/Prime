@@ -38,25 +38,25 @@ const nextConfig = {
   },
   async redirects() {
     return [
-      // Redirect old "wholesale and retail" routes to "retail"
+      // Redirect old "wholesale and retail" routes to main dashboard (MVP retail removed)
       {
         source: '/dashboard/wholesale%20and%20retail',
-        destination: '/dashboard/retail',
+        destination: '/dashboard',
         permanent: false,
       },
       {
         source: '/dashboard/wholesale%20and%20retail/:path*',
-        destination: '/dashboard/retail/:path*',
+        destination: '/dashboard',
         permanent: false,
       },
       {
         source: '/dashboard/wholesale and retail',
-        destination: '/dashboard/retail',
+        destination: '/dashboard',
         permanent: false,
       },
       {
         source: '/dashboard/wholesale and retail/:path*',
-        destination: '/dashboard/retail/:path*',
+        destination: '/dashboard',
         permanent: false,
       },
     ]

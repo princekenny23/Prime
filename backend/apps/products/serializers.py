@@ -74,8 +74,9 @@ class ItemVariationSerializer(serializers.ModelSerializer):
 
     def validate_barcode(self, value):
         """Ensure barcode is unique across variations and products within tenant/outlet"""
+        # Allow blank input but persist as empty string (DB column is NOT NULL)
         if not value or (isinstance(value, str) and value.strip() == ""):
-            return None
+            return ""
 
         request = self.context.get('request')
         if not request:

@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.4",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/html2canvas": "^0.5.35"
+  }
+}

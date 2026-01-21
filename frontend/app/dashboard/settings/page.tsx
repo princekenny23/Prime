@@ -27,13 +27,7 @@ const settingsOptions: (Omit<OptionCardProps, "iconSize">)[] = [
     href: "/dashboard/settings/outlets-and-tills-management",
     icon: Store,
   },
-  {
-    id: "receipts",
-    title: "Receipts",
-    titleKey: "settings.menu.receipts",
-    href: "/dashboard/settings/receipts",
-    icon: Receipt,
-  },
+
   {
     id: "integrations",
     title: "Integrations",

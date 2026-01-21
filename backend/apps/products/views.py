@@ -225,24 +225,38 @@ class ProductViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         # Save the product (this will update Product.stock)
         product = serializer.save()
         
-        # Update LocationStock for the default variation if stock was provided
+        # Update stock using batch-aware system if stock was provided
         if new_stock is not None:
             from apps.inventory.models import LocationStock
+            from apps.inventory.stock_helpers import adjust_stock, get_available_stock
+            
             variation = product.variations.filter(is_active=True, track_inventory=True).first()
             if variation:
                 outlet = self.get_outlet_for_request(self.request)
                 if outlet:
-                    location_stock, created = LocationStock.objects.get_or_create(
+                    # Get current available stock
+                    current_stock = get_available_stock(variation, outlet)
+                    
+                    # Adjust to the target stock using batch-aware helper
+                    if new_stock != current_stock:
+                        adjust_stock(
+                            variation=variation,
+                            outlet=outlet,
+                            new_quantity=new_stock,
+                            user=self.request.user,
+                            reason=f"Product update via API - set stock to {new_stock} (was {current_stock})"
+                        )
+                        logger.info(
+                            f"Adjusted stock for product {product.id}, variation {variation.id}, outlet {outlet.id}: {current_stock} -> {new_stock}"
+                        )
+                    
+                    # Also update LocationStock.quantity for backward compatibility
+                    LocationStock.objects.update_or_create(
                         tenant=product.tenant,
                         variation=variation,
                         outlet=outlet,
                         defaults={'quantity': new_stock}
                     )
-                    if not created:
-                        # Update existing LocationStock
-                        location_stock.quantity = new_stock
-                        location_stock.save()
-                    logger.info(f"Updated LocationStock for product {product.id}, variation {variation.id}, outlet {outlet.id}: quantity={location_stock.quantity}")
     
     def destroy(self, request, *args, **kwargs):
         """Override destroy to ensure tenant and outlet match"""
@@ -416,24 +430,45 @@ class ProductViewSet(viewsets.ModelViewSet, TenantFilterMixin):
             )
             logger.info(f"Created default variation for product {product.id}: {default_variation.id}")
         
-        # Always create LocationStock entry for default variation (even if stock is 0)
-        # This ensures the stock tracking system is properly initialized
+        # Always create LocationStock entry and initial batch for default variation
+        # This ensures the stock tracking system is properly initialized with batches
         from apps.inventory.models import LocationStock
+        from apps.inventory.stock_helpers import add_stock
+        from datetime import timedelta
+        from django.utils import timezone
+        
         variation = product.variations.first()
         if variation and variation.track_inventory:
             # Use the stock value from the product (which was set from the request)
             initial_stock = product.stock if product.stock is not None else 0
-            location_stock, created = LocationStock.objects.get_or_create(
+            
+            # Create/update LocationStock for backward compatibility
+            LocationStock.objects.update_or_create(
                 tenant=tenant,
                 variation=variation,
                 outlet=outlet,
                 defaults={'quantity': initial_stock}
             )
-            if not created:
-                # Update existing LocationStock with the new stock value
-                location_stock.quantity = initial_stock
-                location_stock.save()
-            logger.info(f"Created/updated LocationStock for product {product.id}, variation {variation.id}, outlet {outlet.id}: quantity={location_stock.quantity}, product.stock={product.stock}")
+            
+            # If there's initial stock, create a batch for it
+            if initial_stock > 0:
+                # Generate batch number
+                batch_number = f"INIT-{product.id}-{timezone.now().strftime('%Y%m%d')}"
+                # Default expiry: 1 year from now
+                expiry_date = (timezone.now() + timedelta(days=365)).date()
+                
+                add_stock(
+                    variation=variation,
+                    outlet=outlet,
+                    quantity=initial_stock,
+                    batch_number=batch_number,
+                    expiry_date=expiry_date,
+                    user=self.request.user,
+                    reason=f"Initial stock for new product"
+                )
+                logger.info(f"Created initial batch for product {product.id}, variation {variation.id}: quantity={initial_stock}, batch={batch_number}")
+            else:
+                logger.info(f"Created LocationStock for product {product.id}, variation {variation.id}, outlet {outlet.id} with zero stock")
     
     @action(detail=False, methods=['get'])
     def low_stock(self, request):

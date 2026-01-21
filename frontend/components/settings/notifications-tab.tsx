@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Mail, Bell } from "lucide-react"
+import { Mail, Bell, ExternalLink } from "lucide-react"
 import { useState } from "react"
+import Link from "next/link"
 import { useToast } from "@/components/ui/use-toast"
 
 export function NotificationsTab() {
@@ -96,7 +97,16 @@ export function NotificationsTab() {
           </p>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-between items-center">
+          <Button 
+            variant="outline"
+            asChild
+          >
+            <Link href="/dashboard/settings/notifications">
+              <ExternalLink className="mr-2 h-4 w-4" />
+              View All Notifications
+            </Link>
+          </Button>
           <Button onClick={handleSave} disabled={isSaving}>
             {isSaving ? "Saving..." : "Save Changes"}
           </Button>

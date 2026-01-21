@@ -20,8 +20,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
-import { MapPin, Phone, Mail, Edit, Trash2, Settings, BarChart3, Store, MoreVertical, 
-  Power, PowerOff, Monitor, Eye, Copy, CheckCircle2, XCircle, RefreshCw, Menu } from "lucide-react"
+import { MapPin, Phone, Mail, Edit, Trash2, Store, Menu, 
+  Power, PowerOff, Eye, CheckCircle2, XCircle, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -304,106 +304,71 @@ export function OutletList(props: OutletListProps = {}) {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center justify-end gap-2">
-                        {/* View Button */}
-                        <Link href={`/dashboard/office/outlets/${outlet.id}/analytics`}>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-8 w-8 p-0"
-                            title="View Outlet Details"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </Link>
-
-                        {/* Switch Outlet Button - Only show if not current outlet */}
-                        {currentOutlet?.id !== outlet.id && outlet.isActive && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleSwitchOutlet(outlet)}
-                            disabled={isSwitching === outlet.id}
-                            title="Switch to This Outlet"
-                            className="h-8"
-                          >
-                            {isSwitching === outlet.id ? (
-                              <>
-                                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                                Switching...
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
-                                Switch
-                              </>
-                            )}
-                          </Button>
-                        )}
-
-                        {/* Delete Button */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => handleDelete(outlet)}
-                          disabled={isDeleting === outlet.id}
-                          title="Delete Outlet"
-                        >
-                          {isDeleting === outlet.id ? (
-                            <RefreshCw className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                        </Button>
-
-                        {/* More Actions Dropdown */}
+                      <div className="flex items-center justify-end">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                            >
                               <Menu className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuLabel>More Actions</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            
+                          <DropdownMenuContent align="end">
                             <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/office/outlets/${outlet.id}/settings`} className="flex items-center">
-                                <Settings className="mr-2 h-4 w-4" />
-                                Settings
+                              <Link href={`/dashboard/office/outlets/${outlet.id}/analytics`} className="flex items-center">
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Details
                               </Link>
                             </DropdownMenuItem>
-                            
-                            <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/office/outlets/${outlet.id}/tills`} className="flex items-center">
-                                <Monitor className="mr-2 h-4 w-4" />
-                                Manage Tills
-                              </Link>
-                            </DropdownMenuItem>
-                            
-                            <DropdownMenuSeparator />
                             
                             <DropdownMenuItem onClick={() => handleEdit(outlet)}>
                               <Edit className="mr-2 h-4 w-4" />
                               Edit Outlet
                             </DropdownMenuItem>
                             
+                            {currentOutlet?.id !== outlet.id && outlet.isActive && (
+                              <DropdownMenuItem
+                                onClick={() => handleSwitchOutlet(outlet)}
+                                disabled={isSwitching === outlet.id}
+                              >
+                                {isSwitching === outlet.id ? (
+                                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                                )}
+                                Switch to This Outlet
+                              </DropdownMenuItem>
+                            )}
+                            
+                            <DropdownMenuSeparator />
+                            
                             <DropdownMenuItem
                               onClick={() => handleToggleStatus(outlet)}
                               disabled={isTogglingStatus === outlet.id}
                             >
-                              {outlet.isActive ? (
-                                <>
-                                  <PowerOff className="mr-2 h-4 w-4" />
-                                  Deactivate
-                                </>
+                              {isTogglingStatus === outlet.id ? (
+                                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                              ) : outlet.isActive ? (
+                                <PowerOff className="mr-2 h-4 w-4" />
                               ) : (
-                                <>
-                                  <Power className="mr-2 h-4 w-4" />
-                                  Activate
-                                </>
+                                <Power className="mr-2 h-4 w-4" />
                               )}
+                              {outlet.isActive ? "Deactivate" : "Activate"}
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuItem
+                              onClick={() => handleDelete(outlet)}
+                              disabled={isDeleting === outlet.id}
+                              className="text-destructive"
+                            >
+                              {isDeleting === outlet.id ? (
+                                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="mr-2 h-4 w-4" />
+                              )}
+                              Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

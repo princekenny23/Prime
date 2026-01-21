@@ -6,12 +6,17 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/components/ui/use-toast"
+import { useQZStore } from "@/stores/qzStore"
 
 const STORAGE_KEY = "qz_settings_v1"
 
 export default function QzSettings() {
   const { toast } = useToast()
-  const [enabled, setEnabled] = useState(false)
+  const enabled = useQZStore((s) => s.enabled)
+  const connected = useQZStore((s) => s.connected)
+  const printers = useQZStore((s) => s.printers)
+  const setEnabled = useQZStore((s) => s.setEnabled)
+  const refreshPrinters = useQZStore((s) => s.refreshPrinters)
   const [autoConnect, setAutoConnect] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -70,6 +75,19 @@ export default function QzSettings() {
           <div className="text-sm text-muted-foreground">When enabled, the app will try to auto-discover and connect to QZ printers</div>
         </div>
         <Switch checked={autoConnect} onCheckedChange={(v) => setAutoConnect(Boolean(v))} />
+      </div>
+
+      <div className="rounded border p-3 text-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-medium">Status</div>
+            <div className="text-muted-foreground">{connected ? "Connected" : "Disconnected"}</div>
+          </div>
+          <Button variant="outline" size="sm" onClick={refreshPrinters} disabled={!connected}>Refresh Printers</Button>
+        </div>
+        {connected && (
+          <div className="mt-3 text-muted-foreground">Found {printers.length} printer{printers.length !== 1 ? "s" : ""}</div>
+        )}
       </div>
 
       <div className="flex justify-end gap-2">

@@ -10,6 +10,8 @@ class ExpenseSerializer(serializers.ModelSerializer):
     outlet_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     user = UserSerializer(read_only=True)
     outlet_name = serializers.CharField(source='outlet.name', read_only=True)
+    approved_by_name = serializers.CharField(source='approved_by.get_full_name', read_only=True)
+    rejected_by_name = serializers.CharField(source='rejected_by.get_full_name', read_only=True)
     
     class Meta:
         model = Expense
@@ -17,9 +19,15 @@ class ExpenseSerializer(serializers.ModelSerializer):
             'id', 'tenant', 'outlet', 'outlet_id', 'outlet_name', 'user',
             'expense_number', 'title', 'category', 'vendor', 'description',
             'amount', 'payment_method', 'payment_reference', 'expense_date',
-            'status', 'created_at', 'updated_at'
+            'status', 'approved_by', 'approved_by_name', 'approved_at', 
+            'approval_notes', 'rejected_by', 'rejected_by_name', 'rejected_at',
+            'created_at', 'updated_at'
         )
-        read_only_fields = ('id', 'tenant', 'user', 'expense_number', 'created_at', 'updated_at')
+        read_only_fields = (
+            'id', 'tenant', 'user', 'expense_number', 
+            'approved_by', 'approved_at', 'rejected_by', 'rejected_at',
+            'created_at', 'updated_at'
+        )
     
     def validate_outlet_id(self, value):
         """Validate that outlet belongs to tenant"""

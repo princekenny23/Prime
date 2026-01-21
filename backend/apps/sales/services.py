@@ -1,13 +1,22 @@
 """
 Receipt generation service
 Handles creation and formatting of digital receipts
+Supports: PDF (for download/view) and ESC/POS (for thermal printing)
 """
 import logging
-from django.template.loader import render_to_string
 from django.template import engines, TemplateSyntaxError
+from django.core.files.base import ContentFile
 import json
 from django.utils import timezone
 from decimal import Decimal
+from io import BytesIO
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+import base64
 from .models import Sale, Receipt
 from apps.tenants.models import Tenant
 from apps.accounts.models import User
@@ -19,13 +28,13 @@ class ReceiptService:
     """Service for generating and managing digital receipts"""
     
     @staticmethod
-    def generate_receipt(sale: Sale, format: str = 'json', user: User = None) -> Receipt:
+    def generate_receipt(sale: Sale, format: str = 'pdf', user: User = None) -> Receipt:
         """
         Generate and save a receipt for a sale
         
         Args:
             sale: The Sale instance
-            format: Receipt format ('html', 'pdf', 'json')
+            format: Receipt format ('pdf' or 'escpos')
             user: User who generated the receipt (defaults to sale.user)
         
         Returns:
@@ -42,95 +51,27 @@ class ReceiptService:
             if not user:
                 user = sale.user
 
-            # Prefer tenant's default receipt template when available
-            from .models import ReceiptTemplate
-            from .serializers import SaleSerializer
+            content = None
+            pdf_file = None
 
-            template = None
-            try:
-                template = ReceiptTemplate.objects.filter(tenant=sale.tenant, is_default=True).first()
-            except Exception:
-                template = None
-
-            # Build a safe context using serialized sale data
-            sale_data = SaleSerializer(sale).data
-            context = {
-                'sale': sale_data,
-                'items': sale_data.get('items', []),
-                'outlet': sale_data.get('outlet_detail') or {},
-                'tenant': {'id': str(sale.tenant.id), 'name': getattr(sale.tenant, 'name', '')},
-            }
-
-            if template and template.content:
-                # Render template according to its stored format
-                try:
-                    engine = engines['django']
-                    tpl = engine.from_string(template.content or '')
-                    rendered = tpl.render(context)
-                except TemplateSyntaxError as e:
-                    logger.error(f"Template syntax error for tenant {sale.tenant.id}: {str(e)}")
-                    # Fall back to programmatic generators
-                    rendered = None
-
-                if rendered is not None:
-                    # If caller asked for escpos, convert rendered text to escpos bytes
-                    if format == 'escpos':
-                        # Ensure we have a text representation
-                        text_to_convert = rendered
-                        # If template.format is json, dump to pretty text
-                        if template.format == 'json':
-                            try:
-                                parsed = json.loads(rendered)
-                                text_to_convert = json.dumps(parsed, indent=2)
-                            except Exception:
-                                # leave as-is
-                                pass
-                        content = ReceiptService._text_to_escpos(sale, text_to_convert)
-                    else:
-                        # Respect requested format when possible; otherwise store template's format
-                        if format == 'html' or template.format == 'html' or template.format == 'text':
-                            content = rendered
-                            # if requested format explicitly json, try to convert
-                            if format == 'json':
-                                try:
-                                    content = json.dumps(json.loads(rendered), indent=2)
-                                except Exception:
-                                    # if rendered is not valid JSON, keep as string
-                                    pass
-                        elif template.format == 'json' or format == 'json':
-                            # Ensure valid JSON string
-                            try:
-                                parsed = json.loads(rendered)
-                                content = json.dumps(parsed, indent=2)
-                            except Exception:
-                                # Fallback to putting rendered string in content
-                                content = rendered
-                        else:
-                            content = rendered
-                else:
-                    # Template failed to render; fall back to programmatic generation
-                    template = None
-
-            if not template or not template.content:
-                # Generate receipt content based on format (fallbacks)
-                if format == 'html':
-                    # HTML kept for previewing, but not intended for direct printing in POS flow
-                    content = ReceiptService._generate_html_receipt(sale)
-                elif format == 'json':
-                    content = ReceiptService._generate_json_receipt(sale)
-                elif format == 'escpos':
-                    # Return base64-encoded ESC/POS bytes as text payload
-                    content = ReceiptService._generate_escpos_receipt(sale)
-                else:
-                    # Fallback to structured JSON
-                    content = ReceiptService._generate_json_receipt(sale)
+            # Generate receipt content based on format
+            if format == 'pdf':
+                # Generate PDF and store as file
+                pdf_buffer = ReceiptService._generate_pdf_receipt(sale)
+                pdf_file = ContentFile(pdf_buffer.read(), name=f"receipt_{sale.receipt_number}.pdf")
+                pdf_buffer.close()
+            elif format == 'escpos':
+                # Return base64-encoded ESC/POS bytes as text payload
+                content = ReceiptService._generate_escpos_receipt(sale)
+            else:
+                # Default to PDF
+                pdf_buffer = ReceiptService._generate_pdf_receipt(sale)
+                pdf_file = ContentFile(pdf_buffer.read(), name=f"receipt_{sale.receipt_number}.pdf")
+                pdf_buffer.close()
+                format = 'pdf'
             
-            # Create a new Receipt record (immutable once created). For versioning,
-            # mark any existing current receipts for this sale+format as not current
-            # and void them.
-            # Note: receipt_number is intentionally left as the sale.receipt_number to
-            # maintain human-friendly numbering; if a new unique number is required we
-            # could append a suffix or generate a new token here.
+            # Create a new Receipt record (immutable once created)
+            # Mark any existing current receipts for this sale+format as not current and voided
             previous = Receipt.objects.filter(sale=sale, format=format, is_current=True, voided=False)
             if previous.exists():
                 previous.update(is_current=False, voided=True)
@@ -140,7 +81,8 @@ class ReceiptService:
                 sale=sale,
                 receipt_number=sale.receipt_number,
                 format=format,
-                content=content,
+                content=content or '',
+                pdf_file=pdf_file,
                 generated_by=user,
             )
 
@@ -152,8 +94,22 @@ class ReceiptService:
             raise
     
     @staticmethod
-    def _generate_html_receipt(sale: Sale) -> str:
-        """Generate HTML receipt content"""
+    def _generate_pdf_receipt(sale: Sale) -> BytesIO:
+        """Generate PDF receipt using ReportLab"""
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer, 
+            pagesize=A4, 
+            rightMargin=20*mm, 
+            leftMargin=20*mm, 
+            topMargin=20*mm, 
+            bottomMargin=20*mm
+        )
+        
+        # Container for PDF elements
+        elements = []
+        styles = getSampleStyleSheet()
+        
         # Get business/outlet information
         business_name = sale.tenant.name if sale.tenant else "Business"
         outlet = sale.outlet
@@ -165,249 +121,189 @@ class ReceiptService:
         # Get currency
         currency = sale.tenant.currency if sale.tenant and sale.tenant.currency else "MWK"
         
-        # Format currency
-        def format_currency(amount):
-            return f"{currency} {amount:,.2f}"
+        # Title Style
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            textColor=colors.HexColor('#1e3a8a'),
+            alignment=TA_CENTER,
+            spaceAfter=12,
+        )
         
-        # Receipt header
-        html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <title>Receipt {sale.receipt_number}</title>
-            <style>
-                body {{
-                    font-family: Arial, sans-serif;
-                    max-width: 400px;
-                    margin: 0 auto;
-                    padding: 20px;
-                    background: white;
-                }}
-                .receipt-header {{
-                    text-align: center;
-                    border-bottom: 2px solid #000;
-                    padding-bottom: 15px;
-                    margin-bottom: 15px;
-                }}
-                .receipt-header h1 {{
-                    margin: 0;
-                    font-size: 24px;
-                    font-weight: bold;
-                }}
-                .receipt-header p {{
-                    margin: 5px 0;
-                    font-size: 12px;
-                }}
-                .receipt-info {{
-                    margin: 15px 0;
-                    font-size: 12px;
-                }}
-                .receipt-info p {{
-                    margin: 3px 0;
-                }}
-                .customer-info {{
-                    margin: 15px 0;
-                    padding: 10px;
-                    background: #f5f5f5;
-                    font-size: 12px;
-                }}
-                .receipt-items {{
-                    margin: 15px 0;
-                }}
-                .receipt-items table {{
-                    width: 100%;
-                    border-collapse: collapse;
-                    font-size: 12px;
-                }}
-                .receipt-items th {{
-                    text-align: left;
-                    border-bottom: 1px solid #ddd;
-                    padding: 8px 0;
-                    font-weight: bold;
-                }}
-                .receipt-items td {{
-                    padding: 5px 0;
-                    border-bottom: 1px dotted #ddd;
-                }}
-                .receipt-items .item-name {{
-                    width: 60%;
-                }}
-                .receipt-items .item-qty {{
-                    width: 15%;
-                    text-align: center;
-                }}
-                .receipt-items .item-price {{
-                    width: 25%;
-                    text-align: right;
-                }}
-                .receipt-totals {{
-                    margin-top: 15px;
-                    padding-top: 15px;
-                    border-top: 2px solid #000;
-                }}
-                .receipt-totals p {{
-                    margin: 5px 0;
-                    font-size: 12px;
-                }}
-                .receipt-totals .total-row {{
-                    font-weight: bold;
-                    font-size: 14px;
-                    margin-top: 10px;
-                }}
-                .receipt-footer {{
-                    margin-top: 20px;
-                    text-align: center;
-                    font-size: 11px;
-                    color: #666;
-                    border-top: 1px solid #ddd;
-                    padding-top: 15px;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="receipt">
-                <div class="receipt-header">
-                    <h1>{business_name}</h1>
-                    {f'<p>{outlet_name}</p>' if outlet_name else ''}
-                    {f'<p>{outlet_address}</p>' if outlet_address else ''}
-                    {f'<p>{outlet_phone}</p>' if outlet_phone else ''}
-                    {f'<p>{outlet_email}</p>' if outlet_email else ''}
-                </div>
-                
-                <div class="receipt-info">
-                    <p><strong>Receipt #:</strong> {sale.receipt_number}</p>
-                    <p><strong>Date:</strong> {sale.created_at.strftime('%Y-%m-%d %H:%M:%S')}</p>
-                    {f'<p><strong>Cashier:</strong> {sale.user.get_full_name() if sale.user and sale.user.get_full_name() else (sale.user.email if sale.user else "System")}</p>' if sale.user else ''}
-                </div>
-        """
+        # Header
+        elements.append(Paragraph(business_name.upper(), title_style))
         
-        # Customer info if applicable
+        if outlet_name:
+            elements.append(Paragraph(outlet_name, ParagraphStyle(
+                'outlet', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER
+            )))
+        if outlet_address:
+            elements.append(Paragraph(outlet_address, ParagraphStyle(
+                'address', parent=styles['Normal'], fontSize=9, alignment=TA_CENTER
+            )))
+        if outlet_phone:
+            elements.append(Paragraph(f"Tel: {outlet_phone}", ParagraphStyle(
+                'phone', parent=styles['Normal'], fontSize=9, alignment=TA_CENTER
+            )))
+        if outlet_email:
+            elements.append(Paragraph(f"Email: {outlet_email}", ParagraphStyle(
+                'email', parent=styles['Normal'], fontSize=9, alignment=TA_CENTER
+            )))
+        
+        elements.append(Spacer(1, 12))
+        
+        # Receipt Info
+        info_data = [
+            ['Receipt #:', sale.receipt_number],
+            ['Date:', sale.created_at.strftime('%Y-%m-%d %H:%M:%S')],
+        ]
+        
+        # Add cashier info - ensure it's always shown if user exists
+        if sale.user:
+            # Try to get full name, fall back to first_name + last_name, then email, then username
+            cashier_name = None
+            if hasattr(sale.user, 'get_full_name'):
+                full_name = sale.user.get_full_name()
+                if full_name and full_name.strip():
+                    cashier_name = full_name.strip()
+            
+            if not cashier_name and hasattr(sale.user, 'first_name') and hasattr(sale.user, 'last_name'):
+                first = (sale.user.first_name or '').strip()
+                last = (sale.user.last_name or '').strip()
+                if first or last:
+                    cashier_name = f"{first} {last}".strip()
+            
+            if not cashier_name and hasattr(sale.user, 'email') and sale.user.email:
+                cashier_name = sale.user.email
+            
+            if not cashier_name and hasattr(sale.user, 'username') and sale.user.username:
+                cashier_name = sale.user.username
+            
+            if cashier_name:
+                info_data.append(['Cashier:', cashier_name])
+        
+        info_table = Table(info_data, colWidths=[40*mm, 120*mm])
+        info_table.setStyle(TableStyle([
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.grey),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ]))
+        elements.append(info_table)
+        elements.append(Spacer(1, 12))
+        
+        # Customer info (show Walk-in if no customer)
+        elements.append(Paragraph('CUSTOMER', ParagraphStyle(
+            'customer_header', parent=styles['Heading2'], fontSize=12, textColor=colors.HexColor('#1e3a8a')
+        )))
+
+        customer_data = []
         if sale.customer:
-            html += f"""
-                <div class="customer-info">
-                    <p><strong>Customer:</strong> {sale.customer.name}</p>
-                    {f'<p><strong>Phone:</strong> {sale.customer.phone}</p>' if sale.customer.phone else ''}
-                    {f'<p><strong>Email:</strong> {sale.customer.email}</p>' if sale.customer.email else ''}
-                </div>
-            """
+            customer_data.append(['Name:', sale.customer.name or 'Walk-in'])
+            if sale.customer.phone:
+                customer_data.append(['Phone:', sale.customer.phone])
+            if sale.customer.email:
+                customer_data.append(['Email:', sale.customer.email])
+        else:
+            customer_data.append(['Name:', 'Walk-in'])
+
+        customer_table = Table(customer_data, colWidths=[40*mm, 120*mm])
+        customer_table.setStyle(TableStyle([
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.grey),
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f3f4f6')),
+            ('PADDING', (0, 0), (-1, -1), 6),
+        ]))
+        elements.append(customer_table)
+        elements.append(Spacer(1, 12))
         
         # Items
-        html += """
-                <div class="receipt-items">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th class="item-name">Item</th>
-                                <th class="item-qty">Qty</th>
-                                <th class="item-price">Price</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-        """
+        elements.append(Paragraph('ITEMS', ParagraphStyle(
+            'items_header', parent=styles['Heading2'], fontSize=12, textColor=colors.HexColor('#1e3a8a')
+        )))
         
-        # Add sale items
+        items_data = [['Item', 'Qty', 'Price', 'Total']]
+        
         for item in sale.items.all():
             item_name = item.product_name
             if item.variation_name:
-                item_name += f" - {item.variation_name}"
+                item_name += f"\n({item.variation_name})"
             if item.unit_name:
-                item_name += f" ({item.unit_name})"
+                item_name += f" {item.unit_name}"
             
-            html += f"""
-                            <tr>
-                                <td class="item-name">{item_name}</td>
-                                <td class="item-qty">{item.quantity}</td>
-                                <td class="item-price">{format_currency(item.total)}</td>
-                            </tr>
-            """
+            items_data.append([
+                item_name,
+                str(item.quantity),
+                f"{currency} {item.price:,.2f}",
+                f"{currency} {item.total:,.2f}"
+            ])
         
-        html += """
-                        </tbody>
-                    </table>
-                </div>
-        """
+        items_table = Table(items_data, colWidths=[80*mm, 25*mm, 30*mm, 35*mm])
+        items_table.setStyle(TableStyle([
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e3a8a')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+            ('ALIGN', (2, 0), (-1, -1), 'RIGHT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9fafb')]),
+            ('PADDING', (0, 0), (-1, -1), 6),
+        ]))
+        elements.append(items_table)
+        elements.append(Spacer(1, 12))
         
         # Totals
-        html += f"""
-                <div class="receipt-totals">
-                    <p>Subtotal: {format_currency(sale.subtotal)}</p>
-                    {f'<p>Tax: {format_currency(sale.tax)}</p>' if sale.tax > 0 else ''}
-                    {f'<p>Discount: -{format_currency(sale.discount)}</p>' if sale.discount > 0 else ''}
-                    <p class="total-row">Total: {format_currency(sale.total)}</p>
-                    <p>Payment Method: {sale.get_payment_method_display()}</p>
-                    {f'<p>Cash Received: {format_currency(sale.cash_received)}</p>' if sale.cash_received else ''}
-                    {f'<p>Change: {format_currency(sale.change_given)}</p>' if sale.change_given and sale.change_given > 0 else ''}
-                </div>
-        """
+        totals_data = [
+            ['Subtotal:', f"{currency} {sale.subtotal:,.2f}"],
+        ]
+        
+        if sale.tax and sale.tax > 0:
+            totals_data.append(['Tax:', f"{currency} {sale.tax:,.2f}"])
+        
+        if sale.discount and sale.discount > 0:
+            totals_data.append(['Discount:', f"-{currency} {sale.discount:,.2f}"])
+        
+        totals_data.append(['TOTAL:', f"{currency} {sale.total:,.2f}"])
+        totals_data.append(['Payment Method:', sale.get_payment_method_display()])
+        
+        if sale.cash_received:
+            totals_data.append(['Cash Received:', f"{currency} {sale.cash_received:,.2f}"])
+        
+        if sale.change_given and sale.change_given > 0:
+            totals_data.append(['Change:', f"{currency} {sale.change_given:,.2f}"])
+        
+        totals_table = Table(totals_data, colWidths=[80*mm, 80*mm])
+        totals_table.setStyle(TableStyle([
+            ('FONTSIZE', (0, 0), (-1, -2), 9),
+            ('FONTSIZE', (0, -2), (-1, -1), 10),
+            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('TEXTCOLOR', (0, -2), (-1, -1), colors.HexColor('#1e3a8a')),
+            ('FONTNAME', (0, -2), (-1, -2), 'Helvetica-Bold'),
+            ('LINEABOVE', (0, -2), (-1, -2), 2, colors.HexColor('#1e3a8a')),
+            ('PADDING', (0, 0), (-1, -1), 4),
+        ]))
+        elements.append(totals_table)
+        elements.append(Spacer(1, 20))
         
         # Footer
-        html += """
-                <div class="receipt-footer">
-                    <p>Thank you for your business!</p>
-                    <p>Powered by PRIMEPOS +265 997575865</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
+        footer_style = ParagraphStyle(
+            'footer',
+            parent=styles['Normal'],
+            fontSize=9,
+            alignment=TA_CENTER,
+            textColor=colors.grey,
+        )
+        elements.append(Paragraph('Thank you for your business!', footer_style))
+        elements.append(Paragraph('Powered by PRIMEPOS +265 997575865', footer_style))
         
-        return html
-    
-    @staticmethod
-    def _generate_json_receipt(sale: Sale) -> str:
-        """Generate JSON receipt content"""
-        import json
-        
-        receipt_data = {
-            'receipt_number': sale.receipt_number,
-            'date': sale.created_at.isoformat(),
-            'business': {
-                'name': sale.tenant.name if sale.tenant else None,
-                'outlet': {
-                    'name': sale.outlet.name if sale.outlet else None,
-                    'address': sale.outlet.address if sale.outlet and sale.outlet.address else None,
-                    'phone': sale.outlet.phone if sale.outlet and sale.outlet.phone else None,
-                    'email': sale.outlet.email if sale.outlet and sale.outlet.email else None,
-                } if sale.outlet else None,
-            },
-            'cashier': {
-                'id': str(sale.user.id) if sale.user else None,
-                'name': sale.user.get_full_name() if sale.user and sale.user.get_full_name() else None,
-                'email': sale.user.email if sale.user else None,
-            } if sale.user else None,
-            'customer': {
-                'id': str(sale.customer.id) if sale.customer else None,
-                'name': sale.customer.name if sale.customer else None,
-                'phone': sale.customer.phone if sale.customer and sale.customer.phone else None,
-                'email': sale.customer.email if sale.customer and sale.customer.email else None,
-            } if sale.customer else None,
-            'items': [
-                {
-                    'product_name': item.product_name,
-                    'variation_name': item.variation_name if item.variation_name else None,
-                    'unit_name': item.unit_name if item.unit_name else None,
-                    'quantity': item.quantity,
-                    'price': str(item.price),
-                    'total': str(item.total),
-                }
-                for item in sale.items.all()
-            ],
-            'totals': {
-                'subtotal': str(sale.subtotal),
-                'tax': str(sale.tax),
-                'discount': str(sale.discount),
-                'total': str(sale.total),
-            },
-            'payment': {
-                'method': sale.payment_method,
-                'cash_received': str(sale.cash_received) if sale.cash_received else None,
-                'change_given': str(sale.change_given) if sale.change_given else None,
-            },
-            'currency': sale.tenant.currency if sale.tenant and sale.tenant.currency else 'MWK',
-        }
-        
-        return json.dumps(receipt_data, indent=2)
+        # Build PDF
+        doc.build(elements)
+        buffer.seek(0)
+        return buffer
 
     @staticmethod
     def _generate_escpos_receipt(sale: Sale) -> str:
@@ -416,14 +312,12 @@ class ReceiptService:
         The backend does NOT send this to any printer. The frontend should request a receipt
         with format='escpos', decode the base64 payload and forward the bytes to QZ Tray.
         """
-        import base64
-
         def b(text: str = ""):
             return (text + "\n").encode('utf-8')
 
         # ESC/POS init
         payload = bytearray()
-        payload.extend(b"\x1b@")  # initialize (note: kept as literal for clarity)
+        payload.extend(b"\x1b@")  # initialize
 
         # Header: business/outlet
         business = sale.tenant.name if sale.tenant else "Business"
@@ -457,41 +351,13 @@ class ReceiptService:
         payload.extend(b("\nThank you for your business!"))
         payload.extend(b("Powered by PRIMEPOS +265 997575865"))
 
-        # Paper cut (may not be supported by all printers; frontend may choose to append)
+        # Paper cut (may not be supported by all printers)
         try:
-            # GS V 0 -> b'\x1dV\x00'
             payload.extend(b("\x1dV\x00"))
         except Exception:
             pass
 
         # Return base64-encoded bytes so they can safely be stored/transferred as text
-        return base64.b64encode(bytes(payload)).decode('ascii')
-
-    @staticmethod
-    def _text_to_escpos(sale: Sale, text: str) -> str:
-        """Convert a rendered text receipt into a minimal ESC/POS base64 payload."""
-        import base64
-
-        def b(text_line: str = ""):
-            return (text_line + "\n").encode('utf-8')
-
-        payload = bytearray()
-        # Initialize
-        payload.extend(b"\x1b@")
-        # Add text
-        # Ensure text is str
-        if text:
-            # Split into lines to avoid enormous single writes
-            for line in str(text).splitlines():
-                payload.extend(b(line))
-        # Footer
-        payload.extend(b("\nThank you for your business!"))
-        payload.extend(b("Powered by PRIMEPOS +265 997575865"))
-        try:
-            payload.extend(b("\x1dV\x00"))
-        except Exception:
-            pass
-
         return base64.b64encode(bytes(payload)).decode('ascii')
     
     @staticmethod
@@ -523,7 +389,7 @@ class ReceiptService:
             raise Receipt.DoesNotExist(f"Active receipt for sale {sale_id} not found")
     
     @staticmethod
-    def regenerate_receipt(receipt_id: int, format: str = 'html', user: User = None) -> Receipt:
+    def regenerate_receipt(receipt_id: int, format: str = 'pdf', user: User = None) -> Receipt:
         """Regenerate a receipt by creating a new version and voiding the previous one.
 
         This preserves immutability by creating a new Receipt row rather than
@@ -536,15 +402,22 @@ class ReceiptService:
             if not user:
                 user = old.generated_by
 
+            content = None
+            pdf_file = None
+
             # Generate new content according to requested format
-            if format == 'html':
-                content = ReceiptService._generate_html_receipt(sale)
-            elif format == 'json':
-                content = ReceiptService._generate_json_receipt(sale)
+            if format == 'pdf':
+                pdf_buffer = ReceiptService._generate_pdf_receipt(sale)
+                pdf_file = ContentFile(pdf_buffer.read(), name=f"receipt_{sale.receipt_number}.pdf")
+                pdf_buffer.close()
             elif format == 'escpos':
                 content = ReceiptService._generate_escpos_receipt(sale)
             else:
-                content = ReceiptService._generate_html_receipt(sale)
+                # Default to PDF
+                pdf_buffer = ReceiptService._generate_pdf_receipt(sale)
+                pdf_file = ContentFile(pdf_buffer.read(), name=f"receipt_{sale.receipt_number}.pdf")
+                pdf_buffer.close()
+                format = 'pdf'
 
             # Mark old as voided and not current
             old.voided = True
@@ -557,7 +430,8 @@ class ReceiptService:
                 sale=sale,
                 receipt_number=sale.receipt_number,
                 format=format,
-                content=content,
+                content=content or '',
+                pdf_file=pdf_file,
                 generated_by=user,
                 superseded_by=None
             )

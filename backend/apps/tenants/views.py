@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import UploadedFile
 import logging
 from .models import Tenant
 from .serializers import TenantSerializer
@@ -126,4 +127,68 @@ class TenantViewSet(viewsets.ModelViewSet, TenantFilterMixin):
         
         serializer = self.get_serializer(request.user.tenant)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['post'], url_path='upload-logo')
+    def upload_logo(self, request):
+        """Upload business logo for current user's tenant"""
+        if not request.user.tenant:
+            return Response(
+                {"detail": "User has no tenant"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        tenant = request.user.tenant
+        
+        # Check if user can upload logo (owner or admin)
+        if not request.user.is_saas_admin and request.user.tenant.id != tenant.id:
+            return Response(
+                {"detail": "You don't have permission to upload logo for this tenant"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get file from request
+        file = request.FILES.get('file')
+        if not file:
+            return Response(
+                {"detail": "No file provided"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate file type
+        allowed_types = ['image/png', 'image/jpeg', 'image/webp']
+        if file.content_type not in allowed_types:
+            return Response(
+                {"detail": "Invalid file type. Allowed: PNG, JPG, WebP"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate file size (max 5MB)
+        max_size = 5 * 1024 * 1024  # 5MB
+        if file.size > max_size:
+            return Response(
+                {"detail": "File size exceeds 5MB limit"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Delete old logo if exists
+        if tenant.logo:
+            try:
+                tenant.logo.delete(save=False)
+            except Exception as e:
+                logger.warning(f"Failed to delete old logo for tenant {tenant.id}: {str(e)}")
+        
+        # Save new logo
+        tenant.logo = file
+        tenant.save(update_fields=['logo'])
+        
+        # Return updated tenant with logo URL
+        serializer = self.get_serializer(tenant)
+        return Response(
+            {
+                "detail": "Logo uploaded successfully",
+                "logo": request.build_absolute_uri(tenant.logo.url) if tenant.logo else None,
+                "tenant": serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
 

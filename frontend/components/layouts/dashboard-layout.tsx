@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo, useRef } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -58,6 +58,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user } = useAuthStore()
   const { currentBusiness } = useBusinessStore()
   const { t } = useI18n()
+  const restoringBusinessRef = useRef(false)
+  const redirectedRef = useRef(false)
   
   // Helper to translate navigation item names
   const translateNavItem = (name: string) => {
@@ -71,28 +73,24 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   // For SaaS admin routes, use only base navigation (no industry-specific items)
   // For business routes, use industry-specific navigation
-  let allNavigation: NavigationItem[]
-  if (isAdminRoute || isSaaSAdmin) {
-    // SaaS admin always gets base navigation only, regardless of selected business
-    allNavigation = fullNavigation
-  } else {
-    // Regular business users get industry-specific navigation
-    // Only use currentBusiness.type - don't fall back to tenant as it may be from a different business
+  const allNavigation: NavigationItem[] = useMemo(() => {
+    if (isAdminRoute || isSaaSAdmin) {
+      return fullNavigation
+    }
     const industry = currentBusiness?.type as "wholesale and retail" | "restaurant" | "bar" | null | undefined
-    allNavigation = getIndustrySidebarConfig(industry)
-    
-    // Update Dashboard link to point to the correct dashboard based on business type
-    const dashboardIndex = allNavigation.findIndex(item => item.name === "Dashboard")
+    const nav = getIndustrySidebarConfig(industry)
+    const dashboardIndex = nav.findIndex(item => item.name === "Dashboard")
     if (dashboardIndex !== -1 && currentBusiness) {
       if (currentBusiness.type === "restaurant") {
-        allNavigation[dashboardIndex] = { ...allNavigation[dashboardIndex], href: "/dashboard/restaurant/dashboard" }
+        nav[dashboardIndex] = { ...nav[dashboardIndex], href: "/dashboard/restaurant/dashboard" }
       } else if (currentBusiness.type === "bar") {
-        allNavigation[dashboardIndex] = { ...allNavigation[dashboardIndex], href: "/dashboard/bar/dashboard" }
+        nav[dashboardIndex] = { ...nav[dashboardIndex], href: "/dashboard/bar/dashboard" }
       } else if (currentBusiness.type === "wholesale and retail") {
-        allNavigation[dashboardIndex] = { ...allNavigation[dashboardIndex], href: "/dashboard/retail/dashboard" }
+        nav[dashboardIndex] = { ...nav[dashboardIndex], href: "/dashboard" }
       }
     }
-  }
+    return nav
+  }, [isAdminRoute, isSaaSAdmin, currentBusiness?.type])
   
   // Filter navigation based on user role
   const navigation = allNavigation.filter((item) => hasPermission(item.permission))
@@ -100,32 +98,36 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   // For admin routes, don't require business selection
   // For regular dashboard routes, redirect if no business (unless SaaS admin)
   useEffect(() => {
-    if (isAdminRoute) {
-      // Admin routes don't need business - allow access
-      return
-    }
-    
-    // Check if we're on a tenant-specific dashboard route
+    if (isAdminRoute) return
+
+    const isDashboardRoute = pathname?.startsWith("/dashboard")
     const isTenantDashboardRoute = pathname?.match(/^\/dashboard\/(retail|restaurant|bar)/)
-    
-    if (!isSaaSAdmin && !currentBusiness && pathname?.startsWith("/dashboard")) {
-      // If we're on a tenant dashboard route, try to restore business from user's tenant
-      if (isTenantDashboardRoute && user?.tenant) {
-        const tenantId = typeof user.tenant === 'object' 
-          ? String(user.tenant.id || user.tenant) 
+
+    if (!isSaaSAdmin && !currentBusiness && isDashboardRoute) {
+      if (isTenantDashboardRoute && user?.tenant && !restoringBusinessRef.current) {
+        restoringBusinessRef.current = true
+        const tenantId = typeof user.tenant === 'object'
+          ? String((user.tenant as any).id || user.tenant)
           : String(user.tenant)
-        // Restore the business from the user's tenant
         const { setCurrentBusiness } = useBusinessStore.getState()
-        setCurrentBusiness(tenantId).catch((error: any) => {
-          console.error("Failed to restore business from tenant:", error)
-          // If restoration fails, redirect to admin
-          router.push("/admin")
-        })
-        return // Don't redirect yet, wait for business to be restored
+        setCurrentBusiness(tenantId)
+          .catch((error: any) => {
+            console.error("Failed to restore business from tenant:", error)
+            if (!redirectedRef.current) {
+              redirectedRef.current = true
+              router.push("/admin")
+            }
+          })
+          .finally(() => {
+            restoringBusinessRef.current = false
+          })
+        return
       }
-      
-      // Regular user without business - redirect to admin dashboard
-      router.push("/admin")
+
+      if (!redirectedRef.current) {
+        redirectedRef.current = true
+        router.push("/admin")
+      }
     }
   }, [isAdminRoute, isSaaSAdmin, currentBusiness, pathname, router, user])
 

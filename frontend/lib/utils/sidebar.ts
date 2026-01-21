@@ -51,10 +51,8 @@ export const fullNavigation: NavigationItem[] = [
   { name: "Settings", href: "/dashboard/settings", icon: Settings, permission: "settings" },
 ]
 
-// Wholesale/Retail-specific navigation items (MVP: Deliveries only)
-export const retailNavigation: NavigationItem[] = [
-  { name: "Wholesale", href: "/dashboard/retail", icon: ShoppingCart, permission: "pos" },
-]
+// Retail navigation removed for MVP; wholesale users go to main dashboard
+export const retailNavigation: NavigationItem[] = []
 
 // Universal navigation items (available for all business types)
 // Note: Returns, Discounts, and Credits are now under Sales Hub (/dashboard/sales)
@@ -93,7 +91,7 @@ export function getIndustrySidebarConfig(
   
   switch (industry) {
     case "wholesale and retail":
-      return [...baseNavigation, ...retailNavigation]
+      return [...baseNavigation]
     case "restaurant":
       return [...baseNavigation, ...restaurantNavigation]
     case "bar":

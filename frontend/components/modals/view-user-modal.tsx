@@ -69,9 +69,16 @@ export function ViewUserModal({ open, onOpenChange, user }: ViewUserModalProps) 
                 <Shield className="h-4 w-4" />
                 Role
               </p>
-              <Badge variant="outline" className="mt-1">
-                {user.role || "staff"}
-              </Badge>
+              <div className="flex flex-col gap-1">
+                <Badge variant="outline" className="mt-1 w-fit">
+                  {user.staff_role?.name || user.effective_role || user.role || "staff"}
+                </Badge>
+                {user.staff_role?.description && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {user.staff_role.description}
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="space-y-1">
@@ -113,11 +120,28 @@ export function ViewUserModal({ open, onOpenChange, user }: ViewUserModalProps) 
               >
                 {user.is_saas_admin ? "SaaS Admin" : "Active"}
               </Badge>
-              {user.role === "admin" && (
+              {(user.role === "admin" || user.effective_role === "admin") && (
                 <Badge variant="outline">Administrator</Badge>
               )}
             </div>
           </div>
+
+          {/* Permissions */}
+          {user.permissions && (
+            <div className="p-4 bg-muted/50 rounded-lg">
+              <p className="text-sm text-muted-foreground mb-3">Permissions</p>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(user.permissions).map(([key, value]) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${value ? 'bg-green-500' : 'bg-gray-300'}`} />
+                    <span className="text-sm capitalize">
+                      {key.replace('can_', '').replace('_', ' ')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Additional Info */}
           {user.tenant && (

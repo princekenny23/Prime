@@ -27,7 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { quotationService, type QuotationItem } from "@/lib/services/quotationService"
-import { SelectProductModal } from "@/components/modals/select-product-modal"
+import { ProductSelectionOrchestrator, type ProductSelectionResult } from "@/components/modals/product-selection-orchestrator"
 import { SelectCustomerModal } from "@/components/modals/select-customer-modal"
 import type { Product } from "@/lib/types"
 import type { Customer } from "@/lib/services/customerService"
@@ -98,17 +98,52 @@ export default function NewQuotationPage() {
     setShowProductSelector(true)
   }
 
-  const handleSelectProduct = (product: Product) => {
-    const price = (product as any).retail_price || product.price || 0
+  const handleSelectProduct = (result: ProductSelectionResult) => {
+    console.log("🎯 Product selected from orchestrator:", result)
+    
+    const { product, variation, unit } = result
+    
+    // Calculate price following hierarchy: unit > variation > product
+    const price = unit?.retail_price || 
+                  (variation as any)?.price || 
+                  (product as any).retail_price || 
+                  product.price || 0
+    
+    console.log("💰 Calculated price:", price)
+    
+    // Build product name with variation and unit info
+    let productName = product.name || ""
+    if (variation) {
+      productName += ` (${variation.name})`
+    }
+    if (unit) {
+      productName += ` - ${unit.unit_name}`
+    }
+    
+    console.log("📝 Product name:", productName)
+    
     const newItem: QuotationItem = {
       id: Date.now().toString(),
       product_id: product.id,
-      product_name: product.name || "",
-      quantity: 1,
+      product_name: productName,
+      quantity: result.quantity || 1,
       price,
-      total: price,
-    }
-    setItems(prev => [...prev, newItem])
+      total: price * (result.quantity || 1),
+      // Store additional data for reference
+      variation_id: variation?.id,
+      variation_name: variation?.name,
+      unit_id: unit?.id,
+      unit_name: unit?.unit_name,
+    } as any
+    
+    console.log("✅ New item created:", newItem)
+    console.log("📋 Current items before adding:", items)
+    
+    setItems(prev => {
+      const updated = [...prev, newItem]
+      console.log("📋 Updated items:", updated)
+      return updated
+    })
   }
 
   const handleSelectCustomer = (customer: Customer | null) => {
@@ -676,11 +711,12 @@ export default function NewQuotationPage() {
         </FilterableTabs>
 
         {/* Modals */}
-        <SelectProductModal
+        <ProductSelectionOrchestrator
           open={showProductSelector}
           onOpenChange={setShowProductSelector}
-          onSelect={handleSelectProduct}
+          onComplete={handleSelectProduct}
           outletId={currentOutlet?.id ? String(currentOutlet.id) : undefined}
+          saleType="retail"
         />
 
         <SelectCustomerModal

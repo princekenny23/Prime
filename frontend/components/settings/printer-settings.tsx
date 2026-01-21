@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
+import { useQZStore } from "@/stores/qzStore"
 
 
 // Minimal QZ Tray integration for discovery and selection.
@@ -16,100 +17,43 @@ import { useToast } from "@/components/ui/use-toast"
 
 export function PrinterSettings() {
   const { toast } = useToast()
-  const [qzLoaded, setQzLoaded] = useState(false)
-  const [connected, setConnected] = useState(false)
-  const [printers, setPrinters] = useState<string[]>([])
+  const enabled = useQZStore((s) => s.enabled)
+  const connected = useQZStore((s) => s.connected)
+  const printers = useQZStore((s) => s.printers)
+  const setEnabled = useQZStore((s) => s.setEnabled)
+  const refreshPrinters = useQZStore((s) => s.refreshPrinters)
   const [selectedPrinter, setSelectedPrinter] = useState<string>(typeof window !== "undefined" ? localStorage.getItem("defaultPrinter") || "" : "")
   const [isScanning, setIsScanning] = useState(false)
   const [manualPrinter, setManualPrinter] = useState("")
   const [rawOutputVisible, setRawOutputVisible] = useState(false)
   const [rawPrinters, setRawPrinters] = useState<any>(null)
+  const [extraPrinters, setExtraPrinters] = useState<string[]>([])
 
   // Load QZ Tray library from installed package (client-side only)
   useEffect(() => {
-    if (typeof window === "undefined") return
-    if ((window as any).qz) {
-      setQzLoaded(true)
-      return
+    // Auto-enable QZ if user toggled integration
+    if (enabled && !connected) {
+      setEnabled(true)
     }
-
-    // Dynamic import to avoid SSR issues
-    (async () => {
-      try {
-        const qzModule: any = await import('qz-tray')
-        // qz-tray may export the API as default or attach to window; normalize it
-        const qzLib: any = (qzModule && (qzModule as any).default) || qzModule
-        // Some builds expect global window.qz
-        ;(window as any).qz = qzLib
-        setQzLoaded(true)
-        toast({ title: "QZ Loaded", description: "Loaded qz-tray from local package." })
-      } catch (e) {
-        // If import fails, fall back to trying local file served from public/
-        try {
-          const script = document.createElement('script')
-          script.src = '/qz-tray.js'
-          script.async = true
-          script.onload = () => {
-            if ((window as any).qz) {
-              setQzLoaded(true)
-              toast({ title: 'QZ Loaded (public)', description: 'Loaded qz-tray.js from /qz-tray.js' })
-            } else {
-              setQzLoaded(false)
-              toast({ title: 'QZ Load Error', description: 'qz-tray failed to initialize.' })
-            }
-          }
-          script.onerror = () => {
-            setQzLoaded(false)
-            toast({ title: 'QZ Load Error', description: 'Failed to load qz-tray from package and public fallback.' })
-          }
-          document.body.appendChild(script)
-        } catch (e2) {
-          setQzLoaded(false)
-          toast({ title: 'QZ Load Error', description: 'Failed to load qz-tray library. Check installation.' })
-        }
-      }
-    })()
-  }, [])
+  }, [enabled, connected, setEnabled])
 
   const connectQZ = async () => {
-    if (!(window as any).qz) {
-      toast({ title: "QZ not loaded", description: "QZ Tray library is not available." })
-      return
-    }
-
-    try {
-      // qz websocket connect returns a promise
-      await (window as any).qz.websocket.connect()
-      setConnected(true)
-      toast({ title: "QZ Connected", description: "Connected to QZ Tray on this machine." })
-    } catch (err: any) {
-      toast({ title: "Connect failed", description: (err && err.message) || String(err) })
-    }
+    await setEnabled(true)
+    toast({ title: "QZ Connected", description: "Connected to QZ Tray on this machine." })
   }
 
   const disconnectQZ = async () => {
-    if (!(window as any).qz) return
-    try {
-      await (window as any).qz.websocket.disconnect()
-    } catch (_) {}
-    setConnected(false)
+    await setEnabled(false)
     toast({ title: "QZ Disconnected" })
   }
 
   const scanPrinters = async () => {
-    if (!(window as any).qz) {
-      toast({ title: "QZ not loaded" })
-      return
-    }
-
     setIsScanning(true)
     try {
-      const found: string[] = await (window as any).qz.printers.find()
-      // Deduplicate and merge with manual entry if provided
-      const list = Array.from(new Set(found.map((p) => p && p.toString())))
-      setPrinters(list)
-      setRawPrinters(found)
-      toast({ title: "Printers discovered", description: `${list.length} printers found` })
+      await refreshPrinters()
+      const combined = Array.from(new Set([...(printers || []), ...extraPrinters]))
+      setRawPrinters(combined)
+      toast({ title: "Printers discovered", description: `${combined.length} printers found` })
     } catch (err: any) {
       toast({ title: "Scan failed", description: (err && err.message) || String(err) })
     } finally {
@@ -128,20 +72,19 @@ export function PrinterSettings() {
     }
 
     try {
-      // Connect if not connected
-      if (!(window as any).qz.websocket.isActive()) {
-        await (window as any).qz.websocket.connect()
-        setConnected(true)
+      const qz = (window as any).qz
+      if (!qz?.websocket?.isActive()) {
+        await setEnabled(true)
       }
 
-      const config = (window as any).qz.configs.create(selectedPrinter)
+      const config = qz.configs.create(selectedPrinter)
       const data = [
         "\x1B@",
         "TEST PRINT\n",
         new Date().toLocaleString() + "\n\n",
         "\x1DV\x01",
       ]
-      await (window as any).qz.print(config, data)
+      await qz.print(config, data)
       toast({ title: "Test print sent", description: `Sent test page to ${selectedPrinter}` })
     } catch (err: any) {
       console.error("Test print failed", err)
@@ -152,8 +95,8 @@ export function PrinterSettings() {
   const addManualPrinter = () => {
     if (!manualPrinter) return
     const normalized = manualPrinter.trim()
-    const merged = Array.from(new Set([...printers, normalized]))
-    setPrinters(merged)
+    const merged = Array.from(new Set([...extraPrinters, normalized]))
+    setExtraPrinters(merged)
     setManualPrinter("")
     toast({ title: "Printer added", description: `${normalized}` })
   }
@@ -207,7 +150,7 @@ export function PrinterSettings() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex gap-2">
-          <Button onClick={connectQZ} disabled={!qzLoaded || connected}>Connect QZ</Button>
+          <Button onClick={connectQZ} disabled={connected}>Connect QZ</Button>
           <Button variant="outline" onClick={disconnectQZ} disabled={!connected}>Disconnect</Button>
           <Button variant="ghost" onClick={scanPrinters} disabled={!connected || isScanning}>{isScanning ? "Scanning..." : "Scan Printers"}</Button>
         </div>
@@ -216,7 +159,7 @@ export function PrinterSettings() {
           <Label>Discovered Printers</Label>
           {printers.length === 0 && <p className="text-sm text-muted-foreground">No printers discovered yet.</p>}
           <div className="space-y-1">
-            {printers.map((p) => (
+            {Array.from(new Set([...(printers || []), ...extraPrinters])).map((p) => (
               <div key={p} className="flex items-center gap-3">
                 <input
                   type="radio"
@@ -261,7 +204,7 @@ export function PrinterSettings() {
         </div>
 
         <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={testPrint} disabled={!selectedPrinter || !qzLoaded || !connected}>Test Print</Button>
+          <Button variant="outline" onClick={testPrint} disabled={!selectedPrinter || !connected}>Test Print</Button>
           <Button onClick={saveSelection}>Save Default Printer</Button>
         </div>
       </CardContent>

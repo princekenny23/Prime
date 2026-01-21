@@ -68,7 +68,7 @@ export default function BarDashboardPage() {
     if (currentBusiness.type !== "bar") {
       // Redirect to appropriate dashboard based on business type
       if (currentBusiness.type === "wholesale and retail") {
-        router.push("/dashboard/retail/dashboard")
+        router.push("/dashboard")
       } else if (currentBusiness.type === "restaurant") {
         router.push("/dashboard/restaurant/dashboard")
       } else {

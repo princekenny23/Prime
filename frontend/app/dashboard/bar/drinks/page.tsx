@@ -22,8 +22,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Plus, Search, Wine, TrendingUp, AlertTriangle, Edit, Trash2, Eye, MoreVertical, Package, RefreshCw, Menu } from "lucide-react"
-import { useState, useEffect } from "react"
+import { Plus, Search, Wine, TrendingUp, AlertTriangle, Edit, Trash2, Eye, Package, RefreshCw, Menu } from "lucide-react"
+import { useState, useEffect, ChangeEvent } from "react"
 import { NewDrinkModal } from "@/components/modals/new-drink-modal"
 import { AddEditProductModal } from "@/components/modals/add-edit-product-modal"
 import { productService } from "@/lib/services/productService"
@@ -42,6 +42,20 @@ export default function DrinksPage() {
   const [drinks, setDrinks] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [deletingDrinkId, setDeletingDrinkId] = useState<string | null>(null)
+
+  // Safely coerce possibly-unknown values to number without type errors
+  const toNumber = (val: unknown): number => {
+    if (typeof val === "number") return isNaN(val) ? 0 : val
+    if (typeof val === "string") {
+      const n = parseFloat(val)
+      return isNaN(n) ? 0 : n
+    }
+    if (val && typeof (val as any).toString === "function") {
+      const n = parseFloat((val as any).toString())
+      return isNaN(n) ? 0 : n
+    }
+    return 0
+  }
 
   useEffect(() => {
     const loadDrinks = async () => {
@@ -143,10 +157,8 @@ export default function DrinksPage() {
     if (drink.is_low_stock) return true
     
     // Check product-level
-    const stock = typeof drink.stock === 'number' ? drink.stock : parseFloat(drink.stock?.toString() || '0')
-    const threshold = typeof drink.lowStockThreshold === 'number' 
-      ? drink.lowStockThreshold 
-      : parseFloat(drink.lowStockThreshold?.toString() || '0')
+    const stock = toNumber((drink as any).stock)
+    const threshold = toNumber((drink as any).lowStockThreshold)
     
     if (threshold > 0 && stock <= threshold) return true
     
@@ -166,8 +178,9 @@ export default function DrinksPage() {
   const totalDrinks = drinks.length
   const lowStockCount = drinks.filter(isDrinkLowStock).length
   const totalValue = drinks.reduce((sum, d) => {
-    const stock = typeof d.stock === 'number' ? d.stock : parseFloat(d.stock?.toString() || '0')
-    return sum + ((d.cost || 0) * stock)
+    const stock = toNumber((d as any).stock)
+    const cost = toNumber((d as any).cost)
+    return sum + (cost * stock)
   }, 0)
   const categories = new Set(drinks.map(d => d.categoryId).filter(Boolean)).size
 
@@ -183,8 +196,6 @@ export default function DrinksPage() {
           </Button>
         }
       >
-
-        {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -236,7 +247,7 @@ export default function DrinksPage() {
                 placeholder="Search by name or category..."
                 className="pl-10"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
               />
             </div>
           </CardContent>
@@ -282,10 +293,8 @@ export default function DrinksPage() {
                 ) : (
                   filteredDrinks.map((drink) => {
                     const businessFields = parseBusinessFields(drink)
-                    const stock = typeof drink.stock === 'number' ? drink.stock : parseFloat(drink.stock?.toString() || '0')
-                    const lowStockThreshold = typeof drink.lowStockThreshold === 'number' 
-                      ? drink.lowStockThreshold 
-                      : parseFloat(drink.lowStockThreshold?.toString() || '0')
+                    const stock = toNumber((drink as any).stock)
+                    const lowStockThreshold = toNumber((drink as any).lowStockThreshold)
                     
                     // Check if any variation is low stock
                     let isLow = false
@@ -326,7 +335,7 @@ export default function DrinksPage() {
                           </Link>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{drink.categoryId || "Uncategorized"}</Badge>
+                          <Badge variant="outline" className="">{drink.categoryId || "Uncategorized"}</Badge>
                         </TableCell>
                         <TableCell>
                           {businessFields.volume_ml ? (
@@ -357,21 +366,22 @@ export default function DrinksPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{drink.unit || "pcs"}</Badge>
+                          <Badge variant="outline" className="">{drink.unit || "pcs"}</Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge 
-                            variant={isOutOfStock ? "destructive" : isLow ? "secondary" : "default"}
-                            className={
-                              isOutOfStock 
-                                ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200"
-                                : isLow
-                                ? "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200"
-                                : "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200"
-                            }
-                          >
-                            {isOutOfStock ? "Out of Stock" : isLow ? "Low Stock" : "In Stock"}
-                          </Badge>
+                          {isOutOfStock ? (
+                            <Badge variant="destructive" className="bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200">
+                              Out of Stock
+                            </Badge>
+                          ) : isLow ? (
+                            <Badge variant="secondary" className="bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200">
+                              Low Stock
+                            </Badge>
+                          ) : (
+                            <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200">
+                              In Stock
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>
@@ -428,10 +438,9 @@ export default function DrinksPage() {
             </Table>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Modals */}
-      <NewDrinkModal
+        {/* Modals */}
+        <NewDrinkModal
         open={showNewDrink}
         onOpenChange={(open) => {
           setShowNewDrink(open)

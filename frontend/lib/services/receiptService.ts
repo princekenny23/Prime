@@ -23,7 +23,7 @@ export interface Receipt {
       name: string
     }
   }
-  format: 'html' | 'pdf' | 'json'
+  format: 'pdf' | 'escpos' | 'json'
   content: string
   pdf_file?: string
   pdf_url?: string
@@ -105,7 +105,7 @@ export const receiptService = {
     return api.get<Receipt>(apiEndpoints.receipts.bySale(saleId))
   },
 
-  async download(id: string): Promise<Blob> {
+  async download(id: string): Promise<{ data: Blob; contentType: string | null }> {
     if (!apiEndpoints?.receipts?.download) {
       throw new Error("Receipts API endpoints are not configured")
     }
@@ -123,10 +123,12 @@ export const receiptService = {
       throw new Error('Failed to download receipt')
     }
 
-    return await response.blob()
+    const blob = await response.blob()
+    const contentType = response.headers.get('content-type')
+    return { data: blob, contentType }
   },
 
-  async regenerate(id: string, format: 'html' | 'pdf' | 'json' = 'html'): Promise<Receipt> {
+  async regenerate(id: string, format: 'pdf' | 'escpos' | 'json' = 'pdf'): Promise<Receipt> {
     if (!apiEndpoints?.receipts?.regenerate) {
       throw new Error("Receipts API endpoints are not configured")
     }

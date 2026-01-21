@@ -56,6 +56,10 @@ export interface CreateQuotationData {
   notes?: string
 }
 
+type UpdateQuotationData = Partial<CreateQuotationData> & {
+  status?: Quotation["status"]
+}
+
 export const quotationService = {
   async list(filters?: QuotationFilters): Promise<{ results: Quotation[]; count?: number }> {
     const params = new URLSearchParams()
@@ -128,7 +132,7 @@ export const quotationService = {
     }
   },
 
-  async update(id: string, data: Partial<CreateQuotationData>): Promise<Quotation> {
+  async update(id: string, data: UpdateQuotationData): Promise<Quotation> {
     const backendData: any = {}
     
     if (data.outlet) {
@@ -155,8 +159,19 @@ export const quotationService = {
     if (data.total !== undefined) backendData.total = data.total.toString()
     if (data.valid_until) backendData.valid_until = data.valid_until
     if (data.notes !== undefined) backendData.notes = data.notes
+    if (data.status) backendData.status = data.status
 
-    return api.put<Quotation>(apiEndpoints.quotations.update(id), backendData)
+    // Debug endpoint + payload
+    try {
+      console.log("Updating quotation:", { id, endpoint: apiEndpoints.quotations.update(id), payload: backendData })
+    } catch {}
+
+    // Use PATCH for partial updates
+    return api.patch<Quotation>(apiEndpoints.quotations.update(id), backendData)
+  },
+
+  async updateStatus(id: string, status: Quotation["status"]): Promise<Quotation> {
+    return api.patch<Quotation>(apiEndpoints.quotations.update(id), { status })
   },
 
   async delete(id: string): Promise<void> {

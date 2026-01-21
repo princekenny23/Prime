@@ -1,5 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 
 class User(AbstractUser):
@@ -37,4 +39,211 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.email
+    
+    # Role and Permission Helper Methods
+    @property
+    def staff_role(self):
+        """Get the user's Staff Role object (from staff app)"""
+        try:
+            if hasattr(self, 'staff_profile') and self.staff_profile:
+                return self.staff_profile.role
+        except Exception:
+            pass
+        return None
+    
+    @property
+    def effective_role(self):
+        """Get effective role - prefers staff_role, falls back to user.role"""
+        staff_role = self.staff_role
+        if staff_role:
+            return staff_role.name.lower()
+        return self.role
+    
+    def has_permission(self, permission):
+        """Check if user has a specific permission through their role
+        
+        Args:
+            permission (str): Permission name like 'can_sales', 'can_inventory', etc.
+        
+        Returns:
+            bool: True if user has permission
+        """
+        # SaaS admins have all permissions
+        if self.is_saas_admin or self.is_superuser:
+            return True
+        
+        # Check through staff role
+        staff_role = self.staff_role
+        if staff_role:
+            return getattr(staff_role, permission, False)
+        
+        # Fallback to basic role checking for backward compatibility
+        if self.role == 'admin':
+            return True
+        elif self.role == 'manager':
+            return permission in ['can_sales', 'can_inventory', 'can_products', 'can_customers', 'can_reports', 'can_dashboard']
+        elif self.role == 'cashier':
+            return permission in ['can_sales', 'can_customers', 'can_dashboard']
+        elif self.role == 'staff':
+            return permission in ['can_sales', 'can_dashboard']
+        
+        return False
+    
+    def get_permissions(self):
+        """Get dictionary of all permissions for this user
+        
+        Returns:
+            dict: Dictionary with permission names as keys and boolean values
+        """
+        permissions = {
+            'can_sales': False,
+            'can_inventory': False,
+            'can_products': False,
+            'can_customers': False,
+            'can_reports': False,
+            'can_staff': False,
+            'can_settings': False,
+            'can_dashboard': True,
+        }
+        
+        # SaaS admins have all permissions
+        if self.is_saas_admin or self.is_superuser:
+            return {key: True for key in permissions}
+        
+        # Check through staff role
+        staff_role = self.staff_role
+        if staff_role:
+            for key in permissions:
+                permissions[key] = getattr(staff_role, key, False)
+            return permissions
+        
+        # Fallback to basic role checking
+        if self.role == 'admin':
+            permissions = {key: True for key in permissions}
+        elif self.role == 'manager':
+            permissions.update({
+                'can_sales': True,
+                'can_inventory': True,
+                'can_products': True,
+                'can_customers': True,
+                'can_reports': True,
+                'can_dashboard': True,
+            })
+        elif self.role == 'cashier':
+            permissions.update({
+                'can_sales': True,
+                'can_customers': True,
+                'can_dashboard': True,
+            })
+        elif self.role == 'staff':
+            permissions.update({
+                'can_sales': True,
+                'can_dashboard': True,
+            })
+        
+        return permissions
 
+
+# Signal to create Staff profile when User is created (if they have a tenant)
+@receiver(post_save, sender=User)
+def create_staff_profile(sender, instance, created, **kwargs):
+    """Automatically create Staff profile for users with a tenant"""
+    if created and instance.tenant and not instance.is_superuser:
+        # Avoid circular import
+        from apps.staff.models import Staff
+        
+        # Check if staff profile already exists
+        if not hasattr(instance, 'staff_profile'):
+            try:
+                Staff.objects.create(
+                    user=instance,
+                    tenant=instance.tenant,
+                    is_active=True
+                )
+            except Exception as e:
+                # Log but don't fail user creation
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to create staff profile for user {instance.id}: {str(e)}")
+
+
+# Utility function to create default roles for a tenant
+def create_default_roles_for_tenant(tenant):
+    """Create default roles for a tenant
+    
+    Args:
+        tenant: Tenant instance
+    
+    Returns:
+        dict: Dictionary with role names as keys and Role instances as values
+    """
+    from apps.staff.models import Role
+    
+    default_roles = {
+        'Admin': {
+            'description': 'Full system access and control',
+            'can_sales': True,
+            'can_inventory': True,
+            'can_products': True,
+            'can_customers': True,
+            'can_reports': True,
+            'can_staff': True,
+            'can_settings': True,
+            'can_dashboard': True,
+        },
+        'Manager': {
+            'description': 'Manage outlet operations and staff',
+            'can_sales': True,
+            'can_inventory': True,
+            'can_products': True,
+            'can_customers': True,
+            'can_reports': True,
+            'can_staff': True,
+            'can_settings': False,
+            'can_dashboard': True,
+        },
+        'Supervisor': {
+            'description': 'Supervise daily operations',
+            'can_sales': True,
+            'can_inventory': True,
+            'can_products': True,
+            'can_customers': True,
+            'can_reports': True,
+            'can_staff': False,
+            'can_settings': False,
+            'can_dashboard': True,
+        },
+        'Cashier': {
+            'description': 'Process sales transactions',
+            'can_sales': True,
+            'can_inventory': False,
+            'can_products': False,
+            'can_customers': True,
+            'can_reports': False,
+            'can_staff': False,
+            'can_settings': False,
+            'can_dashboard': True,
+        },
+        'Staff': {
+            'description': 'Basic staff access',
+            'can_sales': True,
+            'can_inventory': False,
+            'can_products': False,
+            'can_customers': False,
+            'can_reports': False,
+            'can_staff': False,
+            'can_settings': False,
+            'can_dashboard': True,
+        },
+    }
+    
+    created_roles = {}
+    for role_name, role_data in default_roles.items():
+        role, _ = Role.objects.get_or_create(
+            tenant=tenant,
+            name=role_name,
+            defaults=role_data
+        )
+        created_roles[role_name] = role
+    
+    return created_roles

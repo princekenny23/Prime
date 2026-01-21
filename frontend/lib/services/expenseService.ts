@@ -74,6 +74,14 @@ export const expenseService = {
     return api.delete(`/expenses/${id}/`)
   },
 
+  async approve(id: string, notes?: string): Promise<Expense> {
+    return api.patch<Expense>(`/expenses/${id}/approve/`, { notes })
+  },
+
+  async reject(id: string, notes?: string): Promise<Expense> {
+    return api.patch<Expense>(`/expenses/${id}/reject/`, { notes })
+  },
+
   async stats(filters?: ExpenseFilters): Promise<{
     total_expenses: number
     today_expenses: number

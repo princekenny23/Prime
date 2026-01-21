@@ -34,19 +34,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import type { User } from "@/lib/types"
+import type { User as UserType } from "@/lib/types"
 
 export default function AccountsPage() {
   const { currentBusiness } = useBusinessStore()
   const { toast } = useToast()
-  const [users, setUsers] = useState<User[]>([])
+  const [users, setUsers] = useState<UserType[]>([])
   const [roles, setRoles] = useState<Role[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [activeTab, setActiveTab] = useState("users")
   const [showAddUser, setShowAddUser] = useState(false)
   const [showViewUser, setShowViewUser] = useState(false)
-  const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [selectedUser, setSelectedUser] = useState<UserType | null>(null)
   const [userToDelete, setUserToDelete] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const useReal = useRealAPI()
@@ -66,16 +66,19 @@ export default function AccountsPage() {
         
         // Transform backend user data to frontend User format
         const backendUsers = tenantResponse.users || []
-        const transformedUsers: User[] = backendUsers.map((backendUser: any) => ({
+        const transformedUsers: UserType[] = backendUsers.map((backendUser: any) => ({
           id: String(backendUser.id),
           email: backendUser.email || "",
           name: backendUser.name || backendUser.username || backendUser.email?.split("@")[0] || "",
           role: backendUser.role || "staff",
+          effective_role: backendUser.effective_role || backendUser.role || "staff",
           businessId: String(currentBusiness.id),
           outletIds: [],
           createdAt: backendUser.date_joined || new Date().toISOString(),
           is_saas_admin: backendUser.is_saas_admin || false,
           tenant: currentBusiness,
+          permissions: backendUser.permissions || undefined,
+          staff_role: backendUser.staff_role || undefined,
         }))
         
         setUsers(transformedUsers)
@@ -229,8 +232,9 @@ export default function AccountsPage() {
                         filteredUsers.map((user) => {
                           const userName = user.name || user.email?.split("@")[0] || "N/A"
                           const userEmail = user.email || "N/A"
-                          const userRole = user.role || "staff"
-                          const isAdmin = user.is_saas_admin || userRole === "admin"
+                          // Display staff_role name if available, otherwise fall back to role
+                          const displayRole = user.staff_role?.name || user.effective_role || user.role || "staff"
+                          const isAdmin = user.is_saas_admin || user.role === "admin"
                           
                           return (
                             <TableRow key={user.id} className="border-gray-300">
@@ -242,9 +246,16 @@ export default function AccountsPage() {
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                                  {userRole}
-                                </span>
+                                <div className="flex flex-col gap-1">
+                                  <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 inline-block w-fit">
+                                    {displayRole}
+                                  </span>
+                                  {user.staff_role && (
+                                    <span className="text-xs text-gray-500">
+                                      {user.staff_role.description || ''}
+                                    </span>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-2">

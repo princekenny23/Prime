@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Plus, Search, FileText, Trash2, Eye, Filter, Download, Menu, ShoppingCart } from "lucide-react"
+import { Plus, Search, FileText, Trash2, Eye, Filter, Download, Menu, ShoppingCart, Calendar, Printer, Pencil, X } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +25,12 @@ import {
 import { useState, useEffect, useCallback } from "react"
 import { useBusinessStore } from "@/stores/businessStore"
 import { useToast } from "@/components/ui/use-toast"
+import { DatePicker } from "@/components/ui/date-picker"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import {
   Select,
   SelectContent,
@@ -50,12 +56,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { formatCurrency } from "@/lib/utils/currency"
 import Link from "next/link"
 import { format } from "date-fns"
 import { useRouter } from "next/navigation"
 import { quotationService, type Quotation } from "@/lib/services/quotationService"
 import { useTenant } from "@/contexts/tenant-context"
+import { SelectProductModal } from "@/components/modals/select-product-modal"
+import { SelectCustomerModal } from "@/components/modals/select-customer-modal"
 
 export default function QuotationsPage() {
   const { currentBusiness } = useBusinessStore()
@@ -66,10 +76,49 @@ export default function QuotationsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined,
+  })
   const [quotationToDelete, setQuotationToDelete] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null)
   const [showViewDialog, setShowViewDialog] = useState(false)
+  const [isPrinting, setIsPrinting] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null)
+  const [editForm, setEditForm] = useState({ customer_id: "", customer_name: "", valid_until: "", notes: "" })
+  const [editItems, setEditItems] = useState<any[]>([])
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [showProductSelector, setShowProductSelector] = useState(false)
+  const [showCustomerSelector, setShowCustomerSelector] = useState(false)
+
+  const autoExpireQuotations = useCallback(async (data: Quotation[]) => {
+    const now = new Date()
+    const toExpire = data.filter((quotation) => {
+      const validUntil = new Date(quotation.valid_until)
+      return validUntil < now && !["expired", "converted", "cancelled"].includes(quotation.status)
+    })
+
+    if (!toExpire.length) return data
+
+    try {
+      await Promise.allSettled(toExpire.map((quotation) => quotationService.updateStatus(quotation.id, "expired")))
+      return data.map((quotation) =>
+        toExpire.find((item) => item.id === quotation.id)
+          ? { ...quotation, status: "expired" as const }
+          : quotation
+      )
+    } catch (error) {
+      console.error("Failed to auto-expire quotations:", error)
+      toast({
+        title: "Status sync issue",
+        description: "Some quotations could not be marked as expired. Please refresh and try again.",
+        variant: "destructive",
+      })
+      return data
+    }
+  }, [toast])
 
   const loadQuotations = useCallback(async () => {
     if (!currentBusiness) {
@@ -85,7 +134,8 @@ export default function QuotationsPage() {
         status: statusFilter !== "all" ? statusFilter : undefined,
         search: searchTerm || undefined,
       })
-      setQuotations(response.results || [])
+      const syncedQuotations = await autoExpireQuotations(response.results || [])
+      setQuotations(syncedQuotations)
     } catch (error) {
       console.error("Failed to load quotations:", error)
       setQuotations([])
@@ -97,7 +147,7 @@ export default function QuotationsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [currentBusiness, currentOutlet, statusFilter, searchTerm, toast])
+  }, [currentBusiness, currentOutlet, statusFilter, searchTerm, toast, autoExpireQuotations])
 
   useEffect(() => {
     if (currentBusiness) {
@@ -110,7 +160,7 @@ export default function QuotationsPage() {
     if (currentBusiness) {
       loadQuotations()
     }
-  }, [statusFilter, searchTerm])
+  }, [statusFilter, searchTerm, currentBusiness, loadQuotations])
 
   const filteredQuotations = quotations.filter(quotation => {
     const matchesSearch = 
@@ -119,8 +169,15 @@ export default function QuotationsPage() {
     
     const matchesStatus = 
       statusFilter === "all" || quotation.status === statusFilter
+
+    let matchesDate = true
+    if (dateRange.from || dateRange.to) {
+      const quotationDate = new Date(quotation.created_at)
+      if (dateRange.from && quotationDate < dateRange.from) matchesDate = false
+      if (dateRange.to && quotationDate > dateRange.to) matchesDate = false
+    }
     
-    return matchesSearch && matchesStatus
+    return matchesSearch && matchesStatus && matchesDate
   })
 
   const totalValue = filteredQuotations.reduce((sum, q) => sum + q.total, 0)
@@ -170,6 +227,111 @@ export default function QuotationsPage() {
         description: error.message || "Failed to load quotation details.",
         variant: "destructive",
       })
+    }
+  }
+
+  const openEdit = async (quotationId: string) => {
+    try {
+      const quotation = await quotationService.get(quotationId)
+      setEditingQuotation(quotation)
+      setEditForm({
+        customer_id: quotation.customer?.id ? String(quotation.customer.id) : "",
+        customer_name: quotation.customer_name || quotation.customer?.name || "",
+        valid_until: quotation.valid_until?.split("T")[0] || "",
+        notes: quotation.notes || "",
+      })
+      setEditItems(
+        (quotation.items || []).map((item, idx) => ({
+          id: item.id || String(idx),
+          product_id: item.product_id,
+          product_name: item.product_name,
+          quantity: item.quantity,
+          price: item.price,
+          total: item.total,
+        }))
+      )
+      setShowEditDialog(true)
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to load quotation.", variant: "destructive" })
+    }
+  }
+
+  const editSubtotal = editItems.reduce((sum, it) => sum + (Number(it.total) || 0), 0)
+  const editDiscount = 0
+  const editTax = 0
+  const editTotal = editSubtotal - editDiscount + editTax
+
+  const updateEditQuantity = (id: string, quantity: number) => {
+    if (quantity < 1) return
+    setEditItems((prev) => prev.map((it) => (it.id === id ? { ...it, quantity, total: (Number(it.price) || 0) * quantity } : it)))
+  }
+
+  const removeEditItem = (id: string) => setEditItems((prev) => prev.filter((it) => it.id !== id))
+
+  const addEditProduct = (product: any) => {
+    const price = (product as any).retail_price || product.price || 0
+    setEditItems((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        product_id: product.id,
+        product_name: product.name || "",
+        quantity: 1,
+        price,
+        total: price,
+      },
+    ])
+  }
+
+  const onSelectCustomer = (customer: any | null) => {
+    if (customer) {
+      setEditForm((p) => ({ ...p, customer_id: String(customer.id), customer_name: customer.name }))
+    } else {
+      setEditForm((p) => ({ ...p, customer_id: "" }))
+    }
+  }
+
+  const saveEdit = async () => {
+    if (!editingQuotation) return
+    if (!currentOutlet) {
+      toast({ title: "Validation Error", description: "Please select an outlet.", variant: "destructive" })
+      return
+    }
+    if (!editForm.customer_id && !editForm.customer_name) {
+      toast({ title: "Validation Error", description: "Select or enter a customer.", variant: "destructive" })
+      return
+    }
+    if (editItems.length === 0) {
+      toast({ title: "Validation Error", description: "Add at least one item.", variant: "destructive" })
+      return
+    }
+    setIsSavingEdit(true)
+    try {
+      await quotationService.update(editingQuotation.id, {
+        customer_id: editForm.customer_id || undefined,
+        customer_name: editForm.customer_name || undefined,
+        items: editItems.map((it) => ({
+          product_id: it.product_id,
+          product_name: it.product_name,
+          quantity: it.quantity,
+          price: it.price,
+          total: it.total,
+        })),
+        subtotal: editSubtotal,
+        discount: editDiscount,
+        tax: editTax,
+        total: editTotal,
+        valid_until: editForm.valid_until,
+        notes: editForm.notes || undefined,
+      })
+      toast({ title: "Quotation Updated", description: "Changes saved successfully." })
+      setShowEditDialog(false)
+      setEditingQuotation(null)
+      loadQuotations()
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to update quotation.", variant: "destructive" })
+    } finally {
+      setIsSavingEdit(false)
     }
   }
 
@@ -283,10 +445,9 @@ export default function QuotationsPage() {
 
       // Capture as canvas
       const canvas = await html2canvas.default(tempDiv, {
-        scale: 2,
         useCORS: true,
         logging: false,
-        backgroundColor: "#ffffff",
+        background: "#ffffff",
       })
 
       // Remove temp element
@@ -321,8 +482,152 @@ export default function QuotationsPage() {
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const handlePrintWithQR = async (quotation: Quotation) => {
+    setIsPrinting(true)
+    try {
+      const qz = require('qz-tray')
+      
+      // Generate quotation HTML content
+      const quotationHTML = `
+        <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 10px; font-size: 12px; max-width: 300px; }
+              .header { text-align: center; margin-bottom: 10px; border-bottom: 1px solid #000; padding-bottom: 5px; }
+              .title { font-size: 16px; font-weight: bold; }
+              .business-name { font-size: 14px; margin-top: 2px; }
+              .section { margin-top: 8px; }
+              .label { font-weight: bold; }
+              .row { display: flex; justify-content: space-between; margin: 3px 0; }
+              table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+              th, td { text-align: left; padding: 4px; border-bottom: 1px dashed #ccc; font-size: 11px; }
+              th { font-weight: bold; }
+              .text-right { text-align: right; }
+              .totals { margin-top: 8px; border-top: 2px solid #000; padding-top: 5px; }
+              .total-row { font-weight: bold; font-size: 14px; margin-top: 5px; padding-top: 5px; border-top: 1px solid #000; }
+              .footer { text-align: center; margin-top: 10px; border-top: 1px solid #000; padding-top: 5px; font-size: 10px; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <div class="title">QUOTATION</div>
+              <div class="business-name">${currentBusiness?.name || 'Business'}</div>
+              ${currentBusiness?.address ? `<div style="font-size: 10px; color: #666;">${currentBusiness.address}</div>` : ""}
+              ${currentOutlet ? `<div style="font-size: 10px; margin-top: 2px;">Outlet: ${currentOutlet.name}</div>` : ""}
+            </div>
+            
+            <div class="section">
+              <div class="row">
+                <span class="label">Quotation #:</span>
+                <span>${quotation.quotation_number}</span>
+              </div>
+              <div class="row">
+                <span class="label">Customer:</span>
+                <span>${quotation.customer_name || "Walk-in"}</span>
+              </div>
+              <div class="row">
+                <span class="label">Date:</span>
+                <span>${format(new Date(quotation.created_at), "MMM dd, yyyy")}</span>
+              </div>
+              <div class="row">
+                <span class="label">Valid Until:</span>
+                <span>${format(new Date(quotation.valid_until), "MMM dd, yyyy")}</span>
+              </div>
+            </div>
+            
+            <table>
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th class="text-right">Qty</th>
+                  <th class="text-right">Price</th>
+                  <th class="text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${quotation.items?.map(item => `
+                  <tr>
+                    <td>${item.product_name}</td>
+                    <td class="text-right">${item.quantity}</td>
+                    <td class="text-right">${formatCurrency(item.price, currentBusiness)}</td>
+                    <td class="text-right">${formatCurrency(item.total, currentBusiness)}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+            
+            <div class="totals">
+              <div class="row">
+                <span>Subtotal:</span>
+                <span>${formatCurrency(quotation.subtotal, currentBusiness)}</span>
+              </div>
+              ${quotation.discount > 0 ? `
+              <div class="row">
+                <span>Discount:</span>
+                <span>-${formatCurrency(quotation.discount, currentBusiness)}</span>
+              </div>
+              ` : ""}
+              ${quotation.tax > 0 ? `
+              <div class="row">
+                <span>Tax:</span>
+                <span>${formatCurrency(quotation.tax, currentBusiness)}</span>
+              </div>
+              ` : ""}
+              <div class="row total-row">
+                <span>TOTAL:</span>
+                <span>${formatCurrency(quotation.total, currentBusiness)}</span>
+              </div>
+            </div>
+            
+            ${quotation.notes ? `
+            <div class="section">
+              <div class="label">Notes:</div>
+              <div style="font-size: 10px; margin-top: 3px; white-space: pre-wrap;">${quotation.notes}</div>
+            </div>
+            ` : ""}
+            
+            <div class="footer">
+              <p>Valid until ${format(new Date(quotation.valid_until), "MMMM dd, yyyy")}</p>
+              <p>Thank you for your business!</p>
+              <p style="margin-top: 5px;">Printed: ${format(new Date(), "MMM dd, yyyy HH:mm:ss")}</p>
+            </div>
+          </body>
+        </html>
+      `
+
+      // Connect to qz-tray and print
+      await qz.websocket.connect()
+      
+      const config = qz.configs.create(qz.printers.getDefault())
+      const html = [{type: 'html', format: 'plain', data: quotationHTML}]
+      
+      await qz.print(config, html)
+      await qz.websocket.disconnect()
+
+      toast({
+        title: "Printed",
+        description: "Quotation has been sent to printer.",
+      })
+    } catch (error: any) {
+      console.error("Failed to print quotation:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to print. Make sure QZ Tray is running.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsPrinting(false)
+    }
+  }
+
+  const getStatusBadge = (quotation: Quotation) => {
+    // Check if quotation is expired first
+    if (new Date(quotation.valid_until) < new Date() && quotation.status !== "converted" && quotation.status !== "cancelled") {
+      return <Badge variant="destructive">Expired</Badge>
+    }
+    
+    // Otherwise show the actual status
+    switch (quotation.status) {
       case "draft":
         return <Badge variant="secondary">Draft</Badge>
       case "sent":
@@ -336,7 +641,7 @@ export default function QuotationsPage() {
       case "cancelled":
         return <Badge variant="outline">Cancelled</Badge>
       default:
-        return <Badge variant="secondary">{status}</Badge>
+        return <Badge variant="secondary">{quotation.status}</Badge>
     }
   }
 
@@ -360,32 +665,75 @@ export default function QuotationsPage() {
       >
         {/* Filters */}
         <div className="mb-6 pb-4 border-b border-gray-300">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-900">Status</label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="bg-white border-gray-300">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="sent">Sent</SelectItem>
+                  <SelectItem value="accepted">Accepted</SelectItem>
+                  <SelectItem value="converted">Converted</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-900">Search</label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by quotation number or customer..."
+                  placeholder="Search quotations..."
                   className="pl-10 bg-white border-gray-300"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px] bg-white border-gray-300">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="sent">Sent</SelectItem>
-                <SelectItem value="accepted">Accepted</SelectItem>
-                <SelectItem value="converted">Converted</SelectItem>
-                <SelectItem value="expired">Expired</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 mt-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-900">Date Range</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-left bg-white border-gray-300">
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {dateRange.from && dateRange.to
+                      ? `${format(dateRange.from, "MMM dd")} - ${format(dateRange.to, "MMM dd")}`
+                      : dateRange.from
+                      ? format(dateRange.from, "MMM dd, yyyy")
+                      : "Select date range"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <div className="flex gap-4 p-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-gray-600">From</label>
+                      <DatePicker
+                        date={dateRange.from}
+                        onDateChange={(date) => setDateRange({ ...dateRange, from: date })}
+                        placeholder="Start date"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-gray-600">To</label>
+                      <DatePicker
+                        date={dateRange.to}
+                        onDateChange={(date) => setDateRange({ ...dateRange, to: date })}
+                        placeholder="End date"
+                      />
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
         </div>
 
@@ -414,7 +762,7 @@ export default function QuotationsPage() {
             ) : (
               <div className="rounded-md border border-gray-300 bg-white">
                 <Table>
-                  <TableHeader>
+                    <TableHeader>
                     <TableRow className="bg-gray-50">
                       <TableHead className="text-gray-900 font-semibold">Quotation #</TableHead>
                       <TableHead className="text-gray-900 font-semibold">Customer</TableHead>
@@ -425,7 +773,7 @@ export default function QuotationsPage() {
                       <TableHead className="text-gray-900 font-semibold">Status</TableHead>
                       <TableHead className="text-right text-gray-900 font-semibold">Actions</TableHead>
                     </TableRow>
-                  </TableHeader>
+                    </TableHeader>
                   <TableBody>
                     {filteredQuotations.map((quotation) => (
                       <TableRow key={quotation.id} className="border-gray-300">
@@ -441,7 +789,7 @@ export default function QuotationsPage() {
                         <TableCell className="font-semibold">
                           {formatCurrency(quotation.total, currentBusiness)}
                         </TableCell>
-                        <TableCell>{getStatusBadge(quotation.status)}</TableCell>
+                        <TableCell>{getStatusBadge(quotation)}</TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -456,9 +804,17 @@ export default function QuotationsPage() {
                                 <Eye className="mr-2 h-4 w-4" />
                                 View
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openEdit(quotation.id)}>
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleDownloadPDF(quotation)}>
                                 <Download className="mr-2 h-4 w-4" />
                                 Download PDF
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handlePrintWithQR(quotation)} disabled={isPrinting}>
+                                <Printer className="mr-2 h-4 w-4" />
+                                {isPrinting ? "Printing..." : "Print with QR"}
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
@@ -480,6 +836,155 @@ export default function QuotationsPage() {
           </div>
         </div>
       </PageLayout>
+
+        {/* Edit Quotation Dialog */}
+        <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Pencil className="h-5 w-5" />
+                Edit Quotation {editingQuotation?.quotation_number ? `- ${editingQuotation.quotation_number}` : ""}
+              </DialogTitle>
+              <DialogDescription>
+                Update customer, items, and details, then save.
+              </DialogDescription>
+            </DialogHeader>
+
+            {/* Edit Form */}
+            <div className="grid gap-6 md:grid-cols-3">
+              {/* Left: Form */}
+              <div className="md:col-span-2 space-y-6">
+                <div className="space-y-4 border rounded-lg p-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit_customer">Customer *</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="edit_customer"
+                        placeholder="Enter customer name or select from list"
+                        value={editForm.customer_name}
+                        onChange={(e) => {
+                          setEditForm((p) => ({ ...p, customer_name: e.target.value }))
+                          if (editForm.customer_id) setEditForm((p) => ({ ...p, customer_id: "" }))
+                        }}
+                      />
+                      <Button type="button" variant="outline" onClick={() => setShowCustomerSelector(true)}>
+                        Select
+                      </Button>
+                      {editForm.customer_id && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setEditForm((p) => ({ ...p, customer_id: "", customer_name: "" }))}
+                          title="Clear selection"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    {editForm.customer_id ? (
+                      <p className="text-xs text-muted-foreground">Customer selected from database</p>
+                    ) : editForm.customer_name ? (
+                      <p className="text-xs text-muted-foreground">Walk-in customer</p>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="edit_valid_until">Valid Until *</Label>
+                    <Input
+                      id="edit_valid_until"
+                      type="date"
+                      value={editForm.valid_until}
+                      onChange={(e) => setEditForm((p) => ({ ...p, valid_until: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="border rounded-lg">
+                  <div className="flex items-center justify-between p-4">
+                    <h4 className="font-semibold">Items</h4>
+                    <Button type="button" variant="outline" onClick={() => setShowProductSelector(true)}>
+                      <Plus className="h-4 w-4 mr-2" /> Add Item
+                    </Button>
+                  </div>
+                  <div className="p-4 pt-0">
+                    {editItems.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <p>No items added</p>
+                        <Button type="button" variant="outline" className="mt-4" onClick={() => setShowProductSelector(true)}>
+                          <Plus className="h-4 w-4 mr-2" /> Add First Item
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {editItems.map((item) => (
+                          <div key={item.id} className="flex items-center gap-4 p-4 border rounded-lg">
+                            <div className="flex-1">
+                              <p className="font-medium">{item.product_name}</p>
+                              <p className="text-sm text-muted-foreground">{formatCurrency(item.price, currentBusiness)} each</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button type="button" variant="outline" size="icon" onClick={() => updateEditQuantity(item.id, item.quantity - 1)}>-</Button>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={(e) => updateEditQuantity(item.id, parseInt(e.target.value) || 1)}
+                                className="w-20 text-center"
+                              />
+                              <Button type="button" variant="outline" size="icon" onClick={() => updateEditQuantity(item.id, item.quantity + 1)}>+</Button>
+                            </div>
+                            <div className="w-24 text-right">
+                              <p className="font-semibold">{formatCurrency(item.total, currentBusiness)}</p>
+                            </div>
+                            <Button type="button" variant="ghost" size="icon" onClick={() => removeEditItem(item.id)}>
+                              <X className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border rounded-lg p-4">
+                  <Label htmlFor="edit_notes">Notes</Label>
+                  <Textarea id="edit_notes" rows={4} placeholder="Add notes..." value={editForm.notes} onChange={(e) => setEditForm((p) => ({ ...p, notes: e.target.value }))} />
+                </div>
+              </div>
+
+              {/* Right: Summary */}
+              <div className="space-y-6">
+                <div className="border rounded-lg p-4 space-y-3">
+                  <h4 className="font-semibold">Summary</h4>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span className="font-medium">{formatCurrency(editSubtotal, currentBusiness)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Discount</span><span className="font-medium">{formatCurrency(editDiscount, currentBusiness)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Tax</span><span className="font-medium">{formatCurrency(editTax, currentBusiness)}</span></div>
+                  <div className="border-t pt-3 flex justify-between"><span className="font-semibold">Total</span><span className="text-lg font-bold">{formatCurrency(editTotal, currentBusiness)}</span></div>
+                </div>
+                <div className="flex gap-3">
+                  <Button type="button" variant="outline" className="flex-1" onClick={() => setShowEditDialog(false)}>Cancel</Button>
+                  <Button type="button" className="flex-1" onClick={saveEdit} disabled={isSavingEdit}>{isSavingEdit ? "Saving..." : "Save Changes"}</Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Modals used inside Edit */}
+            <SelectProductModal
+              open={showProductSelector}
+              onOpenChange={setShowProductSelector}
+              onSelect={addEditProduct}
+              outletId={currentOutlet?.id ? String(currentOutlet.id) : undefined}
+            />
+
+            <SelectCustomerModal
+              open={showCustomerSelector}
+              onOpenChange={setShowCustomerSelector}
+              onSelect={onSelectCustomer}
+              outletId={currentOutlet?.id ? String(currentOutlet.id) : undefined}
+            />
+          </DialogContent>
+        </Dialog>
 
         {/* View Quotation Dialog */}
         <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
@@ -545,7 +1050,7 @@ export default function QuotationsPage() {
                       </p>
                       <p className="text-sm text-muted-foreground mt-2">Status:</p>
                       <p className="font-semibold mt-1">
-                        {getStatusBadge(selectedQuotation.status)}
+                        {getStatusBadge(selectedQuotation)}
                       </p>
                     </div>
                   </div>

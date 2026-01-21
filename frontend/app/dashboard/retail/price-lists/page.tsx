@@ -83,76 +83,20 @@ export default function PriceListsPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search price lists..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
+              "use client"
 
-        {/* Price Lists Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Price Lists</CardTitle>
+              import { useEffect } from "react"
+              import { useRouter } from "next/navigation"
+
+              export default function PriceListsPage() {
+                const router = useRouter()
+
+                useEffect(() => {
+                  router.replace("/dashboard")
+                }, [router])
+
+                return null
+              }
             <CardDescription>
-              Custom pricing for different customer segments
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : filteredLists.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground mb-4">No price lists found</p>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Your First Price List
-                </Button>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Customer Group</TableHead>
-                    <TableHead>Products</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredLists.map((list) => (
-                    <TableRow key={list.id}>
-                      <TableCell className="font-medium">{list.name}</TableCell>
-                      <TableCell>{list.type || "Standard"}</TableCell>
-                      <TableCell>{list.customer_group?.name || "All Customers"}</TableCell>
-                      <TableCell>{list.product_count || 0}</TableCell>
-                      <TableCell>
-                        <Badge variant={list.is_active ? "default" : "secondary"}>
-                          {list.is_active ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          Edit
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </PageLayout>
-    </DashboardLayout>
-  )
-}
 
+              Custom pricing for different customer segments

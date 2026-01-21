@@ -24,3 +24,5 @@ class RestaurantConfig(AppConfig):
 
 
 
+
+

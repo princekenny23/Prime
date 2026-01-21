@@ -118,21 +118,33 @@ class ExpenseViewSet(viewsets.ModelViewSet, TenantFilterMixin):
             'status_breakdown': list(status_breakdown),
         })
     
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['patch'])
     def approve(self, request, pk=None):
         """Approve an expense"""
         expense = self.get_object()
+        notes = request.data.get('notes', '')
+        
         expense.status = 'approved'
+        expense.approved_by = request.user
+        expense.approved_at = timezone.now()
+        expense.approval_notes = notes
         expense.save()
+        
         serializer = self.get_serializer(expense)
         return Response(serializer.data)
     
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['patch'])
     def reject(self, request, pk=None):
         """Reject an expense"""
         expense = self.get_object()
+        notes = request.data.get('notes', '')
+        
         expense.status = 'rejected'
+        expense.rejected_by = request.user
+        expense.rejected_at = timezone.now()
+        expense.approval_notes = notes  # Store rejection reason in approval_notes
         expense.save()
+        
         serializer = self.get_serializer(expense)
         return Response(serializer.data)
 

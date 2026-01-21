@@ -12,7 +12,7 @@ class TenantSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tenant
         fields = ('id', 'name', 'type', 'pos_type', 'currency', 'currency_symbol', 'phone', 'email', 
-                  'address', 'settings', 'is_active', 'created_at', 'updated_at', 
+                  'address', 'logo', 'settings', 'is_active', 'created_at', 'updated_at', 
                   'outlets', 'users')
         read_only_fields = ('id', 'created_at', 'updated_at')
     
@@ -57,18 +57,38 @@ class TenantSerializer(serializers.ModelSerializer):
         return value
     
     def get_users(self, obj):
-        """Get users for this tenant without circular import"""
+        """Get users for this tenant with their role and permission information"""
         # Use a simplified serializer to avoid circular dependency
-        users = obj.users.all()
-        return [{
-            'id': user.id,
-            'email': user.email,
-            'username': user.username,
-            'name': user.name or '',
-            'phone': user.phone or '',
-            'role': user.role,
-            'is_saas_admin': user.is_saas_admin,
-            'is_active': user.is_active,
-            'date_joined': user.date_joined.isoformat() if user.date_joined else None,
-        } for user in users]
+        users = obj.users.select_related('tenant').prefetch_related('staff_profile__role').all()
+        result = []
+        
+        for user in users:
+            user_data = {
+                'id': user.id,
+                'email': user.email,
+                'username': user.username,
+                'name': user.name or '',
+                'phone': user.phone or '',
+                'role': user.role,
+                'effective_role': user.effective_role,
+                'is_saas_admin': user.is_saas_admin,
+                'is_active': user.is_active,
+                'date_joined': user.date_joined.isoformat() if user.date_joined else None,
+                'permissions': user.get_permissions(),
+            }
+            
+            # Add staff role information if available
+            staff_role = user.staff_role
+            if staff_role:
+                user_data['staff_role'] = {
+                    'id': staff_role.id,
+                    'name': staff_role.name,
+                    'description': staff_role.description,
+                }
+            else:
+                user_data['staff_role'] = None
+            
+            result.append(user_data)
+        
+        return result
 

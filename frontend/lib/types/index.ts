@@ -23,6 +23,8 @@ export interface BusinessSettings {
   taxEnabled: boolean
   taxRate: number
   printerSettings?: any
+  timezone?: string
+  taxId?: string
 }
 
 export interface Outlet {
@@ -40,6 +42,7 @@ export interface User {
   email: string
   name: string
   role: "admin" | "manager" | "cashier" | "staff"
+  effective_role?: string
   businessId: string
   outletIds: string[]
   createdAt: string
@@ -49,6 +52,21 @@ export interface User {
     type?: string
   } | string | number
   is_saas_admin?: boolean
+  permissions?: {
+    can_sales: boolean
+    can_inventory: boolean
+    can_products: boolean
+    can_customers: boolean
+    can_reports: boolean
+    can_staff: boolean
+    can_settings: boolean
+    can_dashboard: boolean
+  }
+  staff_role?: {
+    id: string | number
+    name: string
+    description?: string
+  }
 }
 
 export interface Product {
@@ -59,11 +77,13 @@ export interface Product {
   sku?: string
   barcode?: string
   price: number
+  retail_price?: number
   cost?: number
   categoryId?: string
   stock: number
   lowStockThreshold?: number
   is_low_stock?: boolean // Backend-calculated low stock flag
+  unit?: string
   variations?: Array<{
     id: string | number
     name: string

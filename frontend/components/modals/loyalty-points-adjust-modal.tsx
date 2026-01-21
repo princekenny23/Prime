@@ -15,11 +15,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Award, Plus, Minus } from "lucide-react"
 import { useState } from "react"
 import { useToast } from "@/components/ui/use-toast"
+import { customerService, type Customer } from "@/lib/services/customerService"
 
 interface LoyaltyPointsAdjustModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  customer: any
+  customer: Customer | null
 }
 
 export function LoyaltyPointsAdjustModal({ open, onOpenChange, customer }: LoyaltyPointsAdjustModalProps) {
@@ -27,10 +28,11 @@ export function LoyaltyPointsAdjustModal({ open, onOpenChange, customer }: Loyal
   const [isLoading, setIsLoading] = useState(false)
   const [adjustmentType, setAdjustmentType] = useState<"add" | "subtract" | "set">("add")
   const [points, setPoints] = useState<string>("")
+  const [reason, setReason] = useState<string>("")
 
   if (!customer) return null
 
-  const currentPoints = customer.points || 0
+  const currentPoints = customer.loyalty_points || 0
   const newPoints = adjustmentType === "add"
     ? currentPoints + parseInt(points || "0")
     : adjustmentType === "subtract"
@@ -47,18 +49,46 @@ export function LoyaltyPointsAdjustModal({ open, onOpenChange, customer }: Loyal
       return
     }
 
+    if (adjustmentType === "subtract" && parseInt(points) > currentPoints) {
+      toast({
+        title: "Insufficient Points",
+        description: "Cannot subtract more points than the customer has.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsLoading(true)
 
-    // In production, this would call API
-    setTimeout(() => {
-      setIsLoading(false)
+    try {
+      // Map UI adjustment type to backend transaction type
+      const transactionType = adjustmentType === "add" ? "earned" : adjustmentType === "subtract" ? "redeemed" : "adjusted"
+      
+      // Call backend API
+      await customerService.adjustPoints(
+        customer.id,
+        adjustmentType === "set" ? parseInt(points) : parseInt(points),
+        transactionType,
+        reason || undefined
+      )
+
       toast({
         title: "Points Adjusted",
         description: `Loyalty points have been ${adjustmentType === "add" ? "added" : adjustmentType === "subtract" ? "subtracted" : "set"} successfully.`,
       })
       setPoints("")
+      setReason("")
       onOpenChange(false)
-    }, 1000)
+    } catch (error: any) {
+      console.error("Failed to adjust points:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to adjust loyalty points. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -150,16 +180,18 @@ export function LoyaltyPointsAdjustModal({ open, onOpenChange, customer }: Loyal
           </Tabs>
 
           <div className="space-y-2">
-            <Label htmlFor="reason">Reason</Label>
+            <Label htmlFor="reason">Reason (Optional)</Label>
             <Input
               id="reason"
-              placeholder="Optional reason for adjustment"
+              placeholder="e.g., Special promotion, Loyalty reward"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
             />
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
             Cancel
           </Button>
           <Button
