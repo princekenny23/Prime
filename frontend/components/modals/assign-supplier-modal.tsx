@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   Dialog,
   DialogContent,
@@ -55,13 +55,7 @@ export function AssignSupplierModal({
     address: "",
   })
 
-  useEffect(() => {
-    if (open && !showCreateForm) {
-      loadSuppliers()
-    }
-  }, [open, showCreateForm])
-
-  const loadSuppliers = async () => {
+  const loadSuppliers = useCallback(async () => {
     setIsLoadingSuppliers(true)
     try {
       const response = await supplierService.list()
@@ -76,7 +70,13 @@ export function AssignSupplierModal({
     } finally {
       setIsLoadingSuppliers(false)
     }
-  }
+  }, [toast])
+
+  useEffect(() => {
+    if (open && !showCreateForm) {
+      loadSuppliers()
+    }
+  }, [open, showCreateForm, loadSuppliers])
 
   const handleCreateSupplier = async () => {
     if (!newSupplier.name.trim()) {

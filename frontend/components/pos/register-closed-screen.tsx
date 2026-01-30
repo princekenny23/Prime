@@ -29,6 +29,7 @@ export function RegisterClosedScreen() {
 
   useEffect(() => {
     loadOpenShifts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBusiness])
 
   const loadOpenShifts = async () => {

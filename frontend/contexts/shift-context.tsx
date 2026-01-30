@@ -266,7 +266,15 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
   const getTillsForOutlet = async (outletId: string): Promise<Till[]> => {
     if (useRealAPI()) {
       try {
-        return await outletService.getTills(outletId)
+        const tills = await outletService.getTills(outletId)
+        // Transform from outletService Till format to shift-context Till format
+        return tills.map(till => ({
+          id: till.id,
+          name: till.name,
+          outletId: till.outlet,
+          isActive: till.is_active,
+          isInUse: till.is_in_use,
+        }))
       } catch (error) {
         console.error("Error loading tills:", error)
         return []

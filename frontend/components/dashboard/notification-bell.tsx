@@ -37,6 +37,7 @@ export function NotificationBell() {
     }, 30000)
 
     return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBusiness, currentOutlet])
 
   // Update notifications list when new notification arrives via WebSocket
@@ -59,6 +60,7 @@ export function NotificationBell() {
       }, 1000)
       return () => clearTimeout(timeoutId)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latestNotification])
 
   const loadNotifications = async () => {

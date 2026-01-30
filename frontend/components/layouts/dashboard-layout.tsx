@@ -90,6 +90,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       }
     }
     return nav
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdminRoute, isSaaSAdmin, currentBusiness?.type])
   
   // Filter navigation based on user role

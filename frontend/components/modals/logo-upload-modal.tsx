@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef } from "react"
+import Image from "next/image"
 import {
   Dialog,
   DialogContent,
@@ -147,9 +148,11 @@ export function LogoUploadModal({
           {/* Preview */}
           <div className="w-full h-48 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 overflow-hidden">
             {preview ? (
-              <img
+              <Image
                 src={preview}
                 alt="Logo preview"
+                width={192}
+                height={192}
                 className="w-full h-full object-contain p-4"
               />
             ) : (

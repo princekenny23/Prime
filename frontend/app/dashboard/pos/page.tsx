@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/layouts/dashboard-layout"
 import { PageLayout } from "@/components/layouts/page-layout"
@@ -69,25 +69,14 @@ export default function POSLandingPage() {
 
     // For standard POS, check business type
     if (currentBusiness.type === "wholesale and retail") {
-      loadRegisterStatuses()
+      // loadRegisterStatuses will be called in useEffect
     } else {
       // For other business types, redirect to their specific POS
       router.push(`/pos/${currentBusiness.type}`)
     }
   }, [currentBusiness, outlets, activeShift, router])
 
-  // If user already has an active shift, redirect to appropriate POS
-  useEffect(() => {
-    if (activeShift && currentBusiness) {
-      if (currentBusiness.posType === "single_product") {
-        router.push("/pos/single-product")
-      } else if (currentBusiness.type === "wholesale and retail") {
-      router.push("/pos/retail")
-      }
-    }
-  }, [activeShift, currentBusiness, router])
-
-  const loadRegisterStatuses = async () => {
+  const loadRegisterStatuses = useCallback(async () => {
     if (!currentBusiness || !outlets.length) {
       setIsLoading(false)
       return
@@ -130,7 +119,19 @@ export default function POSLandingPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [currentBusiness, outlets])
+
+  // If user already has an active shift, redirect to appropriate POS
+  useEffect(() => {
+    loadRegisterStatuses()
+    if (activeShift && currentBusiness) {
+      if (currentBusiness.posType === "single_product") {
+        router.push("/pos/single-product")
+      } else if (currentBusiness.type === "wholesale and retail") {
+        router.push("/pos/retail")
+      }
+    }
+  }, [activeShift, currentBusiness, router, loadRegisterStatuses])
 
   const handleStartNew = () => {
     router.push("/dashboard/office/shift-management/start-shift")

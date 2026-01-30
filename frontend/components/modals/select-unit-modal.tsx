@@ -30,7 +30,7 @@ interface SelectUnitModalProps {
   onOpenChange: (open: boolean) => void
   product: any
   saleType?: "retail" | "wholesale"
-  onSelect: (unit: ProductUnit) => void
+  onSelect: (unit: ProductUnit | null) => void
 }
 
 export function SelectUnitModal({

@@ -14,9 +14,7 @@ import {
 import { ReportFilters } from "@/components/reports/report-filters"
 import { Users, DollarSign, Award, ShoppingCart } from "lucide-react"
 import { useState, useEffect } from "react"
-import { ExportReportModal } from "@/components/modals/export-report-modal"
-import { PrintReportModal } from "@/components/modals/print-report-modal"
-import { ReportSettingsModal } from "@/components/modals/report-settings-modal"
+import { DataExchangeModal } from "@/components/modals/data-exchange-modal"
 import { reportService } from "@/lib/services/reportService"
 import { customerService } from "@/lib/services/customerService"
 import { saleService } from "@/lib/services/saleService"
@@ -26,8 +24,6 @@ import { useRealAPI } from "@/lib/utils/api-config"
 export default function CustomersReportsPage() {
   const { currentBusiness, currentOutlet } = useBusinessStore()
   const [showExport, setShowExport] = useState(false)
-  const [showPrint, setShowPrint] = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
   const [topCustomers, setTopCustomers] = useState<any[]>([])
   const [customerSegments, setCustomerSegments] = useState<any[]>([])
   const [stats, setStats] = useState({ totalCustomers: 0, totalSpent: 0, totalPoints: 0, avgOrders: 0 })
@@ -152,8 +148,8 @@ export default function CustomersReportsPage() {
 
         <ReportFilters
           onExport={() => setShowExport(true)}
-          onPrint={() => setShowPrint(true)}
-          onSettings={() => setShowSettings(true)}
+          onPrint={() => {}}
+          onSettings={() => {}}
         />
 
         {/* Stats Cards */}
@@ -313,16 +309,13 @@ export default function CustomersReportsPage() {
         open={showExport}
         onOpenChange={setShowExport}
         type="export"
-        config={dataExchangeConfigs.reports}
-      />
-      <PrintReportModal
-        open={showPrint}
-        onOpenChange={setShowPrint}
-        reportType="Customer Report"
-      />
-      <ReportSettingsModal
-        open={showSettings}
-        onOpenChange={setShowSettings}
+        config={{
+          entityType: "reports",
+          fields: [],
+          requiredFields: [],
+          defaultFormat: "xlsx",
+          apiEndpoints: { import: "/api/reports/import", export: "/api/reports/export" }
+        }}
       />
       </PageLayout>
     </DashboardLayout>

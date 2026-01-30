@@ -101,21 +101,17 @@ export default function NewQuotationPage() {
   const handleSelectProduct = (result: ProductSelectionResult) => {
     console.log("🎯 Product selected from orchestrator:", result)
     
-    const { product, variation, unit } = result
+    const { product, unit } = result
     
-    // Calculate price following hierarchy: unit > variation > product
+    // Calculate price - use unit price if available, otherwise product price
     const price = unit?.retail_price || 
-                  (variation as any)?.price || 
                   (product as any).retail_price || 
                   product.price || 0
     
     console.log("💰 Calculated price:", price)
     
-    // Build product name with variation and unit info
+    // Build product name with unit info
     let productName = product.name || ""
-    if (variation) {
-      productName += ` (${variation.name})`
-    }
     if (unit) {
       productName += ` - ${unit.unit_name}`
     }
@@ -130,8 +126,6 @@ export default function NewQuotationPage() {
       price,
       total: price * (result.quantity || 1),
       // Store additional data for reference
-      variation_id: variation?.id,
-      variation_name: variation?.name,
       unit_id: unit?.id,
       unit_name: unit?.unit_name,
     } as any
@@ -290,11 +284,10 @@ export default function NewQuotationPage() {
 
       // Capture the preview content as canvas
       const canvas = await html2canvas.default(previewRef.current, {
-        scale: 2,
         useCORS: true,
         logging: false,
         backgroundColor: "#ffffff",
-      })
+      } as any)
 
       // Calculate PDF dimensions
       const imgWidth = 210 // A4 width in mm

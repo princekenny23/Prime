@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Search, CalendarX, AlertTriangle, CheckCircle, Clock } from "lucide-react"
+import { Search, AlertTriangle, CheckCircle } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { productService } from "@/lib/services/productService"
@@ -36,21 +36,14 @@ export default function ExpiryManagementPage() {
   const [products, setProducts] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    loadProducts()
-  }, [])
-
   const loadProducts = async () => {
     setIsLoading(true)
     try {
       const response = await productService.list({ is_active: true })
       const allProducts = response.results || response || []
-      
-      // Filter products that have expiry dates
       const productsWithExpiry = allProducts.filter((p: any) => 
         p.expiry_date || p.manufacturing_date || p.track_expiration
       )
-      
       setProducts(productsWithExpiry)
     } catch (error) {
       console.error("Failed to load products:", error)
@@ -64,50 +57,34 @@ export default function ExpiryManagementPage() {
     }
   }
 
+  useEffect(() => {
+    loadProducts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const getExpiryStatus = (expiryDate: string | null | undefined) => {
-    if (!expiryDate) return { status: "none", label: "No Expiry", color: "bg-gray-100 text-gray-800" }
-    
+    if (!expiryDate) return { status: "none", label: "No Expiry", color: "bg-gray-100" }
     const expiry = new Date(expiryDate)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const daysUntilExpiry = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    const days = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
     
-    if (daysUntilExpiry < 0) {
-      return { status: "expired", label: "Expired", color: "bg-red-100 text-red-800", days: Math.abs(daysUntilExpiry) }
-    } else if (daysUntilExpiry === 0) {
-      return { status: "expires-today", label: "Expires Today", color: "bg-red-100 text-red-800" }
-    } else if (daysUntilExpiry <= 7) {
-      return { status: "expiring-soon", label: `Expires in ${daysUntilExpiry} days`, color: "bg-orange-100 text-orange-800", days: daysUntilExpiry }
-    } else if (daysUntilExpiry <= 30) {
-      return { status: "expiring-month", label: `Expires in ${daysUntilExpiry} days`, color: "bg-yellow-100 text-yellow-800", days: daysUntilExpiry }
-    } else {
-      return { status: "valid", label: `Expires in ${daysUntilExpiry} days`, color: "bg-green-100 text-green-800", days: daysUntilExpiry }
-    }
+    if (days < 0) return { status: "expired", label: "Expired", color: "bg-red-100" }
+    if (days === 0) return { status: "expires-today", label: "Expires Today", color: "bg-red-100" }
+    if (days <= 7) return { status: "expiring-soon", label: `${days} days`, color: "bg-orange-100" }
+    if (days <= 30) return { status: "expiring-month", label: `${days} days`, color: "bg-yellow-100" }
+    return { status: "valid", label: `${days} days`, color: "bg-green-100" }
   }
 
   const filteredProducts = products.filter((product: any) => {
-    const matchesSearch = 
-      product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.barcode?.toLowerCase().includes(searchTerm.toLowerCase())
+    const search = searchTerm.toLowerCase()
+    const matches = product.name?.toLowerCase().includes(search) || 
+                   product.sku?.toLowerCase().includes(search) ||
+                   product.barcode?.toLowerCase().includes(search)
     
-    if (statusFilter === "all") return matchesSearch
-    
-    const expiryStatus = getExpiryStatus(product.expiry_date)
-    return matchesSearch && expiryStatus.status === statusFilter
+    if (statusFilter === "all") return matches
+    return matches && getExpiryStatus(product.expiry_date).status === statusFilter
   })
-
-  const expiredCount = products.filter(p => {
-    const status = getExpiryStatus(p.expiry_date)
-    return status.status === "expired"
-  }).length
-
-  const expiringSoonCount = products.filter(p => {
-    const status = getExpiryStatus(p.expiry_date)
-    return status.status === "expiring-soon" || status.status === "expires-today"
-  }).length
-
-  const totalWithExpiry = products.length
 
   return (
     <DashboardLayout>
@@ -115,103 +92,101 @@ export default function ExpiryManagementPage() {
         title={t("inventory.menu.expiry")}
         description={t("inventory.expiry.description")}
       >
+        <div className="space-y-6">
+          {/* Search and Filter */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex gap-4">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                  <Input
+                    placeholder="Search products..."
+                    className="pl-10"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="expired">Expired</SelectItem>
+                    <SelectItem value="expires-today">Expires Today</SelectItem>
+                    <SelectItem value="expiring-soon">Expiring Soon</SelectItem>
+                    <SelectItem value="expiring-month">This Month</SelectItem>
+                    <SelectItem value="valid">Valid</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Filters */}
-        <div className="mb-6 pb-4 border-b border-gray-300">
-          <div className="flex gap-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-              <Input
-                placeholder={t("common.search_products_placeholder")}
-                className="pl-10 bg-white border-gray-300"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[200px] bg-white border-gray-300">
-                <SelectValue placeholder={t("common.filter_by_status")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="expired">Expired</SelectItem>
-                <SelectItem value="expires-today">Expires Today</SelectItem>
-                <SelectItem value="expiring-soon">Expiring Soon (≤7 days)</SelectItem>
-                <SelectItem value="expiring-month">Expiring This Month</SelectItem>
-                <SelectItem value="valid">Valid</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* Products Table */}
-        <div>
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Products with Expiry Dates</h3>
-            <p className="text-sm text-gray-600">
-              {filteredProducts.length} product{filteredProducts.length !== 1 ? "s" : ""} found
-            </p>
-          </div>
-          <div className="rounded-md border border-gray-300 bg-white">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50">
-                  <TableHead className="text-gray-900 font-semibold">Product</TableHead>
-                  <TableHead className="text-gray-900 font-semibold">SKU</TableHead>
-                  <TableHead className="text-gray-900 font-semibold">Manufacturing Date</TableHead>
-                  <TableHead className="text-gray-900 font-semibold">Expiry Date</TableHead>
-                  <TableHead className="text-gray-900 font-semibold">Status</TableHead>
-                  <TableHead className="text-gray-900 font-semibold">Stock</TableHead>
-                  <TableHead className="text-gray-900 font-semibold">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
+          {/* Products Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Products with Expiry</CardTitle>
+              <CardDescription>
+                {filteredProducts.length} product{filteredProducts.length !== 1 ? "s" : ""} found
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
-                      <p className="text-gray-600">Loading products...</p>
-                    </TableCell>
+                    <TableHead>Product</TableHead>
+                    <TableHead>SKU</TableHead>
+                    <TableHead>Mfg Date</TableHead>
+                    <TableHead>Expiry Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Stock</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ) : filteredProducts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
-                      <p className="text-gray-600">No products with expiry information found.</p>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredProducts.map((product) => {
-                    const expiryStatus = getExpiryStatus(product.expiry_date)
-                    return (
-                      <TableRow key={product.id} className="border-gray-300">
-                        <TableCell className="font-medium">{product.name}</TableCell>
-                        <TableCell>{product.sku || "N/A"}</TableCell>
-                        <TableCell>
-                          {product.manufacturing_date 
-                            ? new Date(product.manufacturing_date).toLocaleDateString()
-                            : "N/A"}
-                        </TableCell>
-                        <TableCell>
-                          {product.expiry_date 
-                            ? new Date(product.expiry_date).toLocaleDateString()
-                            : "N/A"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={expiryStatus.color}>
-                            {expiryStatus.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{product.stock || 0}</TableCell>
-                        <TableCell>
-                          <Link href={`/dashboard/inventory/products/${product.id}`}>
-                            <Button variant="ghost" size="sm">View</Button>
-                          </Link>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8">Loading...</TableCell>
+                    </TableRow>
+                  ) : filteredProducts.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8">No products found</TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredProducts.map((product) => {
+                      const status = getExpiryStatus(product.expiry_date)
+                      return (
+                        <TableRow key={product.id}>
+                          <TableCell className="font-medium">{product.name}</TableCell>
+                          <TableCell>{product.sku || "N/A"}</TableCell>
+                          <TableCell>
+                            {product.manufacturing_date 
+                              ? new Date(product.manufacturing_date).toLocaleDateString()
+                              : "N/A"}
+                          </TableCell>
+                          <TableCell>
+                            {product.expiry_date 
+                              ? new Date(product.expiry_date).toLocaleDateString()
+                              : "N/A"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={status.color}>{status.label}</Badge>
+                          </TableCell>
+                          <TableCell>{product.stock || 0}</TableCell>
+                          <TableCell>
+                            <Link href={`/dashboard/inventory/products/${product.id}`}>
+                              <Button variant="ghost" size="sm">View</Button>
+                            </Link>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </div>
       </PageLayout>
     </DashboardLayout>

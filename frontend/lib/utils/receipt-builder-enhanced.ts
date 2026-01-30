@@ -3,7 +3,7 @@
  * Includes unit conversions and multi-unit product support
  */
 
-import type { Product, ItemVariation, ProductUnit } from "@/lib/types"
+import type { Product, ProductUnit } from "@/lib/types"
 
 export interface SaleItemWithUnits {
   productId: string

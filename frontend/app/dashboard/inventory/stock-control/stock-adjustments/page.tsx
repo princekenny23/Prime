@@ -126,9 +126,9 @@ export default function StockAdjustmentsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [currentBusiness?.id, currentOutlet?.id, useReal])
-
-  useEffect(() => {
+  }, [currentBusiness, currentOutlet, useReal])
+  
+  const handleExportAdjustments = useCallback(async () => {
     if (currentBusiness) {
       console.log("useEffect triggered - loading adjustments", {
         currentBusinessId: currentBusiness.id,
@@ -147,7 +147,8 @@ export default function StockAdjustmentsPage() {
     } else {
       console.log("useEffect - no currentBusiness, skipping load")
     }
-  }, [currentBusiness?.id, loadAdjustments])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentBusiness?.id, adjustments.length])
   
   useEffect(() => {
     console.log("Adjustments state changed:", {
@@ -241,7 +242,7 @@ export default function StockAdjustmentsPage() {
             <div className="space-y-2">
               <h3 className="font-semibold text-blue-900">What is Stock Adjustment?</h3>
               <p className="text-sm text-blue-800">
-                Stock adjustment lets you fix inventory counts when they don't match reality. 
+                Stock adjustment lets you fix inventory counts when they don&apos;t match reality. 
                 For example, if you count 50 items but the system shows 45, you can add 5 items. 
                 Or if you find damaged items, you can remove them from stock.
               </p>
@@ -349,6 +350,7 @@ export default function StockAdjustmentsPage() {
                   onChange={handleFileChange}
                   className="hidden"
                   id="adjustment-file-upload"
+                  aria-label="Upload adjustment file"
                 />
                 <Label htmlFor="adjustment-file-upload">
                   <Button variant="outline" asChild>

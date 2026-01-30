@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { ArrowRightLeft, Plus, Trash2 } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { inventoryService } from "@/lib/services/inventoryService"
 import { productService } from "@/lib/services/productService"
@@ -50,22 +50,7 @@ export function TransferStockModal({ open, onOpenChange, onSuccess }: TransferSt
   const [toOutletId, setToOutletId] = useState("")
   const [commonReason, setCommonReason] = useState("")
 
-  useEffect(() => {
-    if (open) {
-      loadProducts()
-      // Initialize with one empty item
-      setTransferItems([{
-        id: Date.now().toString(),
-        product_id: "",
-        quantity: "",
-      }])
-      setFromOutletId("")
-      setToOutletId("")
-      setCommonReason("")
-    }
-  }, [open])
-
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     setLoadingProducts(true)
     try {
       const response = await productService.list({ is_active: true })
@@ -80,7 +65,28 @@ export function TransferStockModal({ open, onOpenChange, onSuccess }: TransferSt
     } finally {
       setLoadingProducts(false)
     }
-  }
+  }, [toast])
+
+  useEffect(() => {
+    if (open) {
+      loadProducts()
+      // Initialize with one empty item
+      setTransferItems([{
+        id: Date.now().toString(),
+        product_id: "",
+        quantity: "",
+      }])
+      setFromOutletId("")
+      setToOutletId("")
+      setCommonReason("")
+    }
+  }, [open, loadProducts])
+
+  useEffect(() => {
+    if (open) {
+      loadProducts()
+    }
+  }, [open, loadProducts])
 
   const addTransferItem = () => {
     setTransferItems([...transferItems, {

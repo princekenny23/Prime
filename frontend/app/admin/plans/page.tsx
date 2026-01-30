@@ -166,15 +166,14 @@ export default function AdminPlansPage() {
             </Card>
           ))}
         </div>
-      </div>
 
-      {/* Modals */}
+        {/* Modals */}
+        <EditPlanModal
+          open={showEditPlan}
+          onOpenChange={setShowEditPlan}
+          plan={selectedPlan}
+        />
       </PageLayout>
-      <EditPlanModal
-        open={showEditPlan}
-        onOpenChange={setShowEditPlan}
-        plan={selectedPlan}
-      />
     </DashboardLayout>
   )
 }

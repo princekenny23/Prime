@@ -73,12 +73,12 @@ export const kitchenService = {
   },
 
   async getPending(): Promise<KitchenOrderTicket[]> {
-    const response = await api.get(`${apiEndpoints.kitchenOrders.list}pending/`)
+    const response = await api.get<any>(`${apiEndpoints.kitchenOrders.list}pending/`)
     return Array.isArray(response) ? response : response.results || []
   },
 
   async getReady(): Promise<KitchenOrderTicket[]> {
-    const response = await api.get(`${apiEndpoints.kitchenOrders.list}ready/`)
+    const response = await api.get<any>(`${apiEndpoints.kitchenOrders.list}ready/`)
     return Array.isArray(response) ? response : response.results || []
   },
 }

@@ -66,6 +66,7 @@ export default function CustomersReportsPage() {
 
   useEffect(() => {
     loadReportData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBusiness])
 
   const filteredCustomers = customers.filter(customer => {

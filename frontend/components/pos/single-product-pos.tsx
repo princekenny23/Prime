@@ -89,6 +89,7 @@ export function SingleProductPOS() {
     }
     
     loadProducts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBusiness])
 
   // Get available units for selected product

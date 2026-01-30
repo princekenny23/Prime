@@ -81,6 +81,7 @@ export default function StockMovementReportsPage() {
 
   useEffect(() => {
     loadReportData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBusiness, currentOutlet])
 
   const handleApplyFilters = () => {

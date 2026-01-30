@@ -131,18 +131,8 @@ export function ProductSelectionOrchestrator({
    */
   const handleBack = () => {
     switch (currentStep) {
-      case "variation":
-        setCurrentStep("product")
-        setSelectedVariation(null)
-        break
       case "unit":
-        // If we have a variation, go back to variation modal
-        // Otherwise, go back to product modal
-        if (selectedVariation) {
-          setCurrentStep("variation")
-        } else {
-          setCurrentStep("product")
-        }
+        setCurrentStep("product")
         setSelectedUnit(null)
         break
     }

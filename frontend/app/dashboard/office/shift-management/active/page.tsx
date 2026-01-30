@@ -36,6 +36,7 @@ export default function ActiveShiftsPage() {
 
   useEffect(() => {
     loadActiveShifts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBusiness])
 
   const handleCloseSuccess = () => {

@@ -965,7 +965,7 @@ export default function ProductsPage() {
               Delete Product
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete <strong>"{productToDelete?.name}"</strong>? 
+              Are you sure you want to delete <strong>&quot;{productToDelete?.name}&quot;</strong>? 
               <br />
               <span className="text-destructive font-medium">This action cannot be undone.</span>
               <br />

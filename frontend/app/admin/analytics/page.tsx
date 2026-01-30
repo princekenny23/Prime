@@ -18,21 +18,21 @@ export default function AdminAnalyticsPage() {
 
   // Mock chart data
   const revenueData = [
-    { name: "Jan", value: 35000 },
-    { name: "Feb", value: 42000 },
-    { name: "Mar", value: 38000 },
-    { name: "Apr", value: 45000 },
-    { name: "May", value: 50000 },
-    { name: "Jun", value: 55000 },
+    { date: "Jan", sales: 35000, profit: 8750 },
+    { date: "Feb", sales: 42000, profit: 10500 },
+    { date: "Mar", sales: 38000, profit: 9500 },
+    { date: "Apr", sales: 45000, profit: 11250 },
+    { date: "May", sales: 50000, profit: 12500 },
+    { date: "Jun", sales: 55000, profit: 13750 },
   ]
 
   const tenantGrowthData = [
-    { name: "Jan", value: 120 },
-    { name: "Feb", value: 125 },
-    { name: "Mar", value: 130 },
-    { name: "Apr", value: 135 },
-    { name: "May", value: 142 },
-    { name: "Jun", value: 150 },
+    { date: "Jan", sales: 120, profit: 0 },
+    { date: "Feb", sales: 125, profit: 0 },
+    { date: "Mar", sales: 130, profit: 0 },
+    { date: "Apr", sales: 135, profit: 0 },
+    { date: "May", sales: 142, profit: 0 },
+    { date: "Jun", sales: 150, profit: 0 },
   ]
 
   return (

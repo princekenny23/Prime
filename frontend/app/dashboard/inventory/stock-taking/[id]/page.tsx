@@ -78,16 +78,12 @@ export default function StockTakingDetailPage() {
     onScan: async (code) => {
       try {
         console.log("Scanned barcode:", code)
-        const { products, variations } = await productService.lookup(code)
+        const { products } = await productService.lookup(code)
         const product = (products && products.length > 0) ? products[0] : undefined
-        const variation = (variations && variations.length > 0) ? variations[0] : undefined
 
         let matchedItem: StockTakingItem | undefined
 
-        if (variation) {
-          const prodId = typeof variation.product === 'object' ? String((variation.product as any).id) : String(variation.product)
-          matchedItem = items.find(i => i.product_id === prodId || i.barcode === code)
-        } else if (product) {
+        if (product) {
           matchedItem = items.find(i => i.product_id === product.id || i.barcode === product.barcode || i.barcode === code)
         }
 
@@ -108,6 +104,7 @@ export default function StockTakingDetailPage() {
   })
   useEffect(() => {
     loadStockTakeData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stockTakeId])
 
   const loadStockTakeData = async (showLoading = true) => {

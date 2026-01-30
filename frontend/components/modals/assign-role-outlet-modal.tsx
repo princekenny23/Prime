@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Shield, MapPin } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { staffService, roleService, type Staff, type Role } from "@/lib/services/staffService"
 import { useBusinessStore } from "@/stores/businessStore"
@@ -40,6 +40,16 @@ export function AssignRoleOutletModal({ open, onOpenChange, staff, onSuccess }: 
   const [selectedRoleId, setSelectedRoleId] = useState<string>("")
   const [selectedOutletIds, setSelectedOutletIds] = useState<string[]>([])
 
+  const loadRoles = useCallback(async () => {
+    if (!currentBusiness) return
+    try {
+      const response = await roleService.list({ tenant: currentBusiness.id, is_active: true })
+      setRoles(response.results || [])
+    } catch (error) {
+      console.error("Failed to load roles:", error)
+    }
+  }, [currentBusiness])
+
   useEffect(() => {
     if (open && staff) {
       loadRoles()
@@ -51,17 +61,7 @@ export function AssignRoleOutletModal({ open, onOpenChange, staff, onSuccess }: 
       }) || []
       setSelectedOutletIds(outletIds)
     }
-  }, [open, staff, currentBusiness])
-
-  const loadRoles = async () => {
-    if (!currentBusiness) return
-    try {
-      const response = await roleService.list({ tenant: currentBusiness.id, is_active: true })
-      setRoles(response.results || [])
-    } catch (error) {
-      console.error("Failed to load roles:", error)
-    }
-  }
+  }, [open, staff, currentBusiness, loadRoles])
 
   if (!staff) return null
 
@@ -164,6 +164,7 @@ export function AssignRoleOutletModal({ open, onOpenChange, staff, onSuccess }: 
                         checked={selectedOutletIds.includes(String(outlet.id))}
                         onChange={() => handleOutletToggle(String(outlet.id))}
                         className="h-4 w-4 rounded border-gray-300"
+                        aria-label={`Select ${outlet.name} outlet`}
                       />
                       <Label
                         htmlFor={`outlet-${outlet.id}`}
@@ -186,7 +187,7 @@ export function AssignRoleOutletModal({ open, onOpenChange, staff, onSuccess }: 
 
           <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
             <p className="text-sm text-blue-800 dark:text-blue-200">
-              Changing the role will update the staff member's permissions. Changing the outlets will limit their access to those specific locations.
+              Changing the role will update the staff member&apos;s permissions. Changing the outlets will limit their access to those specific locations.
             </p>
           </div>
         </div>

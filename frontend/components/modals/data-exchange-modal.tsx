@@ -29,6 +29,7 @@ interface DataExchangeModalProps {
   onOpenChange: (open: boolean) => void
   type: "import" | "export"
   config: DataExchangeConfig
+  data?: any[]
   onSuccess?: (result: any) => void
   outlets?: Array<{ id: number | string; name: string }>
   categories?: Array<{ id: number | string; name: string }>
@@ -39,6 +40,7 @@ export function DataExchangeModal({
   onOpenChange,
   type,
   config,
+  data = [],
   onSuccess,
   outlets = [],
   categories = [],

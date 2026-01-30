@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Search, Package } from "lucide-react"
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { productService } from "@/lib/services/productService"
 import { useToast } from "@/components/ui/use-toast"
 import { useBusinessStore } from "@/stores/businessStore"
@@ -39,15 +39,7 @@ export function SelectProductModal({
   const [isLoading, setIsLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
 
-  useEffect(() => {
-    if (open) {
-      loadProducts()
-    } else {
-      setSearchTerm("")
-    }
-  }, [open, outletId])
-
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     setIsLoading(true)
     try {
       const response = await productService.list({ is_active: true })
@@ -62,7 +54,15 @@ export function SelectProductModal({
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [toast])
+
+  useEffect(() => {
+    if (open) {
+      loadProducts()
+    } else {
+      setSearchTerm("")
+    }
+  }, [open, loadProducts])
 
   const filteredProducts = useMemo(() => {
     if (!searchTerm) return products

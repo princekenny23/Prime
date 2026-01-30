@@ -25,6 +25,7 @@ export interface BusinessSettings {
   printerSettings?: any
   timezone?: string
   taxId?: string
+  language?: string
 }
 
 export interface Outlet {
@@ -41,6 +42,7 @@ export interface User {
   id: string
   email: string
   name: string
+  phone?: string
   role: "admin" | "manager" | "cashier" | "staff"
   effective_role?: string
   businessId: string

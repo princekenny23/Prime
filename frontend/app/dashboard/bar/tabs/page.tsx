@@ -88,19 +88,18 @@ export default function TabsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Bar Tabs</h1>
-            <p className="text-muted-foreground">Manage customer tabs and payments</p>
-          </div>
+      <PageLayout
+        title="Bar Tabs"
+        description="Manage customer tabs and payments"
+        actions={
           <Button onClick={() => setShowOpenTab(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Open Tab
           </Button>
-        </div>
-
-        {/* Stats Cards */}
+        }
+      >
+        <div className="space-y-6">
+          {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -249,20 +248,19 @@ export default function TabsPage() {
             </Table>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Modals */}
-      <OpenTabModal
-        open={showOpenTab}
-        onOpenChange={setShowOpenTab}
-      />
+        {/* Modals */}
+        <OpenTabModal
+          open={showOpenTab}
+          onOpenChange={setShowOpenTab}
+        />
+        <CloseTabModal
+          open={showCloseTab}
+          onOpenChange={setShowCloseTab}
+          tab={selectedTab}
+        />
+      </div>
       </PageLayout>
-      <CloseTabModal
-        open={showCloseTab}
-        onOpenChange={setShowCloseTab}
-        tab={selectedTab}
-      />
     </DashboardLayout>
   )
 }
-

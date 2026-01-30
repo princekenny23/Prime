@@ -127,7 +127,6 @@ export function StockDisplay({ product }: StockDisplayProps) {
                     ? "bg-orange-500"
                     : "bg-red-500"
                 }`}
-                // eslint-disable-next-line no-inline-styles
                 style={{
                   width: `${Math.min((baseQuantity / (threshold * 2)) * 100, 100)}%`,
                 } as React.CSSProperties}

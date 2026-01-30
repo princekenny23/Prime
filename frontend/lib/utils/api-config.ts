@@ -20,6 +20,8 @@ export const useRealAPI = (): boolean => {
  * @deprecated Always returns "real" when authenticated
  */
 export const getAPIMode = (): "real" | "mock" => {
-  return useRealAPI() ? "real" : "mock"
+  if (typeof window === "undefined") return "mock"
+  const hasToken = !!localStorage.getItem("authToken")
+  return hasToken ? "real" : "mock"
 }
 

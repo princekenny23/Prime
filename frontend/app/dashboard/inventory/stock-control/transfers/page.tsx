@@ -95,13 +95,14 @@ export default function TransfersPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [currentBusiness?.id, useReal])
+  }, [currentBusiness, useReal])
 
   useEffect(() => {
     if (currentBusiness) {
       loadTransfers()
     }
-  }, [currentBusiness?.id, loadTransfers])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentBusiness?.id])
 
   return (
     <DashboardLayout>

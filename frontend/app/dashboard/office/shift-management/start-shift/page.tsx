@@ -70,7 +70,7 @@ export default function StartShiftPage() {
                         <h4 className="font-medium text-sm">Select Outlet</h4>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Choose the outlet where you'll be working today.
+                        Choose the outlet where you&apos;ll be working today.
                       </p>
                     </div>
                   </div>
@@ -106,7 +106,7 @@ export default function StartShiftPage() {
                         <h4 className="font-medium text-sm">Choose Till</h4>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Pick an available till. Tills already in use won't be selectable.
+                        Pick an available till. Tills already in use won&apos;t be selectable.
                       </p>
                     </div>
                   </div>
@@ -142,7 +142,7 @@ export default function StartShiftPage() {
                         <h4 className="font-medium text-sm">Start Shift</h4>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Review all details and click "Start Shift" to begin.
+                        Review all details and click &quot;Start Shift&quot; to begin.
                       </p>
                     </div>
                   </div>

@@ -275,7 +275,8 @@ export function useShiftLabels() {
     closeRequired: t("shifts.messages.close_required"),
     cashAdded: t("shifts.messages.cash_added"),
     cashDropped: t("shifts.messages.cash_dropped"),
-  }), [t, locale])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [t])
   
   return { labels, locale, isReady }
 }

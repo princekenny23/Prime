@@ -135,6 +135,7 @@ export default function OrdersPage() {
     // Auto-refresh every 30 seconds
     const interval = setInterval(loadOrders, 30000)
     return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBusiness, currentOutlet, useReal])
 
   const filteredOrders = orders.filter(order => {

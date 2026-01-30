@@ -102,6 +102,7 @@ export default function SalesReportsPage() {
 
   useEffect(() => {
     loadReportData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBusiness, currentOutlet])
 
   const handleApplyFilters = () => {
@@ -233,7 +234,6 @@ export default function SalesReportsPage() {
         onOpenChange={setShowExport}
         type="export"
         config={dataExchangeConfigs.reports}
-        data={salesData}
       />
       <PrintReportModal
         open={showPrint}

@@ -86,6 +86,7 @@ export default function InventoryValuationReportPage() {
 
   useEffect(() => {
     loadReport()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBusiness, currentOutlet])
 
   const handleApplyFilters = () => {

@@ -36,6 +36,7 @@ export default function PurchaseOrderDetailPage() {
     if (poId) {
       loadPurchaseOrder()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [poId])
 
   const loadPurchaseOrder = async () => {

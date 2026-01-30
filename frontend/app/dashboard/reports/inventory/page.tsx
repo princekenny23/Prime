@@ -14,9 +14,10 @@ import {
 import { ReportFilters } from "@/components/reports/report-filters"
 import { Package, AlertTriangle, TrendingUp, TrendingDown, Download } from "lucide-react"
 import { useState, useEffect } from "react"
-import { ExportReportModal } from "@/components/modals/export-report-modal"
+import { DataExchangeModal } from "@/components/modals/data-exchange-modal"
 import { PrintReportModal } from "@/components/modals/print-report-modal"
 import { ReportSettingsModal } from "@/components/modals/report-settings-modal"
+import { dataExchangeConfigs } from "@/lib/utils/data-exchange-config"
 import { useBusinessStore } from "@/stores/businessStore"
 import { Badge } from "@/components/ui/badge"
 

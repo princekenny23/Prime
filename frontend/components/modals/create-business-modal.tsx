@@ -80,7 +80,7 @@ export function CreateBusinessModal({
       
       // Step 2: Create outlet for the tenant
       outlet = await outletService.create({
-        tenant: business.id,
+        businessId: business.id,
         name: formData.outletName || `${business.name} - Main`,
         address: formData.outletAddress || "",
         phone: formData.outletPhone || "",

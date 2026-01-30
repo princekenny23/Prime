@@ -27,6 +27,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { purchaseOrderService } from "@/lib/services/purchaseOrderService"
+import type { PurchaseOrder } from "@/lib/services/purchaseOrderService"
 import { supplierService } from "@/lib/services/supplierService"
 import { productService } from "@/lib/services/productService"
 import { productSupplierService } from "@/lib/services/productSupplierService"
@@ -232,7 +233,7 @@ export default function NewPurchaseOrderPage() {
         })),
       }
 
-      const createdPO = await purchaseOrderService.create(purchaseOrderData)
+      const createdPO = await purchaseOrderService.create(purchaseOrderData as Partial<PurchaseOrder>)
       
       toast({
         title: "Success",

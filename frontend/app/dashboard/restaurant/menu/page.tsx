@@ -28,6 +28,12 @@ export default function MenuPage() {
   const router = useRouter()
   const { toast } = useToast()
   const { currentBusiness, currentOutlet } = useBusinessStore()
+  const useReal = useRealAPI()
+  const [searchTerm, setSearchTerm] = useState("")
+  const [showAddMenuItem, setShowAddMenuItem] = useState(false)
+  const [selectedMenuItem, setSelectedMenuItem] = useState<any>(null)
+  const [menuItems, setMenuItems] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   
   // Redirect if not restaurant business
   useEffect(() => {
@@ -36,23 +42,6 @@ export default function MenuPage() {
     }
   }, [currentBusiness, router])
   
-  // Show loading while checking business type
-  if (!currentBusiness || currentBusiness.type !== "restaurant") {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </DashboardLayout>
-    )
-  }
-  const useReal = useRealAPI()
-  const [searchTerm, setSearchTerm] = useState("")
-  const [showAddMenuItem, setShowAddMenuItem] = useState(false)
-  const [selectedMenuItem, setSelectedMenuItem] = useState<any>(null)
-  const [menuItems, setMenuItems] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-
   const loadMenuItems = useCallback(async () => {
     if (!currentBusiness) {
       setMenuItems([])
@@ -94,6 +83,16 @@ export default function MenuPage() {
   useEffect(() => {
     loadMenuItems()
   }, [loadMenuItems])
+
+  if (!currentBusiness || currentBusiness.type !== "restaurant") {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </DashboardLayout>
+    )
+  }
 
   const filteredItems = menuItems.filter(item =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

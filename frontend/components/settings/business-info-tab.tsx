@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import Image from "next/image"
 import {
   Select,
   SelectContent,
@@ -216,9 +217,11 @@ export function BusinessInfoTab() {
           <div className="flex items-center gap-4">
             <div className="w-24 h-24 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 overflow-hidden">
               {logoUrl ? (
-                <img
+                <Image
                   src={logoUrl}
                   alt="Business Logo"
+                  width={96}
+                  height={96}
                   className="w-full h-full object-contain p-1"
                 />
               ) : (

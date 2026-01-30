@@ -214,7 +214,7 @@ export async function generateChartData(
     // Use cache for chart data
     const cacheKey = `chart-${outletId || 'all'}`
     const chartData = await requestCache.getOrSet(cacheKey, () => saleService.getChartData(outletId))
-    return chartData.map(item => ({
+    return chartData.map((item: any) => ({
       date: item.date,
       sales: item.sales,
       profit: item.profit,

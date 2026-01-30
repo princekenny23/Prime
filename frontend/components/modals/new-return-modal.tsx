@@ -460,7 +460,7 @@ export function NewReturnModal({ open, onOpenChange, onReturnCreated }: NewRetur
               {items.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground border rounded-lg">
                   <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No items added. Click "Add Item" to add products.</p>
+                  <p>No items added. Click &quot;Add Item&quot; to add products.</p>
                 </div>
               ) : (
                 <div className="space-y-2">

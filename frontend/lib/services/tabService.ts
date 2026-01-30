@@ -38,7 +38,7 @@ export const tabService = {
     const query = params.toString()
     try {
       // Tabs are essentially sales with payment_method="tab"
-      const response = await api.get(`${apiEndpoints.sales.list}${query ? `?${query}&payment_method=tab` : "?payment_method=tab"}`)
+      const response = await api.get<any>(`${apiEndpoints.sales.list}${query ? `?${query}&payment_method=tab` : "?payment_method=tab"}`)
       // Transform sales to tabs format
       const tabs = (response.results || []).map((sale: any) => ({
         id: sale.id,
@@ -63,7 +63,7 @@ export const tabService = {
   },
 
   async get(id: string): Promise<Tab> {
-    const sale = await api.get(apiEndpoints.sales.get(id))
+    const sale = await api.get<any>(apiEndpoints.sales.get(id))
     return {
       id: sale.id,
       tab_number: sale.receipt_number || `TAB-${sale.id.slice(-6)}`,
@@ -83,7 +83,7 @@ export const tabService = {
 
   async create(data: { customer_id?: string; items: any[]; tenant: string; outlet?: string }): Promise<Tab> {
     // Create a sale with payment_method="tab"
-    const sale = await api.post(apiEndpoints.sales.create, {
+    const sale = await api.post<any>(apiEndpoints.sales.create, {
       ...data,
       payment_method: "tab",
       status: "pending",
@@ -93,7 +93,7 @@ export const tabService = {
 
   async close(id: string, paymentData: { payment_method: string; amount: number }): Promise<Tab> {
     // Update sale to completed status
-    const sale = await api.put(apiEndpoints.sales.update(id), {
+    const sale = await api.put<any>(apiEndpoints.sales.update(id), {
       status: "completed",
       payment_method: paymentData.payment_method,
     })

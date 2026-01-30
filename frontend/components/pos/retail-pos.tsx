@@ -188,6 +188,7 @@ export function RetailPOS() {
 
   useEffect(() => {
     fetchProductsAndCategories()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBusiness])
 
   // Global barcode scanner handler (keyboard-wedge)

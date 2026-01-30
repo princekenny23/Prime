@@ -95,8 +95,8 @@ export function EditTenantModal({ open, onOpenChange, tenant, onUpdate }: EditTe
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
-        type: formData.type,
         address: formData.address,
+        type: formData.type,
       })
 
       toast({

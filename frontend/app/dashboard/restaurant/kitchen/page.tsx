@@ -20,6 +20,12 @@ export default function KitchenPage() {
   const router = useRouter()
   const { toast } = useToast()
   const { currentBusiness, currentOutlet } = useBusinessStore()
+  const [showKOT, setShowKOT] = useState(false)
+  const [selectedOrder, setSelectedOrder] = useState<any>(null)
+  const [activeTab, setActiveTab] = useState("pending")
+  const [kitchenOrders, setKitchenOrders] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const useReal = useRealAPI()
   
   // Redirect if not restaurant business
   useEffect(() => {
@@ -28,23 +34,6 @@ export default function KitchenPage() {
     }
   }, [currentBusiness, router])
   
-  // Show loading while checking business type
-  if (!currentBusiness || currentBusiness.type !== "restaurant") {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </DashboardLayout>
-    )
-  }
-  const [showKOT, setShowKOT] = useState(false)
-  const [selectedOrder, setSelectedOrder] = useState<any>(null)
-  const [activeTab, setActiveTab] = useState("pending")
-  const [kitchenOrders, setKitchenOrders] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const useReal = useRealAPI()
-
   const loadKitchenOrders = async () => {
     if (!currentBusiness) {
       setKitchenOrders([])
@@ -94,6 +83,7 @@ export default function KitchenPage() {
     // Refresh every 30 seconds
     const interval = setInterval(loadKitchenOrders, 30000)
     return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBusiness, currentOutlet, useReal])
 
   const pendingOrders = kitchenOrders.filter(o => 
@@ -131,6 +121,16 @@ export default function KitchenPage() {
   const handlePrintKOT = (order: any) => {
     setSelectedOrder(order)
     setShowKOT(true)
+  }
+
+  if (!currentBusiness || currentBusiness.type !== "restaurant") {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   return (

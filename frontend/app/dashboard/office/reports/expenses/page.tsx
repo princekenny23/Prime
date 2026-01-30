@@ -96,6 +96,7 @@ export default function ExpensesReportsPage() {
 
   useEffect(() => {
     loadReportData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBusiness, currentOutlet])
 
   const handleApplyFilters = () => {

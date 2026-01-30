@@ -82,7 +82,6 @@ export default function SetupOutletPage() {
         name: formData.outletName.trim() || `${currentBusiness.name} - Main`,
         address: formData.address?.trim() || "",
         phone: formData.phone?.trim() || "",
-        email: formData.email?.trim() || "",
         isActive: true,
       })
       

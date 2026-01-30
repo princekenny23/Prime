@@ -254,15 +254,14 @@ export default function AdminSupportTicketsPage() {
             </Tabs>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Modals */}
+        {/* Modals */}
+        <ReplyToSupportTicketModal
+          open={showReplyModal}
+          onOpenChange={setShowReplyModal}
+          ticket={selectedTicket}
+        />
       </PageLayout>
-      <ReplyToSupportTicketModal
-        open={showReplyModal}
-        onOpenChange={setShowReplyModal}
-        ticket={selectedTicket}
-      />
     </DashboardLayout>
   )
 }

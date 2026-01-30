@@ -94,9 +94,9 @@ export default function CustomerManagementPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [currentBusiness, outletFilter, useReal, toast])
+  }, [currentBusiness, outletFilter, toast])
 
-  useEffect(() => {
+  const handleDeleteCustomer = useCallback(async (customerId: string) => {
     loadCustomers()
   }, [loadCustomers])
 

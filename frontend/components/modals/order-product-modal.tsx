@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   Dialog,
   DialogContent,
@@ -56,23 +56,7 @@ export function OrderProductModal({ open, onOpenChange, product, onSuccess }: Or
     address: "",
   })
 
-  useEffect(() => {
-    if (open) {
-      loadSuppliers()
-      if (currentOutlet) {
-        setOutletId(String(currentOutlet.id))
-      }
-      // Set default unit price to product cost if available
-      if (product?.cost) {
-        setUnitPrice(String(product.cost))
-      } else if (product?.retail_price) {
-        // Fallback to retail price if cost not available
-        setUnitPrice(String(product.retail_price))
-      }
-    }
-  }, [open, currentOutlet, product])
-
-  const loadSuppliers = async () => {
+  const loadSuppliers = useCallback(async () => {
     setIsLoadingSuppliers(true)
     try {
       const response = await supplierService.list({ is_active: true })
@@ -87,7 +71,29 @@ export function OrderProductModal({ open, onOpenChange, product, onSuccess }: Or
     } finally {
       setIsLoadingSuppliers(false)
     }
-  }
+  }, [toast])
+
+  useEffect(() => {
+    if (open) {
+      loadSuppliers()
+      if (currentOutlet) {
+        setOutletId(String(currentOutlet.id))
+      }
+      // Set default unit price to product cost if available
+      if (product?.cost) {
+        setUnitPrice(String(product.cost))
+      } else if (product?.retail_price) {
+        // Fallback to retail price if cost not available
+        setUnitPrice(String(product.retail_price))
+      }
+    }
+  }, [open, currentOutlet, product, loadSuppliers])
+
+  useEffect(() => {
+    if (open) {
+      loadSuppliers()
+    }
+  }, [open, loadSuppliers])
 
   const handleCreateSupplier = async () => {
     if (!newSupplier.name.trim()) {

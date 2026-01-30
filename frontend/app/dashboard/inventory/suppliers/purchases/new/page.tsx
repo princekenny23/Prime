@@ -26,7 +26,7 @@ import { useState, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { purchaseOrderService } from "@/lib/services/purchaseOrderService"
+import { purchaseOrderService, type PurchaseOrder } from "@/lib/services/purchaseOrderService"
 import { supplierService } from "@/lib/services/supplierService"
 import { productService } from "@/lib/services/productService"
 import { productSupplierService } from "@/lib/services/productSupplierService"
@@ -213,7 +213,7 @@ export default function NewPurchaseOrderPage() {
 
     setIsSubmitting(true)
     try {
-      const purchaseOrderData = {
+      const purchaseOrderData: Partial<PurchaseOrder> = {
         supplier_id: Number(supplierId),
         outlet_id: Number(outletId),
         order_date: orderDate,

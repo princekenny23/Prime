@@ -86,7 +86,7 @@ export const tenantService = {
       type: mapFrontendTypeToBackend(data.type),
       pos_type: data.posType || "standard",
       currency: data.currency || "MWK",
-      currency_symbol: data.currencySymbol || data.currency_symbol || "MK",
+      currency_symbol: data.currencySymbol || "MK",
       phone: data.phone || "",
       // Only include email if it's a valid non-empty string
       ...(data.email && data.email.trim() ? { email: data.email.trim() } : {}),
@@ -123,7 +123,7 @@ export const tenantService = {
       type: mapFrontendTypeToBackend(data.type ?? currentTenant.type),
       pos_type: data.posType ?? currentTenant.posType ?? "standard",
       currency: data.currency ?? currentTenant.currency ?? "MWK",
-      currency_symbol: data.currencySymbol || data.currency_symbol || currentTenant.currencySymbol || "MK",
+      currency_symbol: data.currencySymbol || currentTenant.currencySymbol || "MK",
       phone: data.phone ?? currentTenant.phone ?? "",
       address: data.address ?? currentTenant.address ?? "",
     }

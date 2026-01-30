@@ -123,7 +123,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
         await tenantService.update(currentTenant.id, {
           settings: {
             language: newLocale,
-          },
+          } as any,
         })
       } catch (error) {
         console.warn("Failed to save language preference to server:", error)

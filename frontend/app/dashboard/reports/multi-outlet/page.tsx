@@ -14,17 +14,13 @@ import {
 import { ReportFilters } from "@/components/reports/report-filters"
 import { Store, TrendingUp, Users, DollarSign, ShoppingCart, ArrowUpRight, ArrowDownRight } from "lucide-react"
 import { useState, useEffect } from "react"
-import { ExportReportModal } from "@/components/modals/export-report-modal"
-import { PrintReportModal } from "@/components/modals/print-report-modal"
-import { ReportSettingsModal } from "@/components/modals/report-settings-modal"
+import { DataExchangeModal } from "@/components/modals/data-exchange-modal"
 import { useBusinessStore } from "@/stores/businessStore"
 import { Badge } from "@/components/ui/badge"
 
 export default function MultiOutletReportsPage() {
   const { currentBusiness } = useBusinessStore()
   const [showExport, setShowExport] = useState(false)
-  const [showPrint, setShowPrint] = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
   const [outletData, setOutletData] = useState<any[]>([])
   const [summary, setSummary] = useState<any>({})
   const [isLoading, setIsLoading] = useState(true)
@@ -124,8 +120,8 @@ export default function MultiOutletReportsPage() {
 
         <ReportFilters
           onExport={() => setShowExport(true)}
-          onPrint={() => setShowPrint(true)}
-          onSettings={() => setShowSettings(true)}
+          onPrint={() => {}}
+          onSettings={() => {}}
         />
 
         {/* Summary Stats */}
@@ -318,16 +314,13 @@ export default function MultiOutletReportsPage() {
         open={showExport}
         onOpenChange={setShowExport}
         type="export"
-        config={dataExchangeConfigs.reports}
-      />
-      <PrintReportModal
-        open={showPrint}
-        onOpenChange={setShowPrint}
-        reportType="Multi-Outlet Report"
-      />
-      <ReportSettingsModal
-        open={showSettings}
-        onOpenChange={setShowSettings}
+        config={{
+          entityType: "reports",
+          fields: [],
+          requiredFields: [],
+          defaultFormat: "xlsx",
+          apiEndpoints: { import: "/api/reports/import", export: "/api/reports/export" }
+        }}
       />
       </PageLayout>
     </DashboardLayout>

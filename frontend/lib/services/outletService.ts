@@ -27,7 +27,6 @@ export const outletService = {
         name: outlet.name,
         address: outlet.address || "",
         phone: outlet.phone || "",
-        email: outlet.email || "",
         isActive: outlet.is_active !== undefined ? outlet.is_active : (outlet.isActive !== undefined ? outlet.isActive : true),
         createdAt: outlet.created_at || outlet.createdAt || new Date().toISOString(),
       } as Outlet
@@ -57,7 +56,7 @@ export const outletService = {
   async create(data: Partial<Outlet>): Promise<Outlet> {
     // Transform frontend data to backend format
     // Backend expects tenant as FK (integer ID or object)
-    const tenantId = data.tenant || data.businessId
+    const tenantId = data.businessId
     
     if (!tenantId) {
       throw new Error("Business ID (tenant) is required to create an outlet.")
@@ -79,8 +78,7 @@ export const outletService = {
       name: data.name?.trim() || "",
       address: data.address?.trim() || "",
       phone: data.phone?.trim() || "",
-      email: data.email?.trim() || "",
-      is_active: data.isActive !== undefined ? data.isActive : (data.is_active !== undefined ? data.is_active : true),
+      is_active: data.isActive !== undefined ? data.isActive : true,
     }
     
     // Validate required fields
@@ -138,14 +136,9 @@ export const outletService = {
     if (data.phone !== undefined) {
       backendData.phone = data.phone.trim() || ""
     }
-    if (data.email !== undefined) {
-      backendData.email = data.email.trim() || ""
-    }
     // Always include is_active if provided, even if false
     if (data.isActive !== undefined) {
       backendData.is_active = data.isActive
-    } else if (data.is_active !== undefined) {
-      backendData.is_active = data.is_active
     }
     
     // Validate required fields if name is being updated
@@ -201,7 +194,8 @@ export const outletService = {
   async getTills(outletId: string): Promise<Till[]> {
     const response = await api.get<any>(`${apiEndpoints.outlets.get(outletId)}tills/`)
     // Transform backend response to frontend format
-    return Array.isArray(response) ? response : (response.results || []).map((till: any) => ({
+    const tills = Array.isArray(response) ? response : (response.results || [])
+    return tills.map((till: any) => ({
       id: String(till.id),
       name: till.name,
       outlet: String(till.outlet?.id || till.outlet || ""),

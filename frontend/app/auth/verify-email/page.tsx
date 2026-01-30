@@ -6,9 +6,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Mail, CheckCircle2, AlertCircle } from "lucide-react"
-import { useState } from "react"
+import { useState, Suspense } from "react"
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get("token")
@@ -126,6 +126,14 @@ export default function VerifyEmailPage() {
         </CardFooter>
       </Card>
     </AuthLayout>
+  )
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={<AuthLayout><Card><CardContent className="p-6 text-center">Loading...</CardContent></Card></AuthLayout>}>
+      <VerifyEmailContent />
+    </Suspense>
   )
 }
 

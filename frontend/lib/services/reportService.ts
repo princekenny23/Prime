@@ -94,7 +94,7 @@ export const reportService = {
     
     const query = params.toString()
     try {
-      const response = await api.get(`${apiEndpoints.reports.sales}${query ? `?${query}` : ""}`)
+      const response = await api.get<any>(`${apiEndpoints.reports.sales}${query ? `?${query}` : ""}`)
       return Array.isArray(response) ? response : response.results || []
     } catch (error) {
       console.error("Failed to fetch sales report:", error)
@@ -112,7 +112,7 @@ export const reportService = {
     
     const query = params.toString()
     try {
-      const response = await api.get(`${apiEndpoints.reports.products}${query ? `?${query}` : ""}`)
+      const response = await api.get<any>(`${apiEndpoints.reports.products}${query ? `?${query}` : ""}`)
       return Array.isArray(response) ? response : response.results || []
     } catch (error) {
       console.error("Failed to fetch product report:", error)
@@ -129,7 +129,7 @@ export const reportService = {
     
     const query = params.toString()
     try {
-      const response = await api.get(`${apiEndpoints.reports.customers}${query ? `?${query}` : ""}`)
+      const response = await api.get<any>(`${apiEndpoints.reports.customers}${query ? `?${query}` : ""}`)
       return Array.isArray(response) ? response : response.results || []
     } catch (error) {
       console.error("Failed to fetch customer report:", error)
@@ -146,7 +146,7 @@ export const reportService = {
     
     const query = params.toString()
     try {
-      return await api.get(`${apiEndpoints.reports.profitLoss}${query ? `?${query}` : ""}`)
+      return await api.get<any>(`${apiEndpoints.reports.profitLoss}${query ? `?${query}` : ""}`)
     } catch (error) {
       console.error("Failed to fetch profit & loss:", error)
       return null
@@ -162,7 +162,7 @@ export const reportService = {
     
     const query = params.toString()
     try {
-      return await api.get(`${apiEndpoints.reports.inventoryValuation}${query ? `?${query}` : ""}`)
+      return await api.get<any>(`${apiEndpoints.reports.inventoryValuation}${query ? `?${query}` : ""}`)
     } catch (error) {
       console.error("Failed to fetch inventory valuation report:", error)
       return null
@@ -175,7 +175,7 @@ export const reportService = {
     
     const query = params.toString()
     try {
-      return await api.get(`${apiEndpoints.reports.dailySales}${query ? `?${query}` : ""}`)
+      return await api.get<any>(`${apiEndpoints.reports.dailySales}${query ? `?${query}` : ""}`)
     } catch (error) {
       console.error("Failed to fetch daily sales report:", error)
       return null
@@ -190,7 +190,7 @@ export const reportService = {
     
     const query = params.toString()
     try {
-      return await api.get(`${apiEndpoints.reports.topProducts}${query ? `?${query}` : ""}`)
+      return await api.get<any>(`${apiEndpoints.reports.topProducts}${query ? `?${query}` : ""}`)
     } catch (error) {
       console.error("Failed to fetch top products report:", error)
       return null
@@ -203,7 +203,7 @@ export const reportService = {
     
     const query = params.toString()
     try {
-      return await api.get(`${apiEndpoints.reports.cashSummary}${query ? `?${query}` : ""}`)
+      return await api.get<any>(`${apiEndpoints.reports.cashSummary}${query ? `?${query}` : ""}`)
     } catch (error) {
       console.error("Failed to fetch cash summary report:", error)
       return null
@@ -217,7 +217,7 @@ export const reportService = {
     
     const query = params.toString()
     try {
-      return await api.get(`${apiEndpoints.reports.shiftSummary}${query ? `?${query}` : ""}`)
+      return await api.get<any>(`${apiEndpoints.reports.shiftSummary}${query ? `?${query}` : ""}`)
     } catch (error) {
       console.error("Failed to fetch shift summary report:", error)
       return null

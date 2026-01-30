@@ -19,6 +19,7 @@ export interface SaleFilters {
   tenant?: string
   businessId?: string
   limit?: number
+  customer?: string
 }
 
 export interface CreateSaleData {

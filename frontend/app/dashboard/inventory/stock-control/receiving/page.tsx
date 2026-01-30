@@ -116,9 +116,9 @@ export default function ReceivingPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [currentBusiness?.id, useReal])
-
-  useEffect(() => {
+  }, [currentBusiness, useReal, outlets])
+  
+  const handleOutletChange = useCallback(async () => {
     if (currentBusiness) {
       loadReceiving()
       
@@ -131,7 +131,8 @@ export default function ReceivingPage() {
         window.removeEventListener("outlet-changed", handleOutletChange)
       }
     }
-  }, [currentBusiness?.id, loadReceiving])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentBusiness?.id])
 
   const filteredReceiving = receiving.filter(order =>
     order.supplier?.toLowerCase().includes(searchTerm.toLowerCase()) ||

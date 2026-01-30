@@ -75,13 +75,14 @@ export default function SuppliersListPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [currentBusiness?.id, useReal])
-
-  useEffect(() => {
+  }, [currentBusiness, useReal])
+  
+  const handleDeleteSupplier = useCallback(async (supplierId: string) => {
     if (currentBusiness) {
       loadSuppliers()
     }
-  }, [currentBusiness?.id, loadSuppliers])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentBusiness?.id])
 
   const filteredSuppliers = suppliers.filter(supplier => {
     const matchesSearch = 

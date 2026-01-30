@@ -19,15 +19,9 @@ interface Outlet {
   id: string
   tenantId: string
   name: string
-  address: string
-  phone: string
-  email: string
+  address?: string
+  phone?: string
   isActive: boolean
-  settings?: {
-    printerSetup?: string
-    posMode?: string
-    receiptTemplate?: string
-  }
 }
 
 interface TenantContextType {
@@ -137,9 +131,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
                   name: o.name,
                   address: o.address || "",
                   phone: o.phone || "",
-                  email: o.email || "",
                   is_active: o.isActive !== undefined ? o.isActive : true,
-                  settings: o.settings || {},
                 }))
                 console.log("Using outlets from outlet service:", tenantOutlets.length)
               }
@@ -170,9 +162,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
               name: o.name,
               address: o.address || "",
               phone: o.phone || "",
-              email: o.email || "",
               isActive: o.is_active !== undefined ? o.is_active : (o.isActive !== undefined ? o.isActive : true),
-              settings: o.settings || {},
             }
           })
           
@@ -194,7 +184,6 @@ export function TenantProvider({ children }: { children: ReactNode }) {
               address: o.address,
               phone: o.phone,
               isActive: o.isActive,
-              settings: o.settings,
               createdAt: new Date().toISOString(),
             })) })
           }
@@ -221,7 +210,6 @@ export function TenantProvider({ children }: { children: ReactNode }) {
               address: defaultOutlet.address,
               phone: defaultOutlet.phone,
               isActive: defaultOutlet.isActive,
-              settings: defaultOutlet.settings,
               createdAt: new Date().toISOString(),
             } })
           } else {
@@ -249,9 +237,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           name: o.name,
           address: o.address || "",
           phone: o.phone || "",
-          email: o.email || "",
           isActive: o.isActive,
-          settings: o.settings,
         }))
         setOutlets(loadedOutlets)
         
@@ -262,9 +248,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
             name: store.currentOutlet.name,
             address: store.currentOutlet.address || "",
             phone: store.currentOutlet.phone || "",
-            email: store.currentOutlet.email || "",
             isActive: store.currentOutlet.isActive,
-            settings: store.currentOutlet.settings,
           })
         } else if (loadedOutlets.length > 0) {
           const defaultOutlet = loadedOutlets.find(o => o.isActive) || loadedOutlets[0]
@@ -307,7 +291,6 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         address: outlet.address,
         phone: outlet.phone,
         isActive: outlet.isActive,
-        settings: outlet.settings,
         createdAt: new Date().toISOString(),
       }
     })
@@ -356,9 +339,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
             name: o.name,
             address: o.address || "",
             phone: o.phone || "",
-            email: o.email || "",
             isActive: o.isActive,
-            settings: o.settings || {},
           }))
           setOutlets(transformedOutlets)
           

@@ -13,7 +13,7 @@ const nextConfig = {
   },
   // Optimize build performance
   experimental: {
-    optimizeCss: true,
+    // optimizeCss: true, // Disabled - requires critters package
   },
   // Exclude backend and other non-frontend files from webpack
   webpack: (config, { isServer }) => {

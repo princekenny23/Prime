@@ -45,7 +45,6 @@ export function AddEditOutletModal({
     name: "",
     address: "",
     phone: "",
-    email: "",
     isActive: true,
   })
 
@@ -57,7 +56,6 @@ export function AddEditOutletModal({
           name: outlet.name || "",
           address: outlet.address || "",
           phone: outlet.phone || "",
-          email: outlet.email || "",
           isActive: outlet.isActive !== undefined ? outlet.isActive : true,
         })
       } else {
@@ -65,7 +63,6 @@ export function AddEditOutletModal({
           name: "",
           address: "",
           phone: "",
-          email: "",
           isActive: true,
         })
       }
@@ -102,7 +99,6 @@ export function AddEditOutletModal({
           name: formData.name,
           address: formData.address,
           phone: formData.phone,
-          email: formData.email,
           isActive: formData.isActive,
         })
         toast({
@@ -116,7 +112,6 @@ export function AddEditOutletModal({
           name: formData.name,
           address: formData.address,
           phone: formData.phone,
-          email: formData.email,
           isActive: formData.isActive,
         })
         toast({
@@ -197,17 +192,6 @@ export function AddEditOutletModal({
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="Enter phone number"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="Enter email address"
               />
             </div>
 

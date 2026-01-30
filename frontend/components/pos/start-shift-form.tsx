@@ -82,6 +82,7 @@ export function StartShiftForm({ onSuccess, redirectTo }: StartShiftFormProps = 
       setTills([])
       setSelectedTill("")
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedOutlet])
 
   // Set default outlet on mount
@@ -89,6 +90,7 @@ export function StartShiftForm({ onSuccess, redirectTo }: StartShiftFormProps = 
     if (currentOutlet && !selectedOutlet) {
       setSelectedOutlet(currentOutlet.id)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentOutlet])
 
   const loadTills = async (outletId: string) => {

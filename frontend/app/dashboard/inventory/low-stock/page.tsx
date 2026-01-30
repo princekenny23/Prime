@@ -113,6 +113,7 @@ export default function LowStockPage() {
       clearInterval(interval)
       window.removeEventListener("outlet-changed", handleOutletChange)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [outlet])
 
   const handleRefresh = async () => {
@@ -220,7 +221,7 @@ export default function LowStockPage() {
             )}
           </div>
           <p className="text-sm text-gray-600 mb-6">
-            Items that need to be reordered. Click "Order Item" to create a purchase order.
+            Items that need to be reordered. Click &quot;Order Item&quot; to create a purchase order.
           </p>
           {isLoadingLowStock ? (
             <div className="text-center py-8">

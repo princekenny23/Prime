@@ -29,6 +29,7 @@ export default function QzSettings() {
         setAutoConnect(parsed.autoConnect ?? true)
       }
     } catch (e) {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const save = () => {

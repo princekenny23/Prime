@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { PackageCheck, Plus, Trash2 } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { inventoryService } from "@/lib/services/inventoryService"
 import { productService } from "@/lib/services/productService"
@@ -51,23 +51,7 @@ export function ReceiveStockModal({ open, onOpenChange, onSuccess }: ReceiveStoc
   const [supplier, setSupplier] = useState("")
   const [reason, setReason] = useState("")
 
-  useEffect(() => {
-    if (open) {
-      loadProducts()
-      // Initialize with one empty item
-      setReceiveItems([{
-        id: Date.now().toString(),
-        product_id: "",
-        quantity: "",
-        cost: "",
-      }])
-      setOutletId("")
-      setSupplier("")
-      setReason("")
-    }
-  }, [open])
-
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     setLoadingProducts(true)
     try {
       const response = await productService.list({ is_active: true })
@@ -82,7 +66,29 @@ export function ReceiveStockModal({ open, onOpenChange, onSuccess }: ReceiveStoc
     } finally {
       setLoadingProducts(false)
     }
-  }
+  }, [toast])
+
+  useEffect(() => {
+    if (open) {
+      loadProducts()
+      // Initialize with one empty item
+      setReceiveItems([{
+        id: Date.now().toString(),
+        product_id: "",
+        quantity: "",
+        cost: "",
+      }])
+      setOutletId("")
+      setSupplier("")
+      setReason("")
+    }
+  }, [open, loadProducts])
+
+  useEffect(() => {
+    if (open) {
+      loadProducts()
+    }
+  }, [open, loadProducts])
 
   const addReceiveItem = () => {
     setReceiveItems([...receiveItems, {

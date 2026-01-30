@@ -124,7 +124,7 @@ export default function SetupBusinessPage() {
             <CardTitle className="text-2xl">Setup Your Business</CardTitle>
           </div>
           <CardDescription>
-            Let's get started by setting up your business profile
+            Let&apos;s get started by setting up your business profile
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -273,6 +273,7 @@ export default function SetupBusinessPage() {
                 checked={acceptedTerms}
                 onChange={(e) => setAcceptedTerms(e.target.checked)}
                 className="mt-1"
+                aria-label="Accept terms and conditions"
                 required
               />
               <Label htmlFor="accept-terms" className="text-sm cursor-pointer">

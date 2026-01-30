@@ -281,7 +281,8 @@ export function BarPOS() {
     
     setIsSearchingCustomers(true)
     try {
-      const customers = await customerService.list({ search: term })
+      const response = await customerService.list({ search: term })
+      const customers = Array.isArray(response) ? response : response.results
       setCustomerSearchResults(customers.slice(0, 10)) // Limit to 10 results
     } catch (error) {
       console.error("Failed to search customers:", error)

@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { inventoryService } from "@/lib/services/inventoryService"
 import { productService } from "@/lib/services/productService"
@@ -63,6 +63,23 @@ export function StockAdjustmentModal({ open, onOpenChange, onSuccess }: StockAdj
 
   const outlet = tenantOutlet || currentOutlet
 
+  const loadProducts = useCallback(async () => {
+    setLoadingProducts(true)
+    try {
+      const response = await productService.list({ is_active: true })
+      setProducts(response.results || [])
+    } catch (error) {
+      console.error("Failed to load products:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load products. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingProducts(false)
+    }
+  }, [toast])
+
   useEffect(() => {
     if (open) {
       loadProducts()
@@ -91,24 +108,13 @@ export function StockAdjustmentModal({ open, onOpenChange, onSuccess }: StockAdj
       setSearchTerm("")
       setShowProductSearch(false)
     }
-  }, [open, outlet, outlets])
+  }, [open, outlet, outlets, loadProducts])
 
-  const loadProducts = async () => {
-    setLoadingProducts(true)
-    try {
-      const response = await productService.list({ is_active: true })
-      setProducts(response.results || [])
-    } catch (error) {
-      console.error("Failed to load products:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load products. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoadingProducts(false)
+  useEffect(() => {
+    if (open) {
+      loadProducts()
     }
-  }
+  }, [open, loadProducts])
 
   const addAdjustmentItem = () => {
     setAdjustmentItems([...adjustmentItems, {
@@ -419,7 +425,7 @@ export function StockAdjustmentModal({ open, onOpenChange, onSuccess }: StockAdj
                 {adjustmentItems.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground border rounded-lg">
                     <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>No items added. Click "Add Product" to add products.</p>
+                    <p>No items added. Click &quot;Add Product&quot; to add products.</p>
                   </div>
                 ) : (
                   adjustmentItems.map((item, index) => {

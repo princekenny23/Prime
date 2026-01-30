@@ -270,13 +270,7 @@ export function OutletList(props: OutletListProps = {}) {
                             <span>{outlet.phone}</span>
                           </div>
                         )}
-                        {outlet.email && (
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <Mail className="h-3 w-3" />
-                            <span className="max-w-[150px] truncate">{outlet.email}</span>
-                          </div>
-                        )}
-                        {!outlet.phone && !outlet.email && (
+                        {!outlet.phone && (
                           <span className="text-muted-foreground text-xs">No contact info</span>
                         )}
                       </div>

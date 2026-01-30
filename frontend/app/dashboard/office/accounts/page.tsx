@@ -91,7 +91,7 @@ export default function AccountsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [currentBusiness?.id, useReal])
+  }, [currentBusiness, useReal])
 
   const loadRoles = useCallback(async () => {
     if (!currentBusiness) {
@@ -110,14 +110,14 @@ export default function AccountsPage() {
       console.error("Failed to load roles:", error)
       setRoles([])
     }
-  }, [currentBusiness?.id, useReal])
-
-  useEffect(() => {
+  }, [currentBusiness, useReal])
+  
+  const handleEditRole = useCallback(async (roleId: string) => {
     if (currentBusiness) {
       loadUsers()
       loadRoles()
     }
-  }, [currentBusiness?.id, loadUsers, loadRoles])
+  }, [currentBusiness, loadUsers, loadRoles])
 
   const filteredUsers = useMemo(() => {
     return users.filter(user => {

@@ -14,9 +14,10 @@ import {
 import { ReportFilters } from "@/components/reports/report-filters"
 import { DollarSign, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, PieChart } from "lucide-react"
 import { useState, useEffect } from "react"
-import { ExportReportModal } from "@/components/modals/export-report-modal"
+import { DataExchangeModal } from "@/components/modals/data-exchange-modal"
 import { PrintReportModal } from "@/components/modals/print-report-modal"
 import { ReportSettingsModal } from "@/components/modals/report-settings-modal"
+import { dataExchangeConfigs } from "@/lib/utils/data-exchange-config"
 import { useBusinessStore } from "@/stores/businessStore"
 
 export default function FinancialReportsPage() {

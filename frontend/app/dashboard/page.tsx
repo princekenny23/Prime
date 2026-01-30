@@ -144,7 +144,7 @@ export default function DashboardPage() {
       window.removeEventListener("outlet-changed", handleOutletChange)
       window.removeEventListener("sale-completed", handleSaleCompleted)
     }
-  }, [currentBusiness?.id, outletId, loadDashboardData])
+  }, [currentBusiness, outletId, loadDashboardData])
 
   const [recentSales, setRecentSales] = useState<any[]>([])
   const recentSalesIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -190,7 +190,7 @@ export default function DashboardPage() {
       }
       window.removeEventListener("sale-completed", handleSaleCompleted)
     }
-  }, [currentBusiness?.id, outletId, loadRecentSales])
+  }, [currentBusiness, outletId, loadRecentSales])
 
   const handleViewSale = useCallback(async (saleId: string) => {
     try {

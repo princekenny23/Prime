@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { User, Mail, Phone, Shield, MapPin } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { staffService, roleService, type Staff, type Role } from "@/lib/services/staffService"
 import { outletService } from "@/lib/services/outletService"
@@ -48,6 +48,16 @@ export function AddEditStaffModal({ open, onOpenChange, staff, onSuccess }: AddE
     role_id: "",
     outlet_ids: [] as string[],
   })
+
+  const loadRoles = useCallback(async () => {
+    if (!currentBusiness) return
+    try {
+      const response = await roleService.list({ tenant: currentBusiness.id, is_active: true })
+      setRoles(response.results || [])
+    } catch (error) {
+      console.error("Failed to load roles:", error)
+    }
+  }, [currentBusiness])
 
   useEffect(() => {
     if (open) {
@@ -81,17 +91,7 @@ export function AddEditStaffModal({ open, onOpenChange, staff, onSuccess }: AddE
         })
       }
     }
-  }, [open, staff, currentBusiness])
-
-  const loadRoles = async () => {
-    if (!currentBusiness) return
-    try {
-      const response = await roleService.list({ tenant: currentBusiness.id, is_active: true })
-      setRoles(response.results || [])
-    } catch (error) {
-      console.error("Failed to load roles:", error)
-    }
-  }
+  }, [open, staff, currentBusiness, loadRoles])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
